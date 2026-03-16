@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Noto_Sans_Thai, Space_Grotesk } from "next/font/google";
+import {
+  IBM_Plex_Mono,
+  Playfair_Display,
+  Prompt,
+} from "next/font/google";
 import "./globals.css";
 
-const bodyFont = Noto_Sans_Thai({
+const bodyFont = Prompt({
   variable: "--font-body",
   subsets: ["thai", "latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-const headingFont = Space_Grotesk({
+const headingFont = Playfair_Display({
   variable: "--font-heading",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],

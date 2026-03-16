@@ -34,6 +34,8 @@ npm run lint
 npm run build
 ```
 
+Static export output is generated in `out/`.
+
 ## Where To Edit Data
 
 Project data lives in:
@@ -57,29 +59,46 @@ If those fields are still missing, the app uses a built-in preview fallback page
 - [src/app/preview/[projectSlug]/[documentId]/page.tsx](./src/app/preview/[projectSlug]/[documentId]/page.tsx) preview fallback
 - [src/lib/portal-styles.ts](./src/lib/portal-styles.ts) shared link/button styles
 
-## Recommended Deployment
+## Deploy To Cloudflare Pages
 
-- Source code on a private GitHub repository
-- Deploy on Cloudflare Pages
-- Protect `/studio/*` and `/p/*` with Cloudflare Access
-- Use R2 later only if PDF files become too large for your preferred Pages workflow
+This project is configured for static export:
+
+- Next config uses `output: "export"`
+- build output directory is `out`
+- Node version is pinned in `.node-version`
+
+Cloudflare Pages setup:
+
+1. Connect this GitHub repository to Cloudflare Pages.
+2. Set the production branch to `main`.
+3. Use `npm run build` as the build command.
+4. Use `out` as the build output directory.
+5. Deploy.
+
+After the first deploy, protect these paths with Cloudflare Access:
+
+- `/studio/*` for owner-only access
+- `/p/*` for client project access
+
+Use R2 later only if your PDF files become too large for your preferred Pages workflow.
 
 ## GitHub Push Checklist
 
-1. Create a new private repository on GitHub.
-2. Add the remote:
+1. Commit your changes:
 
 ```bash
-git remote add origin <your-repo-url>
+git add .
+git commit -m "Prepare client portal for deploy"
 ```
 
-3. Push the `main` branch:
+2. Push the `main` branch:
 
 ```bash
-git push -u origin main
+git push origin main
 ```
 
 ## Notes
 
 - The site is already configured with `noindex` metadata.
+- Static hosting headers are defined in [public/_headers](./public/_headers).
 - This repo currently does not include auth in application code. Access control should be enforced at Cloudflare Access.

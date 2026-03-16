@@ -52,8 +52,8 @@ const projects: ClientProject[] = [
     shareMode: "Cloudflare Access by email",
     viewerCount: 2,
     overview:
-      "บ้านพักอาศัย 2 ชั้นที่ต้องรวม moodboard, design update, revision archive, drawing set และ timeline ไว้ในลิงก์เดียวสำหรับลูกค้า.",
-    nextMilestone: "ส่ง Revise 03 และ drawing set สำหรับอนุมัติหน้างาน",
+      "บ้านพักอาศัย 2 ชั้นที่รวม Mood & Tone, Design, Construction Drawing และ BOQ ไว้ในลิงก์เดียว เพื่อให้ลูกค้าเลือกดูเป็นรายหมวดและราย revision ได้ทันที.",
+    nextMilestone: "ส่ง Revise 03 ของแบบและ BOQ สำหรับอนุมัติหน้างาน",
     ownerNote: "เมื่อลูกค้า approve รอบนี้ ค่อย export drawing เป็น PDF print ชุดเต็ม",
     sections: [
       {
@@ -62,19 +62,35 @@ const projects: ClientProject[] = [
         description: "ภาพรวมอารมณ์ วัสดุ และทิศทางงานก่อนเข้ารายละเอียดแบบจริง",
         items: [
           {
+            id: "mood-tone-v3",
+            title: "Warm Earth Interior Direction",
+            version: "Revise 03",
+            kind: "canva",
+            updatedAt: "2026-03-14",
+            summary: "เวอร์ชันล่าสุดสำหรับยืนยันโทนไม้ ผิววัสดุ และ lighting language ก่อนปิด concept.",
+            latest: true,
+          },
+          {
             id: "mood-tone-v2",
             title: "Warm Earth Interior Direction",
-            version: "Latest concept",
+            version: "Revise 02",
             kind: "canva",
-            updatedAt: "2026-03-12",
-            summary: "ใช้สำหรับยืนยันโทนสีหลัก วัสดุไม้ และ lighting language ก่อนปิด concept.",
-            latest: true,
+            updatedAt: "2026-03-07",
+            summary: "ปรับโทนสีผนังและ texture ของผ้าให้ใกล้กับ reference ที่ลูกค้าเลือก.",
+          },
+          {
+            id: "mood-tone-v1",
+            title: "Warm Earth Interior Direction",
+            version: "Revise 01",
+            kind: "canva",
+            updatedAt: "2026-02-28",
+            summary: "เวอร์ชันเริ่มต้นสำหรับเทียบ mood หลักและแนววัสดุของบ้าน.",
           },
         ],
       },
       {
         id: "design",
-        title: "Design Proposal",
+        title: "Design",
         description: "ไฟล์นำเสนอ layout, material direction และภาพรวมของแต่ละ space",
         items: [
           {
@@ -94,28 +110,13 @@ const projects: ClientProject[] = [
             updatedAt: "2026-03-03",
             summary: "เก็บไว้เป็น archive สำหรับย้อนกลับไปเทียบ before/after ของ feedback.",
           },
-        ],
-      },
-      {
-        id: "revisions",
-        title: "Revision Archive",
-        description: "เก็บเวอร์ชันเก่าย้อนหลังเพื่อให้ลูกค้าดูเฉพาะที่เกี่ยวข้องกับงานของตัวเอง",
-        items: [
           {
-            id: "revise-01",
-            title: "Revision Package",
+            id: "design-v1",
+            title: "Design Presentation",
             version: "Revise 01",
             kind: "pdf",
             updatedAt: "2026-02-21",
-            summary: "รวม feedback ชุดแรกจาก zoning และ furniture layout.",
-          },
-          {
-            id: "revise-02",
-            title: "Revision Package",
-            version: "Revise 02",
-            kind: "pdf",
-            updatedAt: "2026-03-03",
-            summary: "ปรับวัสดุ built-in และ ceiling detail ตามข้อเสนอแนะของลูกค้า.",
+            summary: "เวอร์ชันแรกหลังสรุป zoning และ furniture layout เบื้องต้น.",
           },
         ],
       },
@@ -125,29 +126,61 @@ const projects: ClientProject[] = [
         description: "ไฟล์หน้างานที่ลูกค้าและผู้รับเหมาควรเปิดดูจากเว็บหรือโหลดเป็น PDF ได้",
         items: [
           {
-            id: "cd-set-a",
+            id: "construction-v3",
             title: "Construction Drawing Set",
-            version: "Issue A",
+            version: "Revise 03",
             kind: "pdf",
             updatedAt: "2026-03-15",
             summary: "ชุด drawing ล่าสุดสำหรับ built-in, electrical จุดหลัก และ section ที่จำเป็น.",
             latest: true,
           },
+          {
+            id: "construction-v2",
+            title: "Construction Drawing Set",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-03-10",
+            summary: "ปรับ detail หน้างานของ built-in และ electrical point ตาม feedback รอบก่อน.",
+          },
+          {
+            id: "construction-v1",
+            title: "Construction Drawing Set",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-02",
+            summary: "ชุด drawing เริ่มต้นก่อนสรุปรายละเอียดและแก้หน้างาน.",
+          },
         ],
       },
       {
-        id: "timeline",
-        title: "Timeline",
-        description: "ลำดับงานก่อสร้างและรายการที่ต้อง approve เพื่อไม่ให้ schedule หลุด",
+        id: "boq",
+        title: "BOQ",
+        description: "รายการวัสดุและประมาณราคาเพื่อใช้ดู scope และงบประมาณของแต่ละ revision",
         items: [
           {
-            id: "timeline-master",
-            title: "Construction Timeline",
-            version: "Master timeline",
+            id: "boq-v3",
+            title: "BOQ Package",
+            version: "Revise 03",
             kind: "pdf",
-            updatedAt: "2026-03-10",
-            summary: "ใช้คุย milestone การสั่งของ, built-in production และ site handover.",
+            updatedAt: "2026-03-14",
+            summary: "อัปเดตราคาวัสดุ built-in, ผิวไม้ และรายการงานระบบตามแบบล่าสุด.",
             latest: true,
+          },
+          {
+            id: "boq-v2",
+            title: "BOQ Package",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-03-08",
+            summary: "เวอร์ชันกลางสำหรับเทียบต้นทุนก่อนสรุปรายการวัสดุจริง.",
+          },
+          {
+            id: "boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-01",
+            summary: "BOQ ชุดแรกสำหรับประเมินงบเบื้องต้นของโปรเจกต์นี้.",
           },
         ],
       },
@@ -166,7 +199,7 @@ const projects: ClientProject[] = [
     shareMode: "Cloudflare Access by one-time PIN",
     viewerCount: 1,
     overview:
-      "โครงการปรับห้องทำงานในบ้านให้พร้อมประชุมออนไลน์ ใช้ลิงก์เดียวรวม concept, design draft และ timeline เพื่อ review เร็ว.",
+      "โครงการปรับห้องทำงานในบ้านให้พร้อมประชุมออนไลน์ โดยแบ่งเอกสารเป็น Mood & Tone, Design, Construction Drawing และ BOQ เพื่อ review เป็นชั้น ๆ.",
     nextMilestone: "รอ approve moodboard และ final design direction",
     ownerNote: "ลูกค้าเปิดดูจากมือถือบ่อย ต้องเช็กทุก document ว่าอ่านง่ายบนจอเล็ก",
     sections: [
@@ -176,52 +209,76 @@ const projects: ClientProject[] = [
         description: "ตัวเลือกโทนอบอุ่นและโทนสว่างสำหรับพื้นที่ทำงาน",
         items: [
           {
-            id: "mood-tone-v1",
+            id: "office-mood-v2",
             title: "Nordic Calm Palette",
-            version: "Concept 01",
+            version: "Revise 02",
             kind: "canva",
-            updatedAt: "2026-03-05",
+            updatedAt: "2026-03-08",
             summary: "โทนไม้สว่าง ผนัง warm white และ accent สีเขียวอมเทา.",
             latest: true,
           },
           {
-            id: "mood-tone-v2",
+            id: "office-mood-v1",
             title: "Soft Contrast Palette",
-            version: "Concept 02",
+            version: "Revise 01",
             kind: "canva",
-            updatedAt: "2026-03-08",
+            updatedAt: "2026-03-05",
             summary: "ทางเลือกที่ contrast มากขึ้นสำหรับ background ใน video call.",
           },
         ],
       },
       {
         id: "design",
-        title: "Design Draft",
+        title: "Design",
         description: "ชุด layout และมุมมองหลักก่อนปิดแบบ",
         items: [
           {
-            id: "design-draft-v1",
+            id: "office-design-v2",
             title: "Draft Layout Pack",
-            version: "Draft 01",
+            version: "Revise 02",
             kind: "pdf",
             updatedAt: "2026-03-08",
             summary: "รวม layout, shelving idea และการจัดแสงสำหรับ work focus.",
             latest: true,
           },
+          {
+            id: "office-design-v1",
+            title: "Draft Layout Pack",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-06",
+            summary: "แบบร่างรอบแรกก่อนปรับขนาด shelving และมุมกล้องสำหรับ video call.",
+          },
         ],
       },
       {
-        id: "timeline",
-        title: "Timeline",
-        description: "ช่วงเวลา design freeze, production และ install",
+        id: "construction",
+        title: "Construction Drawing",
+        description: "แบบก่อสร้างหลักสำหรับเฟอร์นิเจอร์บิวท์อินและระบบไฟ",
         items: [
           {
-            id: "timeline-light",
-            title: "Mini Timeline",
-            version: "Planning",
+            id: "office-construction-v1",
+            title: "Home Office Drawing Set",
+            version: "Revise 01",
             kind: "pdf",
-            updatedAt: "2026-03-06",
-            summary: "ใช้กำหนดวันปิดแบบและวันเริ่มติดตั้งเฟอร์นิเจอร์บิวท์อิน.",
+            updatedAt: "2026-03-08",
+            summary: "แบบ built-in, จุดปลั๊ก และ elevation หลักของพื้นที่ทำงาน.",
+            latest: true,
+          },
+        ],
+      },
+      {
+        id: "boq",
+        title: "BOQ",
+        description: "ประมาณราคาและรายการวัสดุสำหรับสรุปงบก่อนเริ่มผลิต",
+        items: [
+          {
+            id: "office-boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-07",
+            summary: "BOQ สำหรับ built-in shelf, โต๊ะทำงาน และไฟตกแต่งชุดแรก.",
             latest: true,
           },
         ],
@@ -241,23 +298,55 @@ const projects: ClientProject[] = [
     shareMode: "Cloudflare Access by email",
     viewerCount: 3,
     overview:
-      "รีโนเวตร้านกาแฟขนาดกลางโดยใช้ portal สำหรับแชร์ drawing หน้างาน, design update และ schedule ให้เจ้าของร้านดูได้จากลิงก์เดียว.",
-    nextMilestone: "ส่ง issue B ก่อนเริ่มงาน built-in counter",
+      "รีโนเวตร้านกาแฟขนาดกลางโดยแยกเอกสารเป็น Mood & Tone, Design, Construction Drawing และ BOQ เพื่อให้เจ้าของร้านไล่ดูเป็น revision ได้ง่าย.",
+    nextMilestone: "ส่ง revise ชุดล่าสุดก่อนเริ่มงาน built-in counter",
     ownerNote: "ถ้า drawing set ชุดถัดไปเกิน 25MB ให้ย้ายไฟล์ PDF ไป R2 แล้วใช้ path เดิมใน portal",
     sections: [
+      {
+        id: "mood-tone",
+        title: "Mood & Tone",
+        description: "โทนวัสดุและบรรยากาศร้านก่อนปิดแบบใช้งานจริง",
+        items: [
+          {
+            id: "cafe-mood-v2",
+            title: "Cafe Material Direction",
+            version: "Revise 02",
+            kind: "canva",
+            updatedAt: "2026-03-07",
+            summary: "คุมโทนไม้เข้ม ผนังปูน และแสง warm dim เพื่อรองรับภาพลักษณ์ร้าน.",
+            latest: true,
+          },
+          {
+            id: "cafe-mood-v1",
+            title: "Cafe Material Direction",
+            version: "Revise 01",
+            kind: "canva",
+            updatedAt: "2026-02-26",
+            summary: "เวอร์ชันแรกสำหรับเทียบ mood ของ bar counter และ facade.",
+          },
+        ],
+      },
       {
         id: "design",
         title: "Design",
         description: "งานนำเสนอภาพรวมร้าน, zoning และ material update",
         items: [
           {
-            id: "design-v4",
+            id: "cafe-design-v2",
             title: "Cafe Design Update",
-            version: "Revise 04",
+            version: "Revise 02",
             kind: "pdf",
             updatedAt: "2026-03-09",
             summary: "เวอร์ชันที่ปิดรายละเอียด facade, bar counter และ seating mix แล้ว.",
             latest: true,
+          },
+          {
+            id: "cafe-design-v1",
+            title: "Cafe Design Update",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-01",
+            summary: "รอบแรกหลังสรุป zoning ของ counter, service และ guest seating.",
           },
         ],
       },
@@ -267,18 +356,18 @@ const projects: ClientProject[] = [
         description: "drawing หน้างานสำหรับผู้รับเหมาและลูกค้าเปิดดูในเว็บได้ทันที",
         items: [
           {
-            id: "cd-set-b",
+            id: "cafe-construction-v2",
             title: "Construction Drawing Set",
-            version: "Issue B",
+            version: "Revise 02",
             kind: "pdf",
             updatedAt: "2026-03-15",
             summary: "รวม plan, reflected ceiling plan, counter section และ signage details.",
             latest: true,
           },
           {
-            id: "cd-set-a",
+            id: "cafe-construction-v1",
             title: "Construction Drawing Set",
-            version: "Issue A",
+            version: "Revise 01",
             kind: "pdf",
             updatedAt: "2026-02-28",
             summary: "เก็บไว้ให้ทีมย้อนเช็ก version เดิมก่อนแก้ issue ใหม่.",
@@ -286,18 +375,26 @@ const projects: ClientProject[] = [
         ],
       },
       {
-        id: "timeline",
-        title: "Timeline",
-        description: "แผนงาน renovation, procurement และ site handover",
+        id: "boq",
+        title: "BOQ",
+        description: "รายการวัสดุและประมาณราคาเพื่อใช้อนุมัติงบและ scope งานร้าน",
         items: [
           {
-            id: "timeline-site",
-            title: "Site Timeline",
-            version: "Execution",
+            id: "cafe-boq-v2",
+            title: "BOQ Package",
+            version: "Revise 02",
             kind: "pdf",
-            updatedAt: "2026-03-11",
-            summary: "ใช้ track งานรื้อ, built-in production, install และ soft opening.",
+            updatedAt: "2026-03-12",
+            summary: "เวอร์ชันล่าสุดของงบ built-in counter, loose furniture และงาน signage.",
             latest: true,
+          },
+          {
+            id: "cafe-boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-03",
+            summary: "BOQ รอบแรกสำหรับเทียบต้นทุนก่อนตัดสินใจเลือกวัสดุ final.",
           },
         ],
       },
@@ -314,7 +411,9 @@ export function getProjectBySlug(slug: string) {
 }
 
 export function getProjectDocument(project: ClientProject, documentId: string) {
-  return project.sections.flatMap((section) => section.items).find((item) => item.id === documentId);
+  return project.sections
+    .flatMap((section) => section.items)
+    .find((item) => item.id === documentId);
 }
 
 export function getProjectDocumentCount(project: ClientProject) {
@@ -323,7 +422,9 @@ export function getProjectDocumentCount(project: ClientProject) {
 
 export function getLatestDocuments(project: ClientProject) {
   const marked = project.sections
-    .flatMap((section) => section.items.map((item) => ({ ...item, sectionTitle: section.title })))
+    .flatMap((section) =>
+      section.items.map((item) => ({ ...item, sectionTitle: section.title })),
+    )
     .filter((item) => item.latest);
 
   if (marked.length > 0) {
