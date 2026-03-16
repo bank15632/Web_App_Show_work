@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Studio Client Rooms
 
-## Getting Started
+Private-by-link client portal for interior design work.
 
-First, run the development server:
+This project is built with Next.js App Router, Tailwind CSS v4, and shadcn/ui. It is designed for:
+
+- an owner-only dashboard at `/studio`
+- client-facing project rooms at `/p/[slug]`
+- grouped documents for `Mood & Tone`, `Design`, `Revision`, `Construction Drawing`, and `Timeline`
+- viewing files inside the web page first, then downloading PDF when needed
+- deployment behind Cloudflare Pages + Cloudflare Access
+
+## Current Routes
+
+- `/` overview page for the system
+- `/studio` owner dashboard
+- `/p/riverside-residence-b7x2` sample client room
+- `/p/nordic-home-office-l2k7` sample client room
+- `/p/atelier-cafe-renovation-m4p1` sample client room
+
+## Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run build
+```
 
-## Learn More
+## Where To Edit Data
 
-To learn more about Next.js, take a look at the following resources:
+Project data lives in:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [src/lib/portal-data.ts](./src/lib/portal-data.ts)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Replace the sample project entries with your real projects.
 
-## Deploy on Vercel
+For each document, you can later add:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `viewerUrl` for Canva embed URLs or PDF viewer URLs
+- `downloadUrl` for downloadable PDF links
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+If those fields are still missing, the app uses a built-in preview fallback page.
+
+## Key Files
+
+- [src/app/page.tsx](./src/app/page.tsx) overview / landing
+- [src/app/studio/page.tsx](./src/app/studio/page.tsx) owner dashboard
+- [src/app/p/[slug]/page.tsx](./src/app/p/[slug]/page.tsx) client room template
+- [src/app/preview/[projectSlug]/[documentId]/page.tsx](./src/app/preview/[projectSlug]/[documentId]/page.tsx) preview fallback
+- [src/lib/portal-styles.ts](./src/lib/portal-styles.ts) shared link/button styles
+
+## Recommended Deployment
+
+- Source code on a private GitHub repository
+- Deploy on Cloudflare Pages
+- Protect `/studio/*` and `/p/*` with Cloudflare Access
+- Use R2 later only if PDF files become too large for your preferred Pages workflow
+
+## GitHub Push Checklist
+
+1. Create a new private repository on GitHub.
+2. Add the remote:
+
+```bash
+git remote add origin <your-repo-url>
+```
+
+3. Push the `main` branch:
+
+```bash
+git push -u origin main
+```
+
+## Notes
+
+- The site is already configured with `noindex` metadata.
+- This repo currently does not include auth in application code. Access control should be enforced at Cloudflare Access.
