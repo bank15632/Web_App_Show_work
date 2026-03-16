@@ -59,7 +59,7 @@ If those fields are still missing, the app uses a built-in preview fallback page
 - [src/app/preview/[projectSlug]/[documentId]/page.tsx](./src/app/preview/[projectSlug]/[documentId]/page.tsx) preview fallback
 - [src/lib/portal-styles.ts](./src/lib/portal-styles.ts) shared link/button styles
 
-## Deploy To Cloudflare Pages
+## Deploy To Cloudflare
 
 This project is configured for static export:
 
@@ -81,6 +81,8 @@ After the first deploy, protect these paths with Cloudflare Access:
 - `/p/*` for client project access
 
 Use R2 later only if your PDF files become too large for your preferred Pages workflow.
+
+If you deploy through Cloudflare Workers Builds instead of Pages, this repository also includes [wrangler.jsonc](./wrangler.jsonc) so `npx wrangler deploy` will publish the static `out` directory as assets.
 
 ## GitHub Push Checklist
 
