@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Download, Eye } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 
 import { DocumentPreview } from "@/components/portal/document-preview";
 import { Badge } from "@/components/ui/badge";
@@ -92,16 +91,6 @@ export function ProjectDocumentBrowser({
         <div className="mx-auto max-w-7xl px-5 md:px-8 xl:px-12">
           <div className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3 overflow-x-auto">
-              <Link
-                href="/studio"
-                className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-muted-foreground"
-              >
-                <ArrowLeft className="size-4" />
-                ย้อนกลับ
-              </Link>
-
-              <div className="hidden h-5 w-px bg-border lg:block" />
-
               <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
                 {categories.map((category) => (
                   <Button
