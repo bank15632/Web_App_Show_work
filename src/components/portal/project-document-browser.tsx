@@ -64,22 +64,41 @@ export function ProjectDocumentBrowser({
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedRevision, setExpandedRevision] = useState<string | null>(null);
+  const [expandedRoom, setExpandedRoom] = useState<string | null>(null);
 
   function handleCategoryChange(category: AvailableCategory) {
     setActiveCategoryId(category.id);
     setActiveDocumentId(getDefaultDocumentId(category.section));
     setDropdownOpen(false);
     setExpandedRevision(null);
+    setExpandedRoom(null);
   }
 
   function selectRevision(doc: ProjectDocument) {
     setActiveDocumentId(doc.id);
     setDropdownOpen(false);
     setExpandedRevision(null);
+    setExpandedRoom(null);
   }
 
   function toggleRevisionExpand(docId: string) {
     setExpandedRevision((prev) => (prev === docId ? null : docId));
+    setExpandedRoom(null);
+  }
+
+  function toggleRoomExpand(roomName: string) {
+    setExpandedRoom((prev) => (prev === roomName ? null : roomName));
+  }
+
+  function getRoomRevisionHistory(roomName: string) {
+    if (!activeCategory) return [];
+    return activeCategory.section.items
+      .filter((doc) => doc.rooms?.some((r) => r.name === roomName))
+      .map((doc) => ({
+        doc,
+        room: doc.rooms!.find((r) => r.name === roomName)!,
+        label: getRevisionLabel(activeCategory.section.items, doc),
+      }));
   }
 
   if (!activeCategory) {
@@ -183,21 +202,62 @@ export function ProjectDocumentBrowser({
                       )}
                     </div>
 
-                    {/* Expanded rooms */}
+                    {/* Expanded rooms — each room is a sub-dropdown */}
                     {expandedRevision === doc.id && doc.rooms && (
-                      <div className="border-t border-border bg-secondary/30 px-4 py-2">
-                        {doc.rooms.map((room, ri) => (
-                          <div
-                            key={ri}
-                            className="flex items-center gap-3 py-2 text-sm"
-                          >
-                            <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                            <span className="font-medium">{room.name}</span>
-                            <span className="text-muted-foreground">
-                              {room.description}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="border-t border-border bg-secondary/30">
+                        {doc.rooms.map((room, ri) => {
+                          const isRoomExpanded = expandedRoom === `${doc.id}:${room.name}`;
+                          const roomHistory = isRoomExpanded ? getRoomRevisionHistory(room.name) : [];
+
+                          return (
+                            <div key={ri} className="border-b border-border/50 last:border-b-0">
+                              <button
+                                onClick={() => toggleRoomExpand(`${doc.id}:${room.name}`)}
+                                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-secondary/50"
+                              >
+                                <ChevronDown
+                                  className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${isRoomExpanded ? "rotate-180" : ""}`}
+                                />
+                                <span className="font-medium">{room.name}</span>
+                                <span className="text-muted-foreground">
+                                  {room.description}
+                                </span>
+                              </button>
+
+                              {/* Room revision history */}
+                              {isRoomExpanded && roomHistory.length > 0 && (
+                                <div className="bg-secondary/20 px-4 pb-2">
+                                  {roomHistory.map((entry) => (
+                                    <button
+                                      key={entry.doc.id}
+                                      onClick={() => selectRevision(entry.doc)}
+                                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-secondary/60 ${
+                                        entry.doc.id === activeDocumentId ? "bg-secondary/80 font-medium" : ""
+                                      }`}
+                                    >
+                                      <span
+                                        className={`flex size-4 shrink-0 items-center justify-center rounded border ${
+                                          entry.doc.checked
+                                            ? "border-emerald-500 bg-emerald-500 text-white"
+                                            : "border-border bg-background"
+                                        }`}
+                                      >
+                                        {entry.doc.checked && <Check className="size-2.5" />}
+                                      </span>
+                                      <span>{entry.label}</span>
+                                      <span className="text-muted-foreground">
+                                        {entry.room.description}
+                                      </span>
+                                      <span className="ml-auto text-muted-foreground">
+                                        {formatPortalDate(entry.doc.updatedAt)}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
