@@ -28,6 +28,12 @@ export interface GalleryImage {
   caption: string;
 }
 
+export interface GalleryRoom {
+  id: string;
+  name: string;
+  images: GalleryImage[];
+}
+
 export interface ClientProject {
   slug: string;
   code: string;
@@ -45,8 +51,10 @@ export interface ClientProject {
   overview: string;
   nextMilestone: string;
   ownerNote: string;
+  area: string;
+  year: string;
   sections: ProjectSection[];
-  gallery: GalleryImage[];
+  gallery: GalleryRoom[];
 }
 
 const projects: ClientProject[] = [
@@ -68,11 +76,23 @@ const projects: ClientProject[] = [
       "บ้านพักอาศัย 2 ชั้นที่รวม Mood & Tone, Design, Construction Drawing และ BOQ ไว้ในลิงก์เดียว เพื่อให้ลูกค้าเลือกดูเป็นรายหมวดและราย revision ได้ทันที.",
     nextMilestone: "ส่ง Revise 03 ของแบบและ BOQ สำหรับอนุมัติหน้างาน",
     ownerNote: "เมื่อลูกค้า approve รอบนี้ ค่อย export drawing เป็น PDF print ชุดเต็ม",
+    area: "320 ตร.ม.",
+    year: "2026",
     gallery: [
-      { id: "g-1", src: "/gallery/riverside/01.jpg", caption: "Living Room - Warm Earth Tone" },
-      { id: "g-2", src: "/gallery/riverside/02.jpg", caption: "Master Bedroom - Natural Light" },
-      { id: "g-3", src: "/gallery/riverside/03.jpg", caption: "Kitchen - Oak & Stone" },
-      { id: "g-4", src: "/gallery/riverside/04.jpg", caption: "Bathroom - Minimal Spa" },
+      { id: "r1", name: "ห้องนั่งเล่น", images: [
+        { id: "g-1", src: "/gallery/riverside/living-01.jpg", caption: "Warm Earth Tone - มุมโซฟา" },
+        { id: "g-2", src: "/gallery/riverside/living-02.jpg", caption: "Warm Earth Tone - มุมทีวี" },
+      ]},
+      { id: "r2", name: "ห้องนอนใหญ่", images: [
+        { id: "g-3", src: "/gallery/riverside/master-01.jpg", caption: "Natural Light - เตียง" },
+        { id: "g-4", src: "/gallery/riverside/master-02.jpg", caption: "Natural Light - walk-in closet" },
+      ]},
+      { id: "r3", name: "ห้องครัว", images: [
+        { id: "g-5", src: "/gallery/riverside/kitchen-01.jpg", caption: "Oak & Stone - เคาน์เตอร์" },
+      ]},
+      { id: "r4", name: "ห้องน้ำ", images: [
+        { id: "g-6", src: "/gallery/riverside/bath-01.jpg", caption: "Minimal Spa" },
+      ]},
     ],
     sections: [
       {
@@ -247,9 +267,13 @@ const projects: ClientProject[] = [
       "โครงการปรับห้องทำงานในบ้านให้พร้อมประชุมออนไลน์ โดยแบ่งเอกสารเป็น Mood & Tone, Design, Construction Drawing และ BOQ เพื่อ review เป็นชั้น ๆ.",
     nextMilestone: "รอ approve moodboard และ final design direction",
     ownerNote: "ลูกค้าเปิดดูจากมือถือบ่อย ต้องเช็กทุก document ว่าอ่านง่ายบนจอเล็ก",
+    area: "25 ตร.ม.",
+    year: "2026",
     gallery: [
-      { id: "g-1", src: "/gallery/nordic-office/01.jpg", caption: "Work Desk - Nordic Calm" },
-      { id: "g-2", src: "/gallery/nordic-office/02.jpg", caption: "Shelving - Light Oak" },
+      { id: "r1", name: "ห้องทำงาน", images: [
+        { id: "g-1", src: "/gallery/nordic-office/desk-01.jpg", caption: "Work Desk - Nordic Calm" },
+        { id: "g-2", src: "/gallery/nordic-office/shelf-01.jpg", caption: "Shelving - Light Oak" },
+      ]},
     ],
     sections: [
       {
@@ -368,10 +392,18 @@ const projects: ClientProject[] = [
       "รีโนเวตร้านกาแฟขนาดกลางโดยแยกเอกสารเป็น Mood & Tone, Design, Construction Drawing และ BOQ เพื่อให้เจ้าของร้านไล่ดูเป็น revision ได้ง่าย.",
     nextMilestone: "ส่ง revise ชุดล่าสุดก่อนเริ่มงาน built-in counter",
     ownerNote: "ถ้า drawing set ชุดถัดไปเกิน 25MB ให้ย้ายไฟล์ PDF ไป R2 แล้วใช้ path เดิมใน portal",
+    area: "180 ตร.ม.",
+    year: "2025",
     gallery: [
-      { id: "g-1", src: "/gallery/atelier-cafe/01.jpg", caption: "Facade - Dark Wood & Concrete" },
-      { id: "g-2", src: "/gallery/atelier-cafe/02.jpg", caption: "Bar Counter - Custom Built-in" },
-      { id: "g-3", src: "/gallery/atelier-cafe/03.jpg", caption: "Seating Area - Warm Dim Light" },
+      { id: "r1", name: "หน้าร้าน", images: [
+        { id: "g-1", src: "/gallery/atelier-cafe/facade-01.jpg", caption: "Facade - Dark Wood & Concrete" },
+      ]},
+      { id: "r2", name: "เคาน์เตอร์", images: [
+        { id: "g-2", src: "/gallery/atelier-cafe/counter-01.jpg", caption: "Bar Counter - Custom Built-in" },
+      ]},
+      { id: "r3", name: "ที่นั่ง", images: [
+        { id: "g-3", src: "/gallery/atelier-cafe/seating-01.jpg", caption: "Seating Area - Warm Dim Light" },
+      ]},
     ],
     sections: [
       {
@@ -514,10 +546,18 @@ const projects: ClientProject[] = [
       "ตกแต่งคอนโด 2 ห้องนอนสไตล์ Modern Minimal โดยเน้นใช้พื้นที่อย่างคุ้มค่าและวัสดุโทนอบอุ่น.",
     nextMilestone: "รอ approve Design Revise 02 ก่อนเข้าสู่ขั้น construction",
     ownerNote: "ลูกค้าต้องการเน้น built-in storage และ lighting ที่ปรับ mood ได้",
+    area: "65 ตร.ม.",
+    year: "2026",
     gallery: [
-      { id: "g-1", src: "/gallery/sukhumvit-condo/01.jpg", caption: "Living Room - Modern Minimal" },
-      { id: "g-2", src: "/gallery/sukhumvit-condo/02.jpg", caption: "Master Bedroom - Built-in Wardrobe" },
-      { id: "g-3", src: "/gallery/sukhumvit-condo/03.jpg", caption: "Kitchen - Compact Design" },
+      { id: "r1", name: "ห้องนั่งเล่น", images: [
+        { id: "g-1", src: "/gallery/sukhumvit-condo/living-01.jpg", caption: "Living Room - Modern Minimal" },
+      ]},
+      { id: "r2", name: "ห้องนอนใหญ่", images: [
+        { id: "g-2", src: "/gallery/sukhumvit-condo/master-01.jpg", caption: "Master Bedroom - Built-in Wardrobe" },
+      ]},
+      { id: "r3", name: "ห้องครัว", images: [
+        { id: "g-3", src: "/gallery/sukhumvit-condo/kitchen-01.jpg", caption: "Kitchen - Compact Design" },
+      ]},
     ],
     sections: [
       {
@@ -636,6 +676,8 @@ const projects: ClientProject[] = [
       "คอนโด loft style ชั้นบนเป็นห้องนอน ชั้นล่างเป็น living + work area ต้องการ mood industrial warm.",
     nextMilestone: "รอ approve Mood & Tone ก่อนเริ่มทำ design",
     ownerNote: "ลูกค้าชอบสไตล์ industrial แต่ต้องไม่ดิบเกินไป ให้มี warmth เข้ามา",
+    area: "45 ตร.ม.",
+    year: "2026",
     gallery: [],
     sections: [
       {
@@ -738,9 +780,15 @@ const projects: ClientProject[] = [
       "ออกแบบ co-working space 3 ชั้น รวม private office, hot desk, meeting room และ cafe lounge.",
     nextMilestone: "ส่ง Revise 02 ของ Design และ Construction Drawing",
     ownerNote: "มี stakeholder หลายคน ต้อง revise หลายรอบ ควรเก็บ archive ทุก version",
+    area: "450 ตร.ม.",
+    year: "2025",
     gallery: [
-      { id: "g-1", src: "/gallery/cowork-thonglor/01.jpg", caption: "Reception - Plant Wall" },
-      { id: "g-2", src: "/gallery/cowork-thonglor/02.jpg", caption: "Hot Desk Area - Open Plan" },
+      { id: "r1", name: "Reception", images: [
+        { id: "g-1", src: "/gallery/cowork-thonglor/reception-01.jpg", caption: "Reception - Plant Wall" },
+      ]},
+      { id: "r2", name: "Hot Desk", images: [
+        { id: "g-2", src: "/gallery/cowork-thonglor/hotdesk-01.jpg", caption: "Hot Desk Area - Open Plan" },
+      ]},
     ],
     sections: [
       {
@@ -859,12 +907,24 @@ const projects: ClientProject[] = [
       "บ้านเดี่ยว 3 ชั้น สไตล์ Modern Tropical เน้น natural ventilation และ indoor-outdoor connection.",
     nextMilestone: "งาน construction เริ่มแล้ว รอติดตามหน้างาน",
     ownerNote: "โปรเจกต์นี้ปิดแบบแล้ว ลูกค้าใช้ดู drawing หน้างาน",
+    area: "480 ตร.ม.",
+    year: "2025",
     gallery: [
-      { id: "g-1", src: "/gallery/pattanakan-house/01.jpg", caption: "Exterior - Modern Tropical Facade" },
-      { id: "g-2", src: "/gallery/pattanakan-house/02.jpg", caption: "Living Room - Double Height" },
-      { id: "g-3", src: "/gallery/pattanakan-house/03.jpg", caption: "Pool Area - Indoor-Outdoor" },
-      { id: "g-4", src: "/gallery/pattanakan-house/04.jpg", caption: "Master Bedroom - Garden View" },
-      { id: "g-5", src: "/gallery/pattanakan-house/05.jpg", caption: "Kitchen - Island Counter" },
+      { id: "r1", name: "ภายนอก", images: [
+        { id: "g-1", src: "/gallery/pattanakan-house/exterior-01.jpg", caption: "Modern Tropical Facade" },
+      ]},
+      { id: "r2", name: "ห้องนั่งเล่น", images: [
+        { id: "g-2", src: "/gallery/pattanakan-house/living-01.jpg", caption: "Double Height Living" },
+      ]},
+      { id: "r3", name: "สระว่ายน้ำ", images: [
+        { id: "g-3", src: "/gallery/pattanakan-house/pool-01.jpg", caption: "Indoor-Outdoor Pool" },
+      ]},
+      { id: "r4", name: "ห้องนอนใหญ่", images: [
+        { id: "g-4", src: "/gallery/pattanakan-house/master-01.jpg", caption: "Master Bedroom - Garden View" },
+      ]},
+      { id: "r5", name: "ห้องครัว", images: [
+        { id: "g-5", src: "/gallery/pattanakan-house/kitchen-01.jpg", caption: "Island Counter" },
+      ]},
     ],
     sections: [
       {
