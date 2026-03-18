@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Download, Eye } from "lucide-react";
 
-import { DocumentPreview } from "@/components/portal/document-preview";
 import {
   formatPortalDate,
   getDocumentPreviewUrl,
@@ -143,8 +142,8 @@ export function ProjectDocumentBrowser({
             {activeDocument.summary}
           </p>
 
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-3">
+          {/* Action buttons + source */}
+          <div className="flex flex-wrap items-center gap-3">
             <a
               href={previewUrl}
               target="_blank"
@@ -166,17 +165,10 @@ export function ProjectDocumentBrowser({
                 ดาวน์โหลด PDF
               </a>
             ) : null}
-          </div>
 
-          {/* Preview */}
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
-            <DocumentPreview
-              title={activeDocument.title}
-              summary={activeDocument.summary}
-              kind={activeDocument.kind}
-              previewUrl={previewUrl}
-              className="min-h-[22rem] rounded-none border-0 bg-secondary/55 md:min-h-[36rem]"
-            />
+            <span className="text-sm text-muted-foreground">
+              Source: {activeDocument.kind === "canva" ? "Canva board" : "PDF"}
+            </span>
           </div>
         </div>
       </div>
