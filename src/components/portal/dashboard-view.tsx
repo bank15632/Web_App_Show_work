@@ -40,21 +40,27 @@ const MONTH_LABELS: Record<number, string> = {
 };
 
 const revisionColumnStyles: Record<RevisionStatus, string> = {
-  todo: "border-border bg-secondary/50",
-  doing: "border-foreground/10 bg-background",
-  done: "border-border bg-secondary/50",
+  todo: "border-amber-200 bg-amber-50",
+  doing: "border-blue-200 bg-blue-50",
+  done: "border-emerald-200 bg-emerald-50",
 };
 
 const revisionHeaderStyles: Record<RevisionStatus, string> = {
-  todo: "text-muted-foreground",
-  doing: "text-foreground",
-  done: "text-muted-foreground",
+  todo: "text-amber-700",
+  doing: "text-blue-700",
+  done: "text-emerald-700",
 };
 
 const revisionDotStyles: Record<RevisionStatus, string> = {
-  todo: "bg-muted-foreground",
-  doing: "bg-foreground",
-  done: "bg-foreground/40",
+  todo: "bg-amber-500",
+  doing: "bg-blue-500",
+  done: "bg-emerald-500",
+};
+
+const revisionCardStyles: Record<RevisionStatus, string> = {
+  todo: "border-amber-200/70 hover:border-amber-300",
+  doing: "border-blue-200/70 hover:border-blue-300",
+  done: "border-emerald-200/70 hover:border-emerald-300",
 };
 
 /* ── Scroll Animation Hook ───────────────────────────── */
@@ -189,9 +195,14 @@ export function DashboardView() {
       {/* Header - BNJ style: white bg, blur, border-bottom */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
         <div className="mx-auto flex max-w-[1320px] items-center gap-4 px-6 py-5 lg:px-10">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-foreground text-sm font-bold text-background">
-            CR
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-bnj.svg"
+            alt="BNJ Studio"
+            width={120}
+            height={60}
+            className="h-10 w-auto shrink-0"
+          />
           <div className="min-w-0">
             <p className="font-display text-lg font-semibold tracking-tight">
               Client Rooms
@@ -250,6 +261,74 @@ export function DashboardView() {
                 งานที่ต้อง revise (Todo + Doing)
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* Task Board - Colored columns */}
+        <section className="fade-up space-y-6">
+          <div>
+            <p className="caption-editorial mb-2">Revision Tasks</p>
+            <h2 className="font-display text-3xl font-medium tracking-tight">
+              ติดตามสถานะงาน Revise
+            </h2>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {(["todo", "doing", "done"] as RevisionStatus[]).map(
+              (status, colIdx) => (
+                <div
+                  key={status}
+                  className={`fade-up ${colIdx === 1 ? "delay-100" : colIdx === 2 ? "delay-200" : ""} rounded-lg border p-5 ${revisionColumnStyles[status]}`}
+                >
+                  <div className="mb-5 flex items-center gap-2.5">
+                    <span
+                      className={`size-2 rounded-full ${revisionDotStyles[status]}`}
+                    />
+                    <h3
+                      className={`text-sm font-semibold uppercase tracking-widest ${revisionHeaderStyles[status]}`}
+                    >
+                      {getRevisionStatusLabel(status)}
+                    </h3>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {taskGroups[status].length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {taskGroups[status].length === 0 && (
+                      <p className="py-6 text-center text-xs text-muted-foreground">
+                        ไม่มีงาน
+                      </p>
+                    )}
+                    {taskGroups[status].map((project) => (
+                      <Link
+                        key={project.slug}
+                        href={`/p/${project.slug}`}
+                        className={`block rounded-lg border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] ${revisionCardStyles[status]}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {project.code}
+                          </span>
+                          <span className="caption-editorial text-[0.7rem]">
+                            {project.projectType}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-display text-base font-medium leading-tight">
+                          {project.title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {project.clientName}
+                        </p>
+                        <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+                          {project.nextMilestone}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ),
+            )}
           </div>
         </section>
 
@@ -323,74 +402,6 @@ export function DashboardView() {
                 delay={i % 2 === 0 ? "" : "delay-100"}
               />
             ))}
-          </div>
-        </section>
-
-        {/* Task Board - BNJ minimal columns */}
-        <section className="fade-up space-y-6">
-          <div>
-            <p className="caption-editorial mb-2">Revision Tasks</p>
-            <h2 className="font-display text-3xl font-medium tracking-tight">
-              ติดตามสถานะงาน Revise
-            </h2>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-3">
-            {(["todo", "doing", "done"] as RevisionStatus[]).map(
-              (status, colIdx) => (
-                <div
-                  key={status}
-                  className={`fade-up ${colIdx === 1 ? "delay-100" : colIdx === 2 ? "delay-200" : ""} rounded-lg border p-5 ${revisionColumnStyles[status]}`}
-                >
-                  <div className="mb-5 flex items-center gap-2.5">
-                    <span
-                      className={`size-2 rounded-full ${revisionDotStyles[status]}`}
-                    />
-                    <h3
-                      className={`text-sm font-semibold uppercase tracking-widest ${revisionHeaderStyles[status]}`}
-                    >
-                      {getRevisionStatusLabel(status)}
-                    </h3>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {taskGroups[status].length}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {taskGroups[status].length === 0 && (
-                      <p className="py-6 text-center text-xs text-muted-foreground">
-                        ไม่มีงาน
-                      </p>
-                    )}
-                    {taskGroups[status].map((project) => (
-                      <Link
-                        key={project.slug}
-                        href={`/p/${project.slug}`}
-                        className="block rounded-lg border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {project.code}
-                          </span>
-                          <span className="caption-editorial text-[0.7rem]">
-                            {project.projectType}
-                          </span>
-                        </div>
-                        <p className="mt-2 font-display text-base font-medium leading-tight">
-                          {project.title}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {project.clientName}
-                        </p>
-                        <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
-                          {project.nextMilestone}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ),
-            )}
           </div>
         </section>
       </main>
