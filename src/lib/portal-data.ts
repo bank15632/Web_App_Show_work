@@ -1,5 +1,7 @@
 export type DocumentKind = "canva" | "pdf";
 export type ProjectStage = "concept" | "revision" | "construction" | "archived";
+export type ProjectType = "House" | "Condo" | "Commercial";
+export type RevisionStatus = "todo" | "doing" | "done";
 
 export interface ProjectDocument {
   id: string;
@@ -25,9 +27,11 @@ export interface ClientProject {
   code: string;
   title: string;
   clientName: string;
-  projectType: string;
+  projectType: ProjectType;
   location: string;
   stage: ProjectStage;
+  revisionStatus: RevisionStatus;
+  createdAt: string;
   updatedAt: string;
   retentionUntil: string;
   shareMode: string;
@@ -44,9 +48,11 @@ const projects: ClientProject[] = [
     code: "B7X2",
     title: "Riverside Residence",
     clientName: "Khun Narin",
-    projectType: "Private Residence",
+    projectType: "House",
     location: "Bangkok",
     stage: "revision",
+    revisionStatus: "doing",
+    createdAt: "2026-01-10",
     updatedAt: "2026-03-14",
     retentionUntil: "2029-03-14",
     shareMode: "Cloudflare Access by email",
@@ -191,9 +197,11 @@ const projects: ClientProject[] = [
     code: "L2K7",
     title: "Nordic Home Office",
     clientName: "Khun Ploy",
-    projectType: "Home Office",
+    projectType: "House",
     location: "Chiang Mai",
     stage: "concept",
+    revisionStatus: "todo",
+    createdAt: "2026-02-10",
     updatedAt: "2026-03-08",
     retentionUntil: "2029-03-08",
     shareMode: "Cloudflare Access by one-time PIN",
@@ -290,9 +298,11 @@ const projects: ClientProject[] = [
     code: "M4P1",
     title: "Atelier Cafe Renovation",
     clientName: "Atelier Brew",
-    projectType: "Cafe Renovation",
+    projectType: "Commercial",
     location: "Nonthaburi",
     stage: "construction",
+    revisionStatus: "done",
+    createdAt: "2025-11-20",
     updatedAt: "2026-03-15",
     retentionUntil: "2029-03-15",
     shareMode: "Cloudflare Access by email",
@@ -400,6 +410,418 @@ const projects: ClientProject[] = [
       },
     ],
   },
+  {
+    slug: "sukhumvit-condo-k9r3",
+    code: "K9R3",
+    title: "Sukhumvit Condo Unit",
+    clientName: "Khun Beam",
+    projectType: "Condo",
+    location: "Bangkok",
+    stage: "revision",
+    revisionStatus: "doing",
+    createdAt: "2026-01-25",
+    updatedAt: "2026-03-10",
+    retentionUntil: "2029-03-10",
+    shareMode: "Cloudflare Access by email",
+    viewerCount: 2,
+    overview:
+      "ตกแต่งคอนโด 2 ห้องนอนสไตล์ Modern Minimal โดยเน้นใช้พื้นที่อย่างคุ้มค่าและวัสดุโทนอบอุ่น.",
+    nextMilestone: "รอ approve Design Revise 02 ก่อนเข้าสู่ขั้น construction",
+    ownerNote: "ลูกค้าต้องการเน้น built-in storage และ lighting ที่ปรับ mood ได้",
+    sections: [
+      {
+        id: "mood-tone",
+        title: "Mood & Tone",
+        description: "โทนสีและวัสดุสำหรับคอนโดสไตล์ Modern Minimal",
+        items: [
+          {
+            id: "condo-suk-mood-v2",
+            title: "Modern Minimal Direction",
+            version: "Revise 02",
+            kind: "canva",
+            updatedAt: "2026-03-05",
+            summary: "โทนไม้อ่อน ผนังขาว accent สีเทาเข้ม เน้น clean line.",
+            latest: true,
+          },
+          {
+            id: "condo-suk-mood-v1",
+            title: "Modern Minimal Direction",
+            version: "Revise 01",
+            kind: "canva",
+            updatedAt: "2026-02-15",
+            summary: "เวอร์ชันแรกเปรียบเทียบ 2 แนวทาง: warm minimal vs cool minimal.",
+          },
+        ],
+      },
+      {
+        id: "design",
+        title: "Design",
+        description: "Layout และ furniture plan สำหรับคอนโด 2 ห้องนอน",
+        items: [
+          {
+            id: "condo-suk-design-v2",
+            title: "Condo Layout Presentation",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-03-10",
+            summary: "อัปเดต layout ห้องนอนใหญ่และ walk-in closet ตาม feedback.",
+            latest: true,
+          },
+          {
+            id: "condo-suk-design-v1",
+            title: "Condo Layout Presentation",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-02-20",
+            summary: "แบบร่างรอบแรกรวม living, bedroom และ kitchen layout.",
+          },
+        ],
+      },
+      {
+        id: "construction",
+        title: "Construction Drawing",
+        description: "แบบก่อสร้างสำหรับงาน built-in และระบบไฟ",
+        items: [
+          {
+            id: "condo-suk-construction-v1",
+            title: "Condo Drawing Set",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-08",
+            summary: "แบบ built-in wardrobe, kitchen cabinet และจุดไฟหลัก.",
+            latest: true,
+          },
+        ],
+      },
+      {
+        id: "boq",
+        title: "BOQ",
+        description: "รายการวัสดุและประมาณราคาสำหรับคอนโด",
+        items: [
+          {
+            id: "condo-suk-boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-06",
+            summary: "BOQ ชุดแรกรวม built-in, loose furniture และงาน M&E.",
+            latest: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "ratchada-condo-t5w8",
+    code: "T5W8",
+    title: "Ratchada Condo Loft",
+    clientName: "Khun Mint",
+    projectType: "Condo",
+    location: "Bangkok",
+    stage: "concept",
+    revisionStatus: "todo",
+    createdAt: "2026-03-01",
+    updatedAt: "2026-03-12",
+    retentionUntil: "2029-03-12",
+    shareMode: "Cloudflare Access by one-time PIN",
+    viewerCount: 1,
+    overview:
+      "คอนโด loft style ชั้นบนเป็นห้องนอน ชั้นล่างเป็น living + work area ต้องการ mood industrial warm.",
+    nextMilestone: "รอ approve Mood & Tone ก่อนเริ่มทำ design",
+    ownerNote: "ลูกค้าชอบสไตล์ industrial แต่ต้องไม่ดิบเกินไป ให้มี warmth เข้ามา",
+    sections: [
+      {
+        id: "mood-tone",
+        title: "Mood & Tone",
+        description: "Industrial warm สำหรับ loft condo",
+        items: [
+          {
+            id: "condo-rat-mood-v1",
+            title: "Industrial Warm Direction",
+            version: "Revise 01",
+            kind: "canva",
+            updatedAt: "2026-03-12",
+            summary: "เปรียบเทียบโทนปูนเปลือย + ไม้สัก vs เหล็กดำ + ไม้โอ๊ค.",
+            latest: true,
+          },
+        ],
+      },
+      {
+        id: "design",
+        title: "Design",
+        description: "Layout สำหรับ loft 2 ชั้น",
+        items: [
+          {
+            id: "condo-rat-design-v1",
+            title: "Loft Design Draft",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-12",
+            summary: "แบบร่าง zoning ชั้นบน-ล่าง รวม stair detail เบื้องต้น.",
+            latest: true,
+          },
+        ],
+      },
+      {
+        id: "construction",
+        title: "Construction Drawing",
+        description: "แบบก่อสร้างสำหรับ built-in และบันได",
+        items: [
+          {
+            id: "condo-rat-construction-v1",
+            title: "Loft Drawing Set",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-12",
+            summary: "แบบบันได, railing และ built-in เบื้องต้น.",
+            latest: true,
+          },
+        ],
+      },
+      {
+        id: "boq",
+        title: "BOQ",
+        description: "ประมาณราคาสำหรับงาน loft condo",
+        items: [
+          {
+            id: "condo-rat-boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-12",
+            summary: "BOQ เบื้องต้นสำหรับงานบันได built-in และ custom furniture.",
+            latest: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "cowork-space-thonglor-j2m6",
+    code: "J2M6",
+    title: "Thonglor Co-working Space",
+    clientName: "WorkHub Co.",
+    projectType: "Commercial",
+    location: "Bangkok",
+    stage: "revision",
+    revisionStatus: "doing",
+    createdAt: "2025-12-05",
+    updatedAt: "2026-02-28",
+    retentionUntil: "2029-02-28",
+    shareMode: "Cloudflare Access by email",
+    viewerCount: 4,
+    overview:
+      "ออกแบบ co-working space 3 ชั้น รวม private office, hot desk, meeting room และ cafe lounge.",
+    nextMilestone: "ส่ง Revise 02 ของ Design และ Construction Drawing",
+    ownerNote: "มี stakeholder หลายคน ต้อง revise หลายรอบ ควรเก็บ archive ทุก version",
+    sections: [
+      {
+        id: "mood-tone",
+        title: "Mood & Tone",
+        description: "โทน creative professional สำหรับ co-working",
+        items: [
+          {
+            id: "cowork-mood-v2",
+            title: "Creative Professional Palette",
+            version: "Revise 02",
+            kind: "canva",
+            updatedAt: "2026-02-20",
+            summary: "โทน warm grey + wood accent + green plant wall สำหรับ common area.",
+            latest: true,
+          },
+          {
+            id: "cowork-mood-v1",
+            title: "Creative Professional Palette",
+            version: "Revise 01",
+            kind: "canva",
+            updatedAt: "2026-01-15",
+            summary: "เวอร์ชันแรกเปรียบเทียบ corporate vs casual co-working mood.",
+          },
+        ],
+      },
+      {
+        id: "design",
+        title: "Design",
+        description: "Layout 3 ชั้นรวม zoning และ furniture plan",
+        items: [
+          {
+            id: "cowork-design-v2",
+            title: "Co-working Design Pack",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-02-28",
+            summary: "อัปเดต layout meeting room ชั้น 2 และ cafe lounge ชั้น 1.",
+            latest: true,
+          },
+          {
+            id: "cowork-design-v1",
+            title: "Co-working Design Pack",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-01-25",
+            summary: "แบบร่างแรกรวม zoning ทั้ง 3 ชั้น.",
+          },
+        ],
+      },
+      {
+        id: "construction",
+        title: "Construction Drawing",
+        description: "แบบก่อสร้างสำหรับ partition, M&E และ built-in",
+        items: [
+          {
+            id: "cowork-construction-v1",
+            title: "Co-working Drawing Set",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-02-25",
+            summary: "แบบ partition, electrical plan และ built-in reception counter.",
+            latest: true,
+          },
+        ],
+      },
+      {
+        id: "boq",
+        title: "BOQ",
+        description: "ประมาณราคาสำหรับ co-working space 3 ชั้น",
+        items: [
+          {
+            id: "cowork-boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-02-22",
+            summary: "BOQ รวม partition system, furniture, M&E และ signage.",
+            latest: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "pattanakan-house-w3n5",
+    code: "W3N5",
+    title: "Pattanakan Modern House",
+    clientName: "Khun Top",
+    projectType: "House",
+    location: "Bangkok",
+    stage: "construction",
+    revisionStatus: "done",
+    createdAt: "2025-10-15",
+    updatedAt: "2026-01-20",
+    retentionUntil: "2029-01-20",
+    shareMode: "Cloudflare Access by email",
+    viewerCount: 2,
+    overview:
+      "บ้านเดี่ยว 3 ชั้น สไตล์ Modern Tropical เน้น natural ventilation และ indoor-outdoor connection.",
+    nextMilestone: "งาน construction เริ่มแล้ว รอติดตามหน้างาน",
+    ownerNote: "โปรเจกต์นี้ปิดแบบแล้ว ลูกค้าใช้ดู drawing หน้างาน",
+    sections: [
+      {
+        id: "mood-tone",
+        title: "Mood & Tone",
+        description: "Modern Tropical mood สำหรับบ้าน 3 ชั้น",
+        items: [
+          {
+            id: "house-pat-mood-v2",
+            title: "Modern Tropical Direction",
+            version: "Revise 02",
+            kind: "canva",
+            updatedAt: "2025-12-10",
+            summary: "โทนไม้ธรรมชาติ + หินเทา + ต้นไม้เขียว approved แล้ว.",
+            latest: true,
+          },
+          {
+            id: "house-pat-mood-v1",
+            title: "Modern Tropical Direction",
+            version: "Revise 01",
+            kind: "canva",
+            updatedAt: "2025-11-20",
+            summary: "เวอร์ชันแรกเทียบ tropical minimal vs tropical luxe.",
+          },
+        ],
+      },
+      {
+        id: "design",
+        title: "Design",
+        description: "แบบนำเสนอทุกชั้นรวม landscape",
+        items: [
+          {
+            id: "house-pat-design-v3",
+            title: "House Design Presentation",
+            version: "Revise 03",
+            kind: "pdf",
+            updatedAt: "2026-01-10",
+            summary: "เวอร์ชัน final ที่ approved แล้วรวม landscape plan.",
+            latest: true,
+          },
+          {
+            id: "house-pat-design-v2",
+            title: "House Design Presentation",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2025-12-20",
+            summary: "ปรับ master bedroom layout และ pool area.",
+          },
+          {
+            id: "house-pat-design-v1",
+            title: "House Design Presentation",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2025-11-25",
+            summary: "แบบร่างแรกรวม zoning ทั้ง 3 ชั้น.",
+          },
+        ],
+      },
+      {
+        id: "construction",
+        title: "Construction Drawing",
+        description: "แบบก่อสร้างชุดเต็มสำหรับผู้รับเหมา",
+        items: [
+          {
+            id: "house-pat-construction-v2",
+            title: "Construction Drawing Set",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-01-20",
+            summary: "แบบ final สำหรับก่อสร้างรวม structural, M&E และ built-in ทุกจุด.",
+            latest: true,
+          },
+          {
+            id: "house-pat-construction-v1",
+            title: "Construction Drawing Set",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-01-05",
+            summary: "ชุดแรกก่อนปรับ detail บันไดและระเบียง.",
+          },
+        ],
+      },
+      {
+        id: "boq",
+        title: "BOQ",
+        description: "BOQ ชุดเต็มสำหรับบ้าน 3 ชั้น",
+        items: [
+          {
+            id: "house-pat-boq-v2",
+            title: "BOQ Package",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-01-15",
+            summary: "BOQ final รวมงาน landscape และ pool.",
+            latest: true,
+          },
+          {
+            id: "house-pat-boq-v1",
+            title: "BOQ Package",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2025-12-28",
+            summary: "BOQ เบื้องต้นก่อนเพิ่มรายการ landscape.",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getProjects() {
@@ -473,5 +895,20 @@ export function getStageLabel(stage: ProjectStage) {
       return "Construction";
     case "archived":
       return "Archived";
+  }
+}
+
+export function getProjectTypes(): ProjectType[] {
+  return ["House", "Condo", "Commercial"];
+}
+
+export function getRevisionStatusLabel(status: RevisionStatus) {
+  switch (status) {
+    case "todo":
+      return "Todo";
+    case "doing":
+      return "Doing";
+    case "done":
+      return "Done";
   }
 }
