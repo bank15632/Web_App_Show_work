@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,17 +12,8 @@ import {
 } from "lucide-react";
 
 import { ProjectStageBadge } from "@/components/portal/project-stage-badge";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   type ClientProject,
-  type ProjectType,
   type RevisionStatus,
   formatPortalDate,
   getProjectDocumentCount,
@@ -30,7 +21,8 @@ import {
   getProjects,
   getRevisionStatusLabel,
 } from "@/lib/portal-data";
-import { secondaryLinkClass } from "@/lib/portal-styles";
+
+/* ── BNJ-style constants ─────────────────────────────── */
 
 const MONTH_LABELS: Record<number, string> = {
   0: "ม.ค.",
@@ -47,29 +39,56 @@ const MONTH_LABELS: Record<number, string> = {
   11: "ธ.ค.",
 };
 
-const typeColorMap: Record<ProjectType, string> = {
-  House: "bg-amber-100 text-amber-800",
-  Condo: "bg-blue-100 text-blue-800",
-  Commercial: "bg-violet-100 text-violet-800",
-};
-
 const revisionColumnStyles: Record<RevisionStatus, string> = {
-  todo: "border-orange-200 bg-orange-50/50",
-  doing: "border-blue-200 bg-blue-50/50",
-  done: "border-emerald-200 bg-emerald-50/50",
+  todo: "border-border bg-secondary/50",
+  doing: "border-foreground/10 bg-background",
+  done: "border-border bg-secondary/50",
 };
 
 const revisionHeaderStyles: Record<RevisionStatus, string> = {
-  todo: "text-orange-700",
-  doing: "text-blue-700",
-  done: "text-emerald-700",
+  todo: "text-muted-foreground",
+  doing: "text-foreground",
+  done: "text-muted-foreground",
 };
 
 const revisionDotStyles: Record<RevisionStatus, string> = {
-  todo: "bg-orange-400",
-  doing: "bg-blue-400",
-  done: "bg-emerald-400",
+  todo: "bg-muted-foreground",
+  doing: "bg-foreground",
+  done: "bg-foreground/40",
 };
+
+/* ── Scroll Animation Hook ───────────────────────────── */
+
+function useScrollAnimation() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = ref.current;
+    if (!container) return;
+
+    const elements = container.querySelectorAll(".fade-up");
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  return ref;
+}
+
+/* ── Filter Select ───────────────────────────────────── */
 
 function FilterSelect({
   label,
@@ -87,7 +106,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring/50"
+        className="h-10 appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
       >
         <option value="all">{label}: ทั้งหมด</option>
         {options.map((opt) => (
@@ -101,35 +120,33 @@ function FilterSelect({
   );
 }
 
+/* ── Main Dashboard ──────────────────────────────────── */
+
 export function DashboardView() {
   const projects = getProjects();
+  const containerRef = useScrollAnimation();
 
   const [typeFilter, setTypeFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
 
   const availableYears = useMemo(() => {
-    const years = [
+    return [
       ...new Set(projects.map((p) => new Date(p.updatedAt).getFullYear())),
     ].sort((a, b) => b - a);
-    return years;
   }, [projects]);
 
   const availableMonths = useMemo(() => {
-    const months = [
+    return [
       ...new Set(projects.map((p) => new Date(p.updatedAt).getMonth())),
     ].sort((a, b) => a - b);
-    return months;
   }, [projects]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
       if (typeFilter !== "all" && p.projectType !== typeFilter) return false;
       const date = new Date(p.updatedAt);
-      if (
-        monthFilter !== "all" &&
-        String(date.getMonth()) !== monthFilter
-      )
+      if (monthFilter !== "all" && String(date.getMonth()) !== monthFilter)
         return false;
       if (yearFilter !== "all" && String(date.getFullYear()) !== yearFilter)
         return false;
@@ -168,78 +185,76 @@ export function DashboardView() {
   }, [projects]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute -left-32 top-40 size-72 rounded-full bg-primary/10 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 top-20 size-72 rounded-full bg-accent/20 blur-3xl" />
-
-      {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-4 lg:px-10">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20">
+    <div ref={containerRef} className="min-h-screen">
+      {/* Header - BNJ style: white bg, blur, border-bottom */}
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
+        <div className="mx-auto flex max-w-[1320px] items-center gap-4 px-6 py-5 lg:px-10">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-foreground text-sm font-bold text-background">
             CR
           </span>
           <div className="min-w-0">
             <p className="font-display text-lg font-semibold tracking-tight">
               Client Rooms
             </p>
-            <p className="text-sm text-muted-foreground">
-              Owner Dashboard
-            </p>
+            <p className="caption-editorial text-xs">Owner Dashboard</p>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-8 px-6 py-10 lg:px-10">
-        {/* Stats */}
-        <section className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-border/70 bg-card/90 backdrop-blur">
-            <CardHeader className="gap-2">
-              <CardDescription className="flex items-center gap-2">
+      <main className="mx-auto max-w-[1320px] space-y-16 px-6 py-12 lg:px-10">
+        {/* Hero Stats - BNJ editorial style */}
+        <section className="fade-up space-y-6">
+          <div>
+            <p className="caption-editorial mb-2">Overview</p>
+            <h1 className="font-display text-4xl font-medium tracking-tight sm:text-5xl">
+              โปรเจกต์ทั้งหมด
+            </h1>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="fade-up rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+              <div className="mb-3 flex items-center gap-2 text-muted-foreground">
                 <FolderOpen className="size-4" />
-                Active Projects
-              </CardDescription>
-              <CardTitle className="font-display text-3xl font-semibold">
+                <span className="caption-editorial text-xs">Active Projects</span>
+              </div>
+              <p className="font-display text-4xl font-medium">
                 {activeProjects.length}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              โปรเจกต์ที่อยู่ใน concept, revision หรือ construction
-            </CardContent>
-          </Card>
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                โปรเจกต์ที่อยู่ใน concept, revision หรือ construction
+              </p>
+            </div>
 
-          <Card className="border-border/70 bg-card/90 backdrop-blur">
-            <CardHeader className="gap-2">
-              <CardDescription className="flex items-center gap-2">
+            <div className="fade-up delay-100 rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+              <div className="mb-3 flex items-center gap-2 text-muted-foreground">
                 <FileText className="size-4" />
-                Documents
-              </CardDescription>
-              <CardTitle className="font-display text-3xl font-semibold">
+                <span className="caption-editorial text-xs">Documents</span>
+              </div>
+              <p className="font-display text-4xl font-medium">
                 {totalDocuments}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              ไฟล์ทั้งหมดรวม Canva, PDF และ revision archives
-            </CardContent>
-          </Card>
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                ไฟล์ทั้งหมดรวม Canva, PDF และ revision archives
+              </p>
+            </div>
 
-          <Card className="border-border/70 bg-card/90 backdrop-blur">
-            <CardHeader className="gap-2">
-              <CardDescription className="flex items-center gap-2">
+            <div className="fade-up delay-200 rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+              <div className="mb-3 flex items-center gap-2 text-muted-foreground">
                 <ClipboardList className="size-4" />
-                Pending Revisions
-              </CardDescription>
-              <CardTitle className="font-display text-3xl font-semibold">
+                <span className="caption-editorial text-xs">Pending Revisions</span>
+              </div>
+              <p className="font-display text-4xl font-medium">
                 {pendingRevisions}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              งานที่ต้อง revise (Todo + Doing)
-            </CardContent>
-          </Card>
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                งานที่ต้อง revise (Todo + Doing)
+              </p>
+            </div>
+          </div>
         </section>
 
-        {/* Filters */}
-        <section className="flex flex-wrap items-center gap-3">
+        {/* Filters - BNJ pill style */}
+        <section className="fade-up flex flex-wrap items-center gap-3">
           <FilterSelect
             label="ประเภท"
             value={typeFilter}
@@ -267,7 +282,7 @@ export function DashboardView() {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
             >
               <X className="size-3.5" />
               ล้าง filter
@@ -278,96 +293,104 @@ export function DashboardView() {
           </span>
         </section>
 
-        {/* Project Grid */}
-        <section className="grid gap-4 md:grid-cols-2">
-          {filteredProjects.length === 0 && (
-            <div className="col-span-full rounded-3xl border border-border/70 bg-card/90 p-10 text-center">
-              <p className="text-lg text-muted-foreground">
-                ไม่พบโปรเจกต์ที่ตรงกับ filter
-              </p>
-              <button
-                onClick={clearFilters}
-                className="mt-3 text-sm font-medium text-primary hover:underline"
-              >
-                ล้าง filter ทั้งหมด
-              </button>
-            </div>
-          )}
-          {filteredProjects.map((project) => (
-            <ProjectCard key={project.slug} project={project} />
-          ))}
-        </section>
-
-        {/* Task Board */}
-        <section className="space-y-5">
-          <div className="space-y-1">
-            <h2 className="font-display text-2xl font-semibold tracking-tight">
-              Revision Tasks
+        {/* Project Grid - BNJ card style */}
+        <section>
+          <div className="fade-up mb-6">
+            <p className="caption-editorial mb-2">Projects</p>
+            <h2 className="font-display text-3xl font-medium tracking-tight">
+              เลือกเปิดหน้าลูกค้า
             </h2>
-            <p className="text-sm text-muted-foreground">
-              ติดตามสถานะงาน revise ของแต่ละโปรเจกต์
-            </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {(["todo", "doing", "done"] as RevisionStatus[]).map((status) => (
-              <div
-                key={status}
-                className={`rounded-3xl border p-4 ${revisionColumnStyles[status]}`}
-              >
-                <div className="mb-4 flex items-center gap-2">
-                  <span
-                    className={`size-2.5 rounded-full ${revisionDotStyles[status]}`}
-                  />
-                  <h3
-                    className={`text-sm font-semibold ${revisionHeaderStyles[status]}`}
-                  >
-                    {getRevisionStatusLabel(status)}
-                  </h3>
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto px-2 py-0.5 text-xs"
-                  >
-                    {taskGroups[status].length}
-                  </Badge>
-                </div>
-
-                <div className="space-y-3">
-                  {taskGroups[status].length === 0 && (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
-                      ไม่มีงาน
-                    </p>
-                  )}
-                  {taskGroups[status].map((project) => (
-                    <Link
-                      key={project.slug}
-                      href={`/p/${project.slug}`}
-                      className="block rounded-2xl border border-border/50 bg-background/80 p-3 transition-all hover:border-border hover:shadow-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="px-2 py-0.5 text-xs">
-                          {project.code}
-                        </Badge>
-                        <Badge
-                          className={`px-2 py-0.5 text-xs ${typeColorMap[project.projectType]}`}
-                        >
-                          {project.projectType}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 font-display text-sm font-semibold leading-tight">
-                        {project.title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {project.clientName}
-                      </p>
-                      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                        {project.nextMilestone}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            {filteredProjects.length === 0 && (
+              <div className="col-span-full rounded-lg border border-border p-12 text-center">
+                <p className="text-lg text-muted-foreground">
+                  ไม่พบโปรเจกต์ที่ตรงกับ filter
+                </p>
+                <button
+                  onClick={clearFilters}
+                  className="mt-3 text-sm font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+                >
+                  ล้าง filter ทั้งหมด
+                </button>
               </div>
+            )}
+            {filteredProjects.map((project, i) => (
+              <ProjectCard
+                key={project.slug}
+                project={project}
+                delay={i % 2 === 0 ? "" : "delay-100"}
+              />
             ))}
+          </div>
+        </section>
+
+        {/* Task Board - BNJ minimal columns */}
+        <section className="fade-up space-y-6">
+          <div>
+            <p className="caption-editorial mb-2">Revision Tasks</p>
+            <h2 className="font-display text-3xl font-medium tracking-tight">
+              ติดตามสถานะงาน Revise
+            </h2>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {(["todo", "doing", "done"] as RevisionStatus[]).map(
+              (status, colIdx) => (
+                <div
+                  key={status}
+                  className={`fade-up ${colIdx === 1 ? "delay-100" : colIdx === 2 ? "delay-200" : ""} rounded-lg border p-5 ${revisionColumnStyles[status]}`}
+                >
+                  <div className="mb-5 flex items-center gap-2.5">
+                    <span
+                      className={`size-2 rounded-full ${revisionDotStyles[status]}`}
+                    />
+                    <h3
+                      className={`text-sm font-semibold uppercase tracking-widest ${revisionHeaderStyles[status]}`}
+                    >
+                      {getRevisionStatusLabel(status)}
+                    </h3>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {taskGroups[status].length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {taskGroups[status].length === 0 && (
+                      <p className="py-6 text-center text-xs text-muted-foreground">
+                        ไม่มีงาน
+                      </p>
+                    )}
+                    {taskGroups[status].map((project) => (
+                      <Link
+                        key={project.slug}
+                        href={`/p/${project.slug}`}
+                        className="block rounded-lg border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {project.code}
+                          </span>
+                          <span className="caption-editorial text-[0.7rem]">
+                            {project.projectType}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-display text-base font-medium leading-tight">
+                          {project.title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {project.clientName}
+                        </p>
+                        <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+                          {project.nextMilestone}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ),
+            )}
           </div>
         </section>
       </main>
@@ -375,43 +398,59 @@ export function DashboardView() {
   );
 }
 
-function ProjectCard({ project }: { project: ClientProject }) {
+/* ── Project Card ────────────────────────────────────── */
+
+function ProjectCard({
+  project,
+  delay,
+}: {
+  project: ClientProject;
+  delay: string;
+}) {
   return (
-    <Card className="group border-border/70 bg-card/90 backdrop-blur transition-shadow hover:shadow-lg">
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="px-3 py-1">
-            {project.code}
-          </Badge>
+    <div
+      className={`fade-up ${delay} group rounded-lg border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]`}
+    >
+      <div className="p-6">
+        {/* Badges row */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="caption-editorial text-xs">{project.code}</span>
+          <span className="text-muted-foreground">·</span>
           <ProjectStageBadge stage={project.stage} />
-          <Badge className={`px-3 py-1 ${typeColorMap[project.projectType]}`}>
+          <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
             {project.projectType}
-          </Badge>
+          </span>
         </div>
-        <CardTitle className="font-display text-2xl">{project.title}</CardTitle>
-        <CardDescription>
+
+        {/* Title */}
+        <h3 className="font-display text-2xl font-medium tracking-tight">
+          {project.title}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
           {project.clientName} · {project.location} · อัปเดต{" "}
           {formatPortalDate(project.updatedAt)}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="line-clamp-2 text-sm leading-7 text-muted-foreground">
+        </p>
+
+        {/* Overview */}
+        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
           {project.overview}
         </p>
-        <div className="flex items-center justify-between gap-3">
+
+        {/* Footer */}
+        <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
           <span className="text-sm text-muted-foreground">
             {getProjectDocumentCount(project)} files · {project.viewerCount}{" "}
             viewers
           </span>
           <Link
             href={`/p/${project.slug}`}
-            className={`${secondaryLinkClass} whitespace-nowrap`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
           >
             เปิดหน้าลูกค้า
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-3.5" />
           </Link>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
