@@ -43,10 +43,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
-      <body
-        className={`${bodyFont.variable} ${headingFont.variable} ${monoFont.variable} min-h-screen bg-background text-foreground antialiased`}
-      >
+    <html
+      lang="th"
+      className={`${bodyFont.variable} ${headingFont.variable} ${monoFont.variable}`}
+    >
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         {children}
       </body>
     </html>

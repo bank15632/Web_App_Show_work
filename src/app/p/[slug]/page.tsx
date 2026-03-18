@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { ProjectDocumentBrowser } from "@/components/portal/project-document-browser";
+import { ProjectGallery } from "@/components/portal/project-gallery";
+import { ProjectTimeline } from "@/components/portal/project-timeline";
 import { DocumentPreview } from "@/components/portal/document-preview";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,9 +20,6 @@ import {
 type ProjectPageProps = {
   params: Promise<{ slug: string }>;
 };
-
-const headerLinkClass =
-  "inline-flex items-center rounded-full border border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-secondary hover:text-foreground";
 
 const actionLinkClass =
   "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90";
@@ -72,23 +70,22 @@ export default async function ProjectRoomPage({ params }: ProjectPageProps) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 md:px-8 xl:px-12">
-          <Link href="/" className="min-w-0">
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-4 md:px-8 xl:px-12">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-bnj.svg"
+            alt="BNJ Studio"
+            width={100}
+            height={50}
+            className="h-8 w-auto shrink-0"
+          />
+          <div className="min-w-0">
             <p className="text-[0.68rem] uppercase tracking-[0.24em] text-muted-foreground">
-              Client Rooms
+              Client Room
             </p>
             <p className="truncate font-display text-2xl leading-none">
               {project.title}
             </p>
-          </Link>
-
-          <div className="hidden items-center gap-2 md:flex">
-            <Link href="/" className={headerLinkClass}>
-              Overview
-            </Link>
-            <Link href="/studio" className={headerLinkClass}>
-              Owner dashboard
-            </Link>
           </div>
         </div>
       </header>
@@ -96,25 +93,7 @@ export default async function ProjectRoomPage({ params }: ProjectPageProps) {
       <main>
         <section className="border-b border-border">
           <div className="mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-8 md:pb-16 md:pt-10 xl:px-12 xl:pb-20">
-            <nav
-              className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-              aria-label="Breadcrumb"
-            >
-              <Link href="/" className="transition-colors hover:text-foreground">
-                Client Rooms
-              </Link>
-              <span>/</span>
-              <Link
-                href="/studio"
-                className="transition-colors hover:text-foreground"
-              >
-                Projects
-              </Link>
-              <span>/</span>
-              <span className="text-foreground">{project.title}</span>
-            </nav>
-
-            <div className="mt-6 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="h-7 rounded-full px-3">
                 {project.code}
               </Badge>
@@ -217,6 +196,10 @@ export default async function ProjectRoomPage({ params }: ProjectPageProps) {
         </section>
 
         <ProjectDocumentBrowser project={project} />
+
+        <ProjectTimeline events={project.timeline} />
+
+        <ProjectGallery images={project.gallery} />
       </main>
     </div>
   );

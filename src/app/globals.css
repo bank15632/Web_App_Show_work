@@ -134,12 +134,11 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
-    @apply font-sans;
     scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background font-sans text-foreground;
   }
   ::selection {
     @apply bg-primary text-primary-foreground;
