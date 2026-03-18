@@ -22,14 +22,6 @@ export interface ProjectSection {
   items: ProjectDocument[];
 }
 
-export interface TimelineEvent {
-  id: string;
-  date: string;
-  title: string;
-  description: string;
-  completed: boolean;
-}
-
 export interface GalleryImage {
   id: string;
   src: string;
@@ -54,7 +46,6 @@ export interface ClientProject {
   nextMilestone: string;
   ownerNote: string;
   sections: ProjectSection[];
-  timeline: TimelineEvent[];
   gallery: GalleryImage[];
 }
 
@@ -77,15 +68,6 @@ const projects: ClientProject[] = [
       "บ้านพักอาศัย 2 ชั้นที่รวม Mood & Tone, Design, Construction Drawing และ BOQ ไว้ในลิงก์เดียว เพื่อให้ลูกค้าเลือกดูเป็นรายหมวดและราย revision ได้ทันที.",
     nextMilestone: "ส่ง Revise 03 ของแบบและ BOQ สำหรับอนุมัติหน้างาน",
     ownerNote: "เมื่อลูกค้า approve รอบนี้ ค่อย export drawing เป็น PDF print ชุดเต็ม",
-    timeline: [
-      { id: "tl-1", date: "2026-01-10", title: "เริ่มโปรเจกต์", description: "รับ brief และสรุป scope งาน", completed: true },
-      { id: "tl-2", date: "2026-01-25", title: "ส่ง Mood & Tone", description: "ส่ง moodboard ให้ลูกค้า review", completed: true },
-      { id: "tl-3", date: "2026-02-15", title: "ส่ง Design Revise 01", description: "Layout และ material direction รอบแรก", completed: true },
-      { id: "tl-4", date: "2026-03-03", title: "ส่ง Design Revise 02", description: "ปรับแบบตาม feedback ลูกค้า", completed: true },
-      { id: "tl-5", date: "2026-03-14", title: "ส่ง Design Revise 03", description: "แบบรอบล่าสุดรอ approve", completed: false },
-      { id: "tl-6", date: "2026-04-01", title: "ส่ง Construction Drawing", description: "แบบก่อสร้างชุดเต็ม", completed: false },
-      { id: "tl-7", date: "2026-04-15", title: "เริ่มงานก่อสร้าง", description: "ส่งมอบแบบให้ผู้รับเหมา", completed: false },
-    ],
     gallery: [
       { id: "g-1", src: "/gallery/riverside/01.jpg", caption: "Living Room - Warm Earth Tone" },
       { id: "g-2", src: "/gallery/riverside/02.jpg", caption: "Master Bedroom - Natural Light" },
@@ -221,6 +203,30 @@ const projects: ClientProject[] = [
           },
         ],
       },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานก่อสร้างจาก Microsoft Project",
+        items: [
+          {
+            id: "timeline-v2",
+            title: "Construction Timeline",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-03-14",
+            summary: "แผนงานล่าสุดอัปเดตตาม progress หน้างานจริง.",
+            latest: true,
+          },
+          {
+            id: "timeline-v1",
+            title: "Construction Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-02-20",
+            summary: "แผนงานเบื้องต้นก่อนเริ่มงานก่อสร้าง.",
+          },
+        ],
+      },
     ],
   },
   {
@@ -241,13 +247,6 @@ const projects: ClientProject[] = [
       "โครงการปรับห้องทำงานในบ้านให้พร้อมประชุมออนไลน์ โดยแบ่งเอกสารเป็น Mood & Tone, Design, Construction Drawing และ BOQ เพื่อ review เป็นชั้น ๆ.",
     nextMilestone: "รอ approve moodboard และ final design direction",
     ownerNote: "ลูกค้าเปิดดูจากมือถือบ่อย ต้องเช็กทุก document ว่าอ่านง่ายบนจอเล็ก",
-    timeline: [
-      { id: "tl-1", date: "2026-02-10", title: "เริ่มโปรเจกต์", description: "รับ brief สำหรับห้องทำงาน", completed: true },
-      { id: "tl-2", date: "2026-02-25", title: "ส่ง Mood & Tone", description: "Nordic Calm Palette", completed: true },
-      { id: "tl-3", date: "2026-03-08", title: "ส่ง Design Draft", description: "Layout และ shelving idea", completed: true },
-      { id: "tl-4", date: "2026-03-20", title: "Approve Design", description: "รอลูกค้า approve design direction", completed: false },
-      { id: "tl-5", date: "2026-04-05", title: "ส่ง Construction Drawing", description: "แบบ built-in และระบบไฟ", completed: false },
-    ],
     gallery: [
       { id: "g-1", src: "/gallery/nordic-office/01.jpg", caption: "Work Desk - Nordic Calm" },
       { id: "g-2", src: "/gallery/nordic-office/02.jpg", caption: "Shelving - Light Oak" },
@@ -333,6 +332,22 @@ const projects: ClientProject[] = [
           },
         ],
       },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานปรับปรุงห้องทำงาน",
+        items: [
+          {
+            id: "office-timeline-v1",
+            title: "Renovation Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-08",
+            summary: "แผนงานเบื้องต้นสำหรับงาน built-in และระบบไฟ.",
+            latest: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -353,14 +368,6 @@ const projects: ClientProject[] = [
       "รีโนเวตร้านกาแฟขนาดกลางโดยแยกเอกสารเป็น Mood & Tone, Design, Construction Drawing และ BOQ เพื่อให้เจ้าของร้านไล่ดูเป็น revision ได้ง่าย.",
     nextMilestone: "ส่ง revise ชุดล่าสุดก่อนเริ่มงาน built-in counter",
     ownerNote: "ถ้า drawing set ชุดถัดไปเกิน 25MB ให้ย้ายไฟล์ PDF ไป R2 แล้วใช้ path เดิมใน portal",
-    timeline: [
-      { id: "tl-1", date: "2025-11-20", title: "เริ่มโปรเจกต์", description: "สำรวจพื้นที่และรับ brief", completed: true },
-      { id: "tl-2", date: "2025-12-10", title: "ส่ง Mood & Tone", description: "โทนวัสดุและบรรยากาศร้าน", completed: true },
-      { id: "tl-3", date: "2026-01-15", title: "ส่ง Design", description: "Zoning และ layout ร้าน", completed: true },
-      { id: "tl-4", date: "2026-02-28", title: "ส่ง Construction Drawing", description: "แบบก่อสร้าง counter, ceiling", completed: true },
-      { id: "tl-5", date: "2026-03-15", title: "เริ่มงานก่อสร้าง", description: "ส่งมอบแบบให้ผู้รับเหมา", completed: true },
-      { id: "tl-6", date: "2026-04-30", title: "ส่งมอบงาน", description: "ตรวจงานและส่งมอบ", completed: false },
-    ],
     gallery: [
       { id: "g-1", src: "/gallery/atelier-cafe/01.jpg", caption: "Facade - Dark Wood & Concrete" },
       { id: "g-2", src: "/gallery/atelier-cafe/02.jpg", caption: "Bar Counter - Custom Built-in" },
@@ -463,6 +470,30 @@ const projects: ClientProject[] = [
           },
         ],
       },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานก่อสร้างร้านกาแฟ",
+        items: [
+          {
+            id: "cafe-timeline-v2",
+            title: "Construction Timeline",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-03-15",
+            summary: "แผนงานอัปเดตรวม phase งาน counter และ facade.",
+            latest: true,
+          },
+          {
+            id: "cafe-timeline-v1",
+            title: "Construction Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-02-28",
+            summary: "แผนงานเริ่มต้นก่อนเริ่มรื้อถอนและก่อสร้าง.",
+          },
+        ],
+      },
     ],
   },
   {
@@ -483,13 +514,6 @@ const projects: ClientProject[] = [
       "ตกแต่งคอนโด 2 ห้องนอนสไตล์ Modern Minimal โดยเน้นใช้พื้นที่อย่างคุ้มค่าและวัสดุโทนอบอุ่น.",
     nextMilestone: "รอ approve Design Revise 02 ก่อนเข้าสู่ขั้น construction",
     ownerNote: "ลูกค้าต้องการเน้น built-in storage และ lighting ที่ปรับ mood ได้",
-    timeline: [
-      { id: "tl-1", date: "2026-01-25", title: "เริ่มโปรเจกต์", description: "รับ brief คอนโด 2 ห้องนอน", completed: true },
-      { id: "tl-2", date: "2026-02-15", title: "ส่ง Mood & Tone", description: "Modern Minimal Direction", completed: true },
-      { id: "tl-3", date: "2026-03-10", title: "ส่ง Design Revise 02", description: "อัปเดต layout ห้องนอนใหญ่", completed: true },
-      { id: "tl-4", date: "2026-03-25", title: "Approve Design", description: "รอลูกค้า approve", completed: false },
-      { id: "tl-5", date: "2026-04-10", title: "ส่ง Construction Drawing", description: "แบบ built-in และ electrical", completed: false },
-    ],
     gallery: [
       { id: "g-1", src: "/gallery/sukhumvit-condo/01.jpg", caption: "Living Room - Modern Minimal" },
       { id: "g-2", src: "/gallery/sukhumvit-condo/02.jpg", caption: "Master Bedroom - Built-in Wardrobe" },
@@ -576,6 +600,22 @@ const projects: ClientProject[] = [
           },
         ],
       },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานตกแต่งคอนโด",
+        items: [
+          {
+            id: "condo-suk-timeline-v1",
+            title: "Renovation Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-10",
+            summary: "แผนงานเบื้องต้นสำหรับงาน built-in และ electrical.",
+            latest: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -596,12 +636,6 @@ const projects: ClientProject[] = [
       "คอนโด loft style ชั้นบนเป็นห้องนอน ชั้นล่างเป็น living + work area ต้องการ mood industrial warm.",
     nextMilestone: "รอ approve Mood & Tone ก่อนเริ่มทำ design",
     ownerNote: "ลูกค้าชอบสไตล์ industrial แต่ต้องไม่ดิบเกินไป ให้มี warmth เข้ามา",
-    timeline: [
-      { id: "tl-1", date: "2026-03-01", title: "เริ่มโปรเจกต์", description: "สำรวจพื้นที่ loft", completed: true },
-      { id: "tl-2", date: "2026-03-12", title: "ส่ง Mood & Tone", description: "Industrial Warm Direction", completed: true },
-      { id: "tl-3", date: "2026-03-25", title: "ส่ง Design", description: "Layout ชั้นบน-ล่าง", completed: false },
-      { id: "tl-4", date: "2026-04-10", title: "ส่ง Construction Drawing", description: "แบบบันไดและ built-in", completed: false },
-    ],
     gallery: [],
     sections: [
       {
@@ -668,6 +702,22 @@ const projects: ClientProject[] = [
           },
         ],
       },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานตกแต่ง loft condo",
+        items: [
+          {
+            id: "condo-rat-timeline-v1",
+            title: "Renovation Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-03-12",
+            summary: "แผนงานเบื้องต้นรวมงานบันไดและ built-in.",
+            latest: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -688,13 +738,6 @@ const projects: ClientProject[] = [
       "ออกแบบ co-working space 3 ชั้น รวม private office, hot desk, meeting room และ cafe lounge.",
     nextMilestone: "ส่ง Revise 02 ของ Design และ Construction Drawing",
     ownerNote: "มี stakeholder หลายคน ต้อง revise หลายรอบ ควรเก็บ archive ทุก version",
-    timeline: [
-      { id: "tl-1", date: "2025-12-05", title: "เริ่มโปรเจกต์", description: "รับ brief co-working 3 ชั้น", completed: true },
-      { id: "tl-2", date: "2026-01-15", title: "ส่ง Mood & Tone", description: "Creative Professional Palette", completed: true },
-      { id: "tl-3", date: "2026-02-28", title: "ส่ง Design Revise 02", description: "อัปเดต meeting room และ cafe", completed: true },
-      { id: "tl-4", date: "2026-03-15", title: "ส่ง Construction Drawing", description: "แบบ partition และ M&E", completed: false },
-      { id: "tl-5", date: "2026-04-01", title: "เริ่มงานก่อสร้าง", description: "Phase 1 - ชั้น 1", completed: false },
-    ],
     gallery: [
       { id: "g-1", src: "/gallery/cowork-thonglor/01.jpg", caption: "Reception - Plant Wall" },
       { id: "g-2", src: "/gallery/cowork-thonglor/02.jpg", caption: "Hot Desk Area - Open Plan" },
@@ -780,6 +823,22 @@ const projects: ClientProject[] = [
           },
         ],
       },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานก่อสร้าง co-working space 3 ชั้น",
+        items: [
+          {
+            id: "cowork-timeline-v1",
+            title: "Construction Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2026-02-28",
+            summary: "แผนงาน 3 phase สำหรับชั้น 1-3 ตามลำดับ.",
+            latest: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -800,15 +859,6 @@ const projects: ClientProject[] = [
       "บ้านเดี่ยว 3 ชั้น สไตล์ Modern Tropical เน้น natural ventilation และ indoor-outdoor connection.",
     nextMilestone: "งาน construction เริ่มแล้ว รอติดตามหน้างาน",
     ownerNote: "โปรเจกต์นี้ปิดแบบแล้ว ลูกค้าใช้ดู drawing หน้างาน",
-    timeline: [
-      { id: "tl-1", date: "2025-10-15", title: "เริ่มโปรเจกต์", description: "รับ brief บ้าน 3 ชั้น", completed: true },
-      { id: "tl-2", date: "2025-11-20", title: "ส่ง Mood & Tone", description: "Modern Tropical Direction", completed: true },
-      { id: "tl-3", date: "2025-12-20", title: "ส่ง Design Revise 02", description: "ปรับ master bedroom และ pool", completed: true },
-      { id: "tl-4", date: "2026-01-10", title: "Approve Design Final", description: "ลูกค้า approve design + landscape", completed: true },
-      { id: "tl-5", date: "2026-01-20", title: "ส่ง Construction Drawing", description: "แบบ final สำหรับก่อสร้าง", completed: true },
-      { id: "tl-6", date: "2026-02-01", title: "เริ่มงานก่อสร้าง", description: "ผู้รับเหมาเริ่มงาน", completed: true },
-      { id: "tl-7", date: "2026-06-30", title: "ส่งมอบงาน", description: "ตรวจงานและส่งมอบบ้าน", completed: false },
-    ],
     gallery: [
       { id: "g-1", src: "/gallery/pattanakan-house/01.jpg", caption: "Exterior - Modern Tropical Facade" },
       { id: "g-2", src: "/gallery/pattanakan-house/02.jpg", caption: "Living Room - Double Height" },
@@ -918,6 +968,30 @@ const projects: ClientProject[] = [
             kind: "pdf",
             updatedAt: "2025-12-28",
             summary: "BOQ เบื้องต้นก่อนเพิ่มรายการ landscape.",
+          },
+        ],
+      },
+      {
+        id: "timeline",
+        title: "Timeline",
+        description: "แผนงานก่อสร้างบ้าน 3 ชั้น",
+        items: [
+          {
+            id: "house-pat-timeline-v2",
+            title: "Construction Timeline",
+            version: "Revise 02",
+            kind: "pdf",
+            updatedAt: "2026-01-20",
+            summary: "แผนงานอัปเดตรวม landscape และ pool construction.",
+            latest: true,
+          },
+          {
+            id: "house-pat-timeline-v1",
+            title: "Construction Timeline",
+            version: "Revise 01",
+            kind: "pdf",
+            updatedAt: "2025-12-28",
+            summary: "แผนงานเริ่มต้นสำหรับงาน structural และ M&E.",
           },
         ],
       },
