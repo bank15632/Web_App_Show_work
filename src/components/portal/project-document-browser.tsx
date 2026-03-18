@@ -16,7 +16,7 @@ import {
 } from "@/lib/portal-data";
 import { cn } from "@/lib/utils";
 
-type CategoryId = "mood-tone" | "design" | "construction" | "boq";
+type CategoryId = "mood-tone" | "design" | "construction" | "boq" | "timeline";
 
 type CategoryConfig = {
   id: CategoryId;
@@ -32,6 +32,7 @@ const categoryConfig: CategoryConfig[] = [
   { id: "design", label: "Design" },
   { id: "construction", label: "Construction drawing" },
   { id: "boq", label: "BOQ" },
+  { id: "timeline", label: "Timeline" },
 ];
 
 export function ProjectDocumentBrowser({

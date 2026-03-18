@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 
 import { ProjectDocumentBrowser } from "@/components/portal/project-document-browser";
 import { ProjectGallery } from "@/components/portal/project-gallery";
-import { ProjectTimeline } from "@/components/portal/project-timeline";
 import { DocumentPreview } from "@/components/portal/document-preview";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -196,8 +195,6 @@ export default async function ProjectRoomPage({ params }: ProjectPageProps) {
         </section>
 
         <ProjectDocumentBrowser project={project} />
-
-        <ProjectTimeline events={project.timeline} />
 
         <ProjectGallery images={project.gallery} />
       </main>
