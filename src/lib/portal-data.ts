@@ -3,6 +3,11 @@ export type ProjectStage = "concept" | "revision" | "construction" | "archived";
 export type ProjectType = "House" | "Condo" | "Commercial";
 export type RevisionStatus = "todo" | "doing" | "done";
 
+export interface RevisionRoom {
+  name: string;
+  description: string;
+}
+
 export interface ProjectDocument {
   id: string;
   title: string;
@@ -11,6 +16,8 @@ export interface ProjectDocument {
   updatedAt: string;
   summary: string;
   latest?: boolean;
+  checked?: boolean;
+  rooms?: RevisionRoom[];
   viewerUrl?: string;
   downloadUrl?: string;
 }
@@ -102,6 +109,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "mood-tone-v3",
+            checked: false,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "ปรับโทนผนังและ accent" }, { name: "ห้องนอนใหญ่", description: "เพิ่ม warm lighting" }, { name: "ห้องครัว", description: "อัปเดตวัสดุ countertop" }],
             title: "Warm Earth Interior Direction",
             version: "Revise 03",
             kind: "canva",
@@ -111,6 +120,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "mood-tone-v2",
+            checked: true,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "ปรับ texture ผ้า" }, { name: "ห้องนอนใหญ่", description: "เปลี่ยนโทนผนัง" }],
             title: "Warm Earth Interior Direction",
             version: "Revise 02",
             kind: "canva",
@@ -119,6 +130,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "mood-tone-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Mood เริ่มต้น" }],
             title: "Warm Earth Interior Direction",
             version: "Revise 01",
             kind: "canva",
@@ -134,6 +147,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "design-v3",
+            checked: false,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "ปรับ layout โซฟา" }, { name: "ห้องนอนใหญ่", description: "แก้ walk-in closet" }],
             title: "Design Presentation",
             version: "Revise 03",
             kind: "pdf",
@@ -143,6 +158,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "design-v2",
+            checked: true,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "ย้ายตำแหน่งทีวี" }, { name: "ห้องครัว", description: "เปลี่ยน island layout" }],
             title: "Design Presentation",
             version: "Revise 02",
             kind: "pdf",
@@ -151,6 +168,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "design-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Zoning และ layout เบื้องต้น" }],
             title: "Design Presentation",
             version: "Revise 01",
             kind: "pdf",
@@ -166,6 +185,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "construction-v3",
+            checked: false,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "built-in ตู้ทีวี" }, { name: "ห้องนอนใหญ่", description: "electrical + built-in" }, { name: "ห้องครัว", description: "cabinet detail" }],
             title: "Construction Drawing Set",
             version: "Revise 03",
             kind: "pdf",
@@ -175,6 +196,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "construction-v2",
+            checked: true,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "ปรับ electrical point" }, { name: "ห้องนอนใหญ่", description: "แก้ built-in detail" }],
             title: "Construction Drawing Set",
             version: "Revise 02",
             kind: "pdf",
@@ -183,6 +206,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "construction-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Drawing set เริ่มต้น" }],
             title: "Construction Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -198,6 +223,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "boq-v3",
+            checked: false,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "อัปเดตราคา built-in" }, { name: "ห้องนอนใหญ่", description: "เพิ่มรายการ closet" }, { name: "ห้องครัว", description: "ราคาวัสดุ countertop" }],
             title: "BOQ Package",
             version: "Revise 03",
             kind: "pdf",
@@ -207,6 +234,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "boq-v2",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "เทียบต้นทุนวัสดุ" }],
             title: "BOQ Package",
             version: "Revise 02",
             kind: "pdf",
@@ -215,6 +244,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "boq-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "BOQ เบื้องต้น" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -230,6 +261,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "timeline-v2",
+            checked: false,
+            rooms: [{ name: "ทั้งหลัง", description: "อัปเดต progress" }],
             title: "Construction Timeline",
             version: "Revise 02",
             kind: "pdf",
@@ -239,6 +272,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "timeline-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "แผนงานเบื้องต้น" }],
             title: "Construction Timeline",
             version: "Revise 01",
             kind: "pdf",
@@ -283,6 +318,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "office-mood-v2",
+            checked: false,
+            rooms: [{ name: "ห้องทำงาน", description: "ปรับโทนไม้และ accent" }],
             title: "Nordic Calm Palette",
             version: "Revise 02",
             kind: "canva",
@@ -292,6 +329,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "office-mood-v1",
+            checked: true,
+            rooms: [{ name: "ห้องทำงาน", description: "Mood เริ่มต้น" }],
             title: "Soft Contrast Palette",
             version: "Revise 01",
             kind: "canva",
@@ -307,6 +346,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "office-design-v2",
+            checked: false,
+            rooms: [{ name: "ห้องทำงาน", description: "ปรับ shelving และแสง" }],
             title: "Draft Layout Pack",
             version: "Revise 02",
             kind: "pdf",
@@ -316,6 +357,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "office-design-v1",
+            checked: true,
+            rooms: [{ name: "ห้องทำงาน", description: "Layout เบื้องต้น" }],
             title: "Draft Layout Pack",
             version: "Revise 01",
             kind: "pdf",
@@ -331,6 +374,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "office-construction-v1",
+            checked: false,
+            rooms: [{ name: "ห้องทำงาน", description: "Built-in และจุดปลั๊ก" }],
             title: "Home Office Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -347,6 +392,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "office-boq-v1",
+            checked: false,
+            rooms: [{ name: "ห้องทำงาน", description: "BOQ built-in + ไฟ" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -363,6 +410,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "office-timeline-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งหลัง", description: "แผนงานเบื้องต้น" }],
             title: "Renovation Timeline",
             version: "Revise 01",
             kind: "pdf",
@@ -413,6 +462,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cafe-mood-v2",
+            checked: true,
+            rooms: [{ name: "หน้าร้าน", description: "โทน facade" }, { name: "เคาน์เตอร์", description: "วัสดุ bar" }],
             title: "Cafe Material Direction",
             version: "Revise 02",
             kind: "canva",
@@ -422,6 +473,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cafe-mood-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งร้าน", description: "Mood เริ่มต้น" }],
             title: "Cafe Material Direction",
             version: "Revise 01",
             kind: "canva",
@@ -437,6 +490,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cafe-design-v2",
+            checked: true,
+            rooms: [{ name: "หน้าร้าน", description: "Facade detail" }, { name: "เคาน์เตอร์", description: "Bar counter layout" }, { name: "ที่นั่ง", description: "Seating mix" }],
             title: "Cafe Design Update",
             version: "Revise 02",
             kind: "pdf",
@@ -446,6 +501,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cafe-design-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งร้าน", description: "Zoning เบื้องต้น" }],
             title: "Cafe Design Update",
             version: "Revise 01",
             kind: "pdf",
@@ -461,6 +518,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cafe-construction-v2",
+            checked: true,
+            rooms: [{ name: "หน้าร้าน", description: "Plan + signage" }, { name: "เคาน์เตอร์", description: "Counter section" }, { name: "ที่นั่ง", description: "Ceiling plan" }],
             title: "Construction Drawing Set",
             version: "Revise 02",
             kind: "pdf",
@@ -470,6 +529,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cafe-construction-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งร้าน", description: "Drawing เริ่มต้น" }],
             title: "Construction Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -485,6 +546,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cafe-boq-v2",
+            checked: true,
+            rooms: [{ name: "เคาน์เตอร์", description: "งบ built-in counter" }, { name: "ที่นั่ง", description: "Loose furniture" }, { name: "หน้าร้าน", description: "Signage" }],
             title: "BOQ Package",
             version: "Revise 02",
             kind: "pdf",
@@ -494,6 +557,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cafe-boq-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งร้าน", description: "BOQ เบื้องต้น" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -509,6 +574,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cafe-timeline-v2",
+            checked: true,
+            rooms: [{ name: "ทั้งร้าน", description: "อัปเดต phase งาน" }],
             title: "Construction Timeline",
             version: "Revise 02",
             kind: "pdf",
@@ -518,6 +585,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cafe-timeline-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งร้าน", description: "แผนงานเริ่มต้น" }],
             title: "Construction Timeline",
             version: "Revise 01",
             kind: "pdf",
@@ -567,6 +636,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-suk-mood-v2",
+            checked: false,
+            rooms: [{ name: "ห้องนั่งเล่น", description: "Clean line accent" }, { name: "ห้องนอนใหญ่", description: "โทนผนัง" }],
             title: "Modern Minimal Direction",
             version: "Revise 02",
             kind: "canva",
@@ -576,6 +647,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "condo-suk-mood-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งห้อง", description: "เปรียบเทียบ 2 แนวทาง" }],
             title: "Modern Minimal Direction",
             version: "Revise 01",
             kind: "canva",
@@ -591,6 +664,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-suk-design-v2",
+            checked: false,
+            rooms: [{ name: "ห้องนอนใหญ่", description: "อัปเดต layout" }, { name: "ห้องนอนใหญ่", description: "Walk-in closet" }],
             title: "Condo Layout Presentation",
             version: "Revise 02",
             kind: "pdf",
@@ -600,6 +675,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "condo-suk-design-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งห้อง", description: "Layout เบื้องต้น" }],
             title: "Condo Layout Presentation",
             version: "Revise 01",
             kind: "pdf",
@@ -615,6 +692,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-suk-construction-v1",
+            checked: false,
+            rooms: [{ name: "ห้องนอนใหญ่", description: "Wardrobe built-in" }, { name: "ห้องครัว", description: "Kitchen cabinet" }],
             title: "Condo Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -631,6 +710,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-suk-boq-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งห้อง", description: "BOQ built-in + furniture" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -647,6 +728,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-suk-timeline-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งห้อง", description: "แผนงานเบื้องต้น" }],
             title: "Renovation Timeline",
             version: "Revise 01",
             kind: "pdf",
@@ -687,6 +770,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-rat-mood-v1",
+            checked: false,
+            rooms: [{ name: "ชั้นบน", description: "โทนห้องนอน" }, { name: "ชั้นล่าง", description: "โทน living + work" }],
             title: "Industrial Warm Direction",
             version: "Revise 01",
             kind: "canva",
@@ -703,6 +788,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-rat-design-v1",
+            checked: false,
+            rooms: [{ name: "ชั้นบน", description: "Layout ห้องนอน" }, { name: "ชั้นล่าง", description: "Zoning + stair" }],
             title: "Loft Design Draft",
             version: "Revise 01",
             kind: "pdf",
@@ -719,6 +806,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-rat-construction-v1",
+            checked: false,
+            rooms: [{ name: "บันได", description: "Stair + railing" }, { name: "ชั้นล่าง", description: "Built-in เบื้องต้น" }],
             title: "Loft Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -735,6 +824,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-rat-boq-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งห้อง", description: "BOQ เบื้องต้น" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -751,6 +842,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "condo-rat-timeline-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งห้อง", description: "แผนงานเบื้องต้น" }],
             title: "Renovation Timeline",
             version: "Revise 01",
             kind: "pdf",
@@ -798,6 +891,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cowork-mood-v2",
+            checked: true,
+            rooms: [{ name: "Common area", description: "Warm grey + plant wall" }, { name: "Private office", description: "โทนสงบ" }],
             title: "Creative Professional Palette",
             version: "Revise 02",
             kind: "canva",
@@ -807,6 +902,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cowork-mood-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งอาคาร", description: "เปรียบเทียบ mood" }],
             title: "Creative Professional Palette",
             version: "Revise 01",
             kind: "canva",
@@ -822,6 +919,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cowork-design-v2",
+            checked: false,
+            rooms: [{ name: "ชั้น 1", description: "Cafe lounge update" }, { name: "ชั้น 2", description: "Meeting room layout" }],
             title: "Co-working Design Pack",
             version: "Revise 02",
             kind: "pdf",
@@ -831,6 +930,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "cowork-design-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งอาคาร", description: "Zoning 3 ชั้น" }],
             title: "Co-working Design Pack",
             version: "Revise 01",
             kind: "pdf",
@@ -846,6 +947,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cowork-construction-v1",
+            checked: false,
+            rooms: [{ name: "ชั้น 1", description: "Reception counter" }, { name: "ทั้งอาคาร", description: "Partition + M&E" }],
             title: "Co-working Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -862,6 +965,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cowork-boq-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งอาคาร", description: "BOQ partition + furniture" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -878,6 +983,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "cowork-timeline-v1",
+            checked: false,
+            rooms: [{ name: "ทั้งอาคาร", description: "แผนงาน 3 phase" }],
             title: "Construction Timeline",
             version: "Revise 01",
             kind: "pdf",
@@ -934,6 +1041,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "house-pat-mood-v2",
+            checked: true,
+            rooms: [{ name: "ภายนอก", description: "โทน facade + landscape" }, { name: "ภายใน", description: "ไม้ + หิน + ต้นไม้" }],
             title: "Modern Tropical Direction",
             version: "Revise 02",
             kind: "canva",
@@ -943,6 +1052,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "house-pat-mood-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "เปรียบเทียบ tropical style" }],
             title: "Modern Tropical Direction",
             version: "Revise 01",
             kind: "canva",
@@ -958,6 +1069,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "house-pat-design-v3",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Final + landscape plan" }],
             title: "House Design Presentation",
             version: "Revise 03",
             kind: "pdf",
@@ -967,6 +1080,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "house-pat-design-v2",
+            checked: true,
+            rooms: [{ name: "ห้องนอนใหญ่", description: "ปรับ layout" }, { name: "สระว่ายน้ำ", description: "Pool area" }],
             title: "House Design Presentation",
             version: "Revise 02",
             kind: "pdf",
@@ -975,6 +1090,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "house-pat-design-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Zoning 3 ชั้น" }],
             title: "House Design Presentation",
             version: "Revise 01",
             kind: "pdf",
@@ -990,6 +1107,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "house-pat-construction-v2",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Final drawing set" }],
             title: "Construction Drawing Set",
             version: "Revise 02",
             kind: "pdf",
@@ -999,6 +1118,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "house-pat-construction-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "Drawing เริ่มต้น" }],
             title: "Construction Drawing Set",
             version: "Revise 01",
             kind: "pdf",
@@ -1014,6 +1135,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "house-pat-boq-v2",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "BOQ final + landscape" }],
             title: "BOQ Package",
             version: "Revise 02",
             kind: "pdf",
@@ -1023,6 +1146,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "house-pat-boq-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "BOQ เบื้องต้น" }],
             title: "BOQ Package",
             version: "Revise 01",
             kind: "pdf",
@@ -1038,6 +1163,8 @@ const projects: ClientProject[] = [
         items: [
           {
             id: "house-pat-timeline-v2",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "อัปเดต landscape + pool" }],
             title: "Construction Timeline",
             version: "Revise 02",
             kind: "pdf",
@@ -1047,6 +1174,8 @@ const projects: ClientProject[] = [
           },
           {
             id: "house-pat-timeline-v1",
+            checked: true,
+            rooms: [{ name: "ทั้งหลัง", description: "แผนงานเริ่มต้น" }],
             title: "Construction Timeline",
             version: "Revise 01",
             kind: "pdf",
