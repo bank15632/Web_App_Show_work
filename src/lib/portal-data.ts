@@ -41,6 +41,20 @@ export interface GalleryRoom {
   images: GalleryImage[];
 }
 
+export type TodoPriority = "low" | "medium" | "high";
+export type TodoStatus = "pending" | "in-progress" | "completed";
+
+export interface TodoItem {
+  id: string;
+  title: string;
+  description?: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+  projectSlug?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
 export interface ClientProject {
   slug: string;
   code: string;
@@ -1274,5 +1288,108 @@ export function getRevisionStatusLabel(status: RevisionStatus) {
       return "Doing";
     case "done":
       return "Done";
+  }
+}
+
+const defaultTodos: TodoItem[] = [
+  {
+    id: "todo-1",
+    title: "ส่ง Revise 03 แบบ Mood & Tone ให้ลูกค้า",
+    description: "ปรับโทนผนังห้องนั่งเล่น + เพิ่ม warm lighting ห้องนอนใหญ่",
+    status: "in-progress",
+    priority: "high",
+    projectSlug: "riverside-residence-b7x2",
+    createdAt: "2026-03-10",
+  },
+  {
+    id: "todo-2",
+    title: "อัปเดต BOQ ราคาวัสดุห้องครัว",
+    description: "เปลี่ยน countertop จาก marble เป็น engineered stone ตามที่ลูกค้าแจ้ง",
+    status: "pending",
+    priority: "high",
+    projectSlug: "riverside-residence-b7x2",
+    createdAt: "2026-03-12",
+  },
+  {
+    id: "todo-3",
+    title: "Export Construction Drawing ชุดเต็ม",
+    description: "รอลูกค้า approve Revise 03 ก่อน แล้วค่อย export PDF print",
+    status: "pending",
+    priority: "medium",
+    projectSlug: "riverside-residence-b7x2",
+    createdAt: "2026-03-14",
+  },
+  {
+    id: "todo-4",
+    title: "เตรียม Mood Board สำหรับ Nordic Home Office",
+    description: "ลูกค้าต้องการสไตล์ Scandinavian + Japanese minimal",
+    status: "pending",
+    priority: "medium",
+    projectSlug: "nordic-home-office-l2k7",
+    createdAt: "2026-03-08",
+  },
+  {
+    id: "todo-5",
+    title: "ถ่ายรูปงานเสร็จ Atelier Cafe",
+    description: "นัดช่างภาพถ่ายงานเสร็จเพื่อลง Gallery",
+    status: "completed",
+    priority: "low",
+    projectSlug: "atelier-cafe-renovation-m4p1",
+    createdAt: "2026-02-20",
+    completedAt: "2026-03-05",
+  },
+  {
+    id: "todo-6",
+    title: "ส่ง Timeline อัปเดตให้ผู้รับเหมา",
+    description: "Export จาก Microsoft Project แล้วอัปเดตในระบบ",
+    status: "in-progress",
+    priority: "medium",
+    projectSlug: "sukhumvit-condo-unit-k9r3",
+    createdAt: "2026-03-11",
+  },
+  {
+    id: "todo-7",
+    title: "ตรวจงาน site visit Pattanakan",
+    description: "เช็คงานติดตั้งเฟอร์นิเจอร์ built-in ห้องนอน + ห้องนั่งเล่น",
+    status: "completed",
+    priority: "high",
+    projectSlug: "pattanakan-modern-house-w3n5",
+    createdAt: "2026-02-28",
+    completedAt: "2026-03-15",
+  },
+  {
+    id: "todo-8",
+    title: "Review แบบ Co-working Space zone ประชุม",
+    description: "ลูกค้าขอเพิ่ม partition กั้นเสียงระหว่างห้องประชุม",
+    status: "pending",
+    priority: "high",
+    projectSlug: "thonglor-co-working-space-j2m6",
+    createdAt: "2026-03-16",
+  },
+];
+
+export function getDefaultTodos(): TodoItem[] {
+  return defaultTodos;
+}
+
+export function getTodoPriorityLabel(priority: TodoPriority) {
+  switch (priority) {
+    case "low":
+      return "ต่ำ";
+    case "medium":
+      return "ปานกลาง";
+    case "high":
+      return "สูง";
+  }
+}
+
+export function getTodoStatusLabel(status: TodoStatus) {
+  switch (status) {
+    case "pending":
+      return "รอดำเนินการ";
+    case "in-progress":
+      return "กำลังทำ";
+    case "completed":
+      return "เสร็จแล้ว";
   }
 }
