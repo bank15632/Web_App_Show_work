@@ -54,6 +54,9 @@
 
 /* BNJ Studio - Black & White Luxury Minimal Palette */
 :root {
+  --font-body: "Prompt", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-code: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --background: #FFFFFF;
   --foreground: #1A1A1A;
   --card: #FFFFFF;

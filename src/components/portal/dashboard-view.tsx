@@ -215,7 +215,7 @@ export function DashboardView() {
             className="ml-auto inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
           >
             <ListTodo className="size-4" />
-            Todo List
+            AI Project Tracker
           </Link>
         </div>
       </header>

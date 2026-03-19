@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "studio-client-rooms-test",
+  "main": "src/test/empty-worker.ts",
+  "compatibility_date": "2026-03-19",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "studio-client-rooms-test",
+      "database_id": "11111111-1111-1111-1111-111111111111",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS_BUCKET",
+      "bucket_name": "studio-client-rooms-test-artifacts"
+    },
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "studio-client-rooms-test-cache"
+    }
+  ]
+}
