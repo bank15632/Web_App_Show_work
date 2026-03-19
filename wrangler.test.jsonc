@@ -16,10 +16,6 @@
     {
       "binding": "ARTIFACTS_BUCKET",
       "bucket_name": "studio-client-rooms-test-artifacts"
-    },
-    {
-      "binding": "NEXT_INC_CACHE_R2_BUCKET",
-      "bucket_name": "studio-client-rooms-test-cache"
     }
   ]
 }
