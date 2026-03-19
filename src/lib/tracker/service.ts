@@ -1,5 +1,6 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 
+import type { TrackerEnv } from "@/lib/tracker/env";
 import { buildTrackerSeedBundle } from "@/lib/tracker/seed";
 import { projectMutationSchema, taskMutationSchema } from "@/lib/tracker/schemas";
 import { trackerMigrationSql } from "@/lib/tracker/sql";
@@ -505,7 +506,7 @@ async function initializeTracker(db: D1Database) {
   }
 }
 
-export async function ensureTrackerReady(env: CloudflareEnv) {
+export async function ensureTrackerReady(env: TrackerEnv) {
   const cached = readyByDb.get(env.DB);
   if (cached) {
     return cached;
@@ -516,7 +517,7 @@ export async function ensureTrackerReady(env: CloudflareEnv) {
   await pending;
 }
 
-export async function getWorkspaceData(env: CloudflareEnv): Promise<TrackerWorkspaceData> {
+export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspaceData> {
   await ensureTrackerReady(env);
 
   const [projectRows, taskRows, decisionRows, artifactRows, reviewItemRows] =
@@ -585,7 +586,7 @@ export async function getWorkspaceData(env: CloudflareEnv): Promise<TrackerWorks
   };
 }
 
-export async function getAuditLogs(env: CloudflareEnv, projectId: string) {
+export async function getAuditLogs(env: TrackerEnv, projectId: string) {
   await ensureTrackerReady(env);
   const rows = await queryAll<AuditLogRow>(
     env.DB,
@@ -596,7 +597,7 @@ export async function getAuditLogs(env: CloudflareEnv, projectId: string) {
   return rows.map(mapAuditLogRow);
 }
 
-export async function getProjectById(env: CloudflareEnv, projectId: string) {
+export async function getProjectById(env: TrackerEnv, projectId: string) {
   await ensureTrackerReady(env);
   const row = await queryFirst<ProjectRow>(
     env.DB,
@@ -667,7 +668,7 @@ async function writeAuditLog(
 }
 
 export async function createProject(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   input: TrackerProjectMutationInput,
 ) {
   await ensureTrackerReady(env);
@@ -716,7 +717,7 @@ export async function createProject(
 }
 
 export async function updateProject(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   projectId: string,
   patch: Partial<TrackerProjectMutationInput>,
 ) {
@@ -786,7 +787,7 @@ export async function updateProject(
 }
 
 export async function createTask(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   projectId: string,
   input: TrackerTaskMutationInput,
   options?: {
@@ -864,7 +865,7 @@ export async function createTask(
 }
 
 export async function updateTask(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   taskId: string,
   patch: Partial<TrackerTaskMutationInput>,
   options?: {
@@ -958,7 +959,7 @@ export async function updateTask(
   return updated;
 }
 
-export async function deleteTask(env: CloudflareEnv, taskId: string) {
+export async function deleteTask(env: TrackerEnv, taskId: string) {
   await ensureTrackerReady(env);
   const existing = await getTaskByIdInternal(env.DB, taskId);
   if (!existing) {
@@ -982,7 +983,7 @@ export async function deleteTask(env: CloudflareEnv, taskId: string) {
 }
 
 export async function reorderTasks(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   projectId: string,
   tasks: TrackerBoardMove[],
 ) {
@@ -1022,7 +1023,7 @@ export async function reorderTasks(
 }
 
 export async function createArtifact(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   input: TrackerArtifactMutationInput,
   options?: {
     actor?: string;
@@ -1081,7 +1082,7 @@ export async function createArtifact(
 }
 
 export async function createDecision(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   projectId: string,
   input: TrackerDecisionMutationInput,
   options?: {
@@ -1138,7 +1139,7 @@ export async function createDecision(
 }
 
 export async function createReviewItems(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   proposals: TrackerReviewProposal[],
 ) {
   await ensureTrackerReady(env);
@@ -1181,7 +1182,7 @@ export async function createReviewItems(
 }
 
 export async function resolveReviewItemApproval(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   reviewItemId: string,
   reviewedBy = "BNJ Studio",
 ): Promise<TrackerReviewResolution> {
@@ -1335,7 +1336,7 @@ export async function resolveReviewItemApproval(
 }
 
 export async function resolveReviewItemRejection(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   reviewItemId: string,
   reason: string,
   reviewedBy = "BNJ Studio",
@@ -1386,7 +1387,7 @@ export async function resolveReviewItemRejection(
   };
 }
 
-async function ensureLegacyInboxProject(env: CloudflareEnv) {
+async function ensureLegacyInboxProject(env: TrackerEnv) {
   const existing = await queryFirst<ProjectRow>(
     env.DB,
     "SELECT * FROM projects WHERE slug = 'legacy-inbox'",
@@ -1414,7 +1415,7 @@ async function ensureLegacyInboxProject(env: CloudflareEnv) {
 }
 
 export async function importLegacyTodos(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   items: TrackerLegacyTodoImport[],
 ) {
   await ensureTrackerReady(env);
@@ -1467,7 +1468,7 @@ export async function importLegacyTodos(
 }
 
 export async function answerWorkspaceQuery(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   question: string,
   projectId?: string,
 ): Promise<TrackerQueryResult> {

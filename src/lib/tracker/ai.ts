@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 
 import { trackerModelDefault } from "@/lib/tracker/constants";
+import type { TrackerEnv } from "@/lib/tracker/env";
 import { aiGenerationSchema } from "@/lib/tracker/schemas";
 import {
   answerWorkspaceQuery,
@@ -15,7 +16,7 @@ import type {
 } from "@/lib/tracker/types";
 
 interface ArtifactGenerationOptions {
-  env: CloudflareEnv;
+  env: TrackerEnv;
   artifact: TrackerArtifactRecord;
   project: TrackerProjectDetail;
   workspace: TrackerWorkspaceData;
@@ -306,7 +307,7 @@ export async function generateArtifactReviewProposals(
 }
 
 export async function answerTrackerQueryWithAi(
-  env: CloudflareEnv,
+  env: TrackerEnv,
   workspace: TrackerWorkspaceData,
   question: string,
   projectId?: string,
