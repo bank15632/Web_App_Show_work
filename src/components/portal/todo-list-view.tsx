@@ -452,8 +452,11 @@ export function TodoListView() {
   }
 
   async function handleCopyAiBrief() {
+    if (!activeProject) return;
+
+    const project = activeProject;
     const brief = buildAiChatBrief({
-      project: activeProject,
+      project,
       filteredTasks,
       revisionArtifacts,
       weeklyReports,
@@ -465,7 +468,7 @@ export function TodoListView() {
       await navigator.clipboard.writeText(brief);
       setStatusMessage("Copied project brief for AI chat.");
     } catch {
-      downloadTextFile(`${activeProject.slug}-ai-brief.md`, brief);
+      downloadTextFile(`${project.slug}-ai-brief.md`, brief);
       setStatusMessage("Clipboard blocked, downloaded an AI brief instead.");
     }
   }
