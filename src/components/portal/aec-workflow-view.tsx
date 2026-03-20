@@ -1,8 +1,13 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  CheckCircle2,
+  CircleDashed,
+  Clock3,
   Gauge,
   Layers3,
   ShieldAlert,
@@ -14,14 +19,29 @@ import {
   aecMetrics,
   aecMvpWeeks,
   aecNextSteps,
+  aecPhaseModules,
   aecPillars,
   aecPlatformSummary,
   aecRisks,
   aecRoadmap,
   aecTechStack,
 } from "@/lib/aec-workflow-content";
+import { cn } from "@/lib/utils";
 
 export function AecWorkflowView() {
+  const [activePhaseId, setActivePhaseId] = useState(aecPhaseModules[0]?.id ?? "");
+  const activePhase =
+    aecPhaseModules.find((phase) => phase.id === activePhaseId) ?? aecPhaseModules[0];
+  const moduleStats = useMemo(() => {
+    return activePhase.modules.reduce(
+      (acc, module) => {
+        acc[module.status] += 1;
+        return acc;
+      },
+      { live: 0, partial: 0, planned: 0 },
+    );
+  }, [activePhase]);
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7f3ed_100%)]">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
@@ -87,6 +107,156 @@ export function AecWorkflowView() {
               title="Insights after the workflow is stable"
               body="AI ถูกวางไว้ช่วย summarize, detect bottlenecks และ suggest next action หลังมี data พอ."
             />
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="caption-editorial">Phase Modules</p>
+              <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">
+                ใช้งาน roadmap เป็น module ทีละ phase
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                แต่ละ phase ถูกแปลงเป็น module lane พร้อมสถานะว่าอะไร live แล้ว,
+                อะไรต่อยอดได้ทันที, และอะไรยังเป็น planned build.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <StatusPill status="live" count={moduleStats.live} />
+              <StatusPill status="partial" count={moduleStats.partial} />
+              <StatusPill status="planned" count={moduleStats.planned} />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {aecPhaseModules.map((phase) => {
+              const isActive = phase.id === activePhase.id;
+
+              return (
+                <button
+                  key={phase.id}
+                  type="button"
+                  onClick={() => setActivePhaseId(phase.id)}
+                  className={cn(
+                    "rounded-full border px-4 py-2 text-left text-sm transition-colors",
+                    isActive
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground",
+                  )}
+                >
+                  <span className="font-medium">{phase.shortLabel}</span>
+                  <span className="ml-2 opacity-80">{phase.duration}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className="rounded-[2rem] border border-border bg-background p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="max-w-3xl">
+                  <p className="caption-editorial text-[0.68rem]">{activePhase.duration}</p>
+                  <h3 className="mt-2 font-display text-3xl font-medium tracking-tight">
+                    {activePhase.name}
+                  </h3>
+                  <p className="mt-3 text-base text-foreground">{activePhase.objective}</p>
+                  <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                    {activePhase.summary}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                {activePhase.modules.map((module) => (
+                  <article
+                    key={module.name}
+                    className="rounded-[1.5rem] border border-border/80 bg-secondary/40 p-5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h4 className="text-lg font-semibold text-pretty">{module.name}</h4>
+                      <ModuleStatusBadge status={module.status} />
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                      {module.summary}
+                    </p>
+                    <div className="mt-4 grid gap-3 rounded-[1.2rem] bg-background p-4">
+                      <div>
+                        <p className="caption-editorial text-[0.68rem]">Deliverable</p>
+                        <p className="mt-1 text-sm leading-6 text-foreground">
+                          {module.deliverable}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="caption-editorial text-[0.68rem]">Current Fit</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          {module.currentFit}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {module.launchHref ? (
+                        <Link
+                          href={module.launchHref}
+                          className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                        >
+                          <ArrowRight className="size-4" />
+                          {module.launchLabel ?? "Open module"}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-dashed border-border px-4 py-2 text-sm text-muted-foreground">
+                          <Clock3 className="size-4" />
+                          Planned module
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="rounded-[2rem] border border-border bg-background p-6">
+                <p className="caption-editorial">Build Checklist</p>
+                <h3 className="mt-2 font-display text-3xl font-medium tracking-tight">
+                  Next implementation lane
+                </h3>
+                <div className="mt-6 space-y-3">
+                  {activePhase.buildChecklist.map((item, index) => (
+                    <div
+                      key={item}
+                      className="flex items-start gap-3 rounded-[1.25rem] border border-border/80 bg-secondary/40 p-4"
+                    >
+                      <span className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full border border-border text-xs font-medium text-muted-foreground">
+                        {index + 1}
+                      </span>
+                      <p className="text-sm leading-7 text-muted-foreground">{item}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-border bg-background p-6">
+                <p className="caption-editorial">Current Direction</p>
+                <h3 className="mt-2 font-display text-3xl font-medium tracking-tight">
+                  Recommended rollout
+                </h3>
+                <div className="mt-6 space-y-3">
+                  <MiniCard
+                    icon={<CheckCircle2 className="size-4" />}
+                    label="Now"
+                    title="Lean on live modules first"
+                    body="ใช้ Client Rooms และ AI Project Tracker เป็นฐานก่อน แล้วต่อ GTD inbox / metrics ทีละ module."
+                  />
+                  <MiniCard
+                    icon={<CircleDashed className="size-4" />}
+                    label="Next"
+                    title="Separate GTD from execution"
+                    body="phase ถัดไปที่คุ้มสุดคือ GTD inbox + weekly review เพราะจะทำให้ roadmap phase 1 สมบูรณ์ขึ้นมาก."
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -274,6 +444,53 @@ export function AecWorkflowView() {
           </div>
         </section>
       </main>
+    </div>
+  );
+}
+
+function ModuleStatusBadge({
+  status,
+}: {
+  status: "live" | "partial" | "planned";
+}) {
+  const label =
+    status === "live" ? "Live" : status === "partial" ? "Partial" : "Planned";
+
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-3 py-1 text-xs font-medium",
+        status === "live" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+        status === "partial" && "border-amber-200 bg-amber-50 text-amber-700",
+        status === "planned" && "border-border bg-background text-muted-foreground",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function StatusPill({
+  status,
+  count,
+}: {
+  status: "live" | "partial" | "planned";
+  count: number;
+}) {
+  const label =
+    status === "live" ? "Live modules" : status === "partial" ? "Partial modules" : "Planned modules";
+
+  return (
+    <div
+      className={cn(
+        "rounded-full border px-4 py-2",
+        status === "live" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+        status === "partial" && "border-amber-200 bg-amber-50 text-amber-700",
+        status === "planned" && "border-border bg-background text-muted-foreground",
+      )}
+    >
+      <span className="text-xs uppercase tracking-[0.12em]">{label}</span>
+      <span className="ml-2 text-sm font-medium">{count}</span>
     </div>
   );
 }
