@@ -1,18 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BookOpenText,
+  BrainCircuit,
+  CalendarClock,
   ClipboardList,
   FileText,
   FolderOpen,
+  ListChecks,
   ListFilter,
   ListTodo,
+  Settings2,
   X,
 } from "lucide-react";
 
 import { ProjectStageBadge } from "@/components/portal/project-stage-badge";
+import { manualFrameworkCards } from "@/lib/aec-user-manual";
+import {
+  getBucketCounts,
+  getWeeklyReviewStatus,
+  gtdStorageKey,
+  reviewStorageKey,
+  safeParseItems,
+  safeParseReview,
+  type GtdItem,
+} from "@/lib/gtd-system";
 import {
   type ClientProject,
   type RevisionStatus,
@@ -22,8 +37,8 @@ import {
   getProjects,
   getRevisionStatusLabel,
 } from "@/lib/portal-data";
-
-/* ── BNJ-style constants ─────────────────────────────── */
+import type { TrackerTaskRecord, TrackerWorkspaceData } from "@/lib/tracker/types";
+import { cn } from "@/lib/utils";
 
 const MONTH_LABELS: Record<number, string> = {
   0: "ม.ค.",
@@ -64,8 +79,6 @@ const revisionCardStyles: Record<RevisionStatus, string> = {
   done: "border-emerald-200/70 hover:border-emerald-300",
 };
 
-/* ── Scroll Animation Hook ───────────────────────────── */
-
 function useScrollAnimation() {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -88,14 +101,12 @@ function useScrollAnimation() {
       { threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
     );
 
-    elements.forEach((el) => observer.observe(el));
+    elements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, []);
 
   return ref;
 }
-
-/* ── Filter Select ───────────────────────────────────── */
 
 function FilterSelect({
   label,
@@ -105,20 +116,20 @@ function FilterSelect({
 }: {
   label: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   options: { value: string; label: string }[];
 }) {
   return (
     <div className="relative">
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(event) => onChange(event.target.value)}
         className="h-10 appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
       >
         <option value="all">{label}: ทั้งหมด</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -127,8 +138,6 @@ function FilterSelect({
   );
 }
 
-/* ── Main Dashboard ──────────────────────────────────── */
-
 export function DashboardView() {
   const projects = getProjects();
   const containerRef = useScrollAnimation();
@@ -136,30 +145,79 @@ export function DashboardView() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
+  const [gtdItems, setGtdItems] = useState<GtdItem[]>([]);
+  const [trackerWorkspace, setTrackerWorkspace] = useState<TrackerWorkspaceData | null>(null);
+  const [trackerStatus, setTrackerStatus] = useState("กำลังดึงข้อมูล Kanban board...");
+  const [reviewStatus, setReviewStatus] = useState(getWeeklyReviewStatus(null));
 
-  const availableYears = useMemo(() => {
-    return [
-      ...new Set(projects.map((p) => new Date(p.updatedAt).getFullYear())),
-    ].sort((a, b) => b - a);
-  }, [projects]);
+  useEffect(() => {
+    const storedItems = safeParseItems(window.localStorage.getItem(gtdStorageKey));
+    const storedReview = safeParseReview(window.localStorage.getItem(reviewStorageKey));
 
-  const availableMonths = useMemo(() => {
-    return [
-      ...new Set(projects.map((p) => new Date(p.updatedAt).getMonth())),
-    ].sort((a, b) => a - b);
-  }, [projects]);
+    setGtdItems(storedItems);
+    setReviewStatus(getWeeklyReviewStatus(storedReview.lastCompletedAt));
 
-  const filteredProjects = useMemo(() => {
-    return projects.filter((p) => {
-      if (typeFilter !== "all" && p.projectType !== typeFilter) return false;
-      const date = new Date(p.updatedAt);
-      if (monthFilter !== "all" && String(date.getMonth()) !== monthFilter)
-        return false;
-      if (yearFilter !== "all" && String(date.getFullYear()) !== yearFilter)
-        return false;
-      return true;
-    });
-  }, [projects, typeFilter, monthFilter, yearFilter]);
+    let ignore = false;
+
+    async function loadWorkspace() {
+      try {
+        const response = await fetch("/api/tracker/workspace", { cache: "no-store" });
+        const data = (await response.json()) as {
+          error?: string;
+          workspace?: TrackerWorkspaceData;
+        };
+
+        if (!response.ok || !data.workspace) {
+          throw new Error(data.error || "Tracker workspace unavailable.");
+        }
+
+        if (!ignore) {
+          setTrackerWorkspace(data.workspace);
+          setTrackerStatus("Kanban board พร้อมใช้งาน");
+        }
+      } catch (error) {
+        if (!ignore) {
+          setTrackerWorkspace(null);
+          setTrackerStatus(
+            error instanceof Error ? error.message : "Tracker workspace unavailable.",
+          );
+        }
+      }
+    }
+
+    void loadWorkspace();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const availableYears = useMemo(
+    () =>
+      [...new Set(projects.map((project) => new Date(project.updatedAt).getFullYear()))].sort(
+        (a, b) => b - a,
+      ),
+    [projects],
+  );
+
+  const availableMonths = useMemo(
+    () =>
+      [...new Set(projects.map((project) => new Date(project.updatedAt).getMonth()))].sort(
+        (a, b) => a - b,
+      ),
+    [projects],
+  );
+
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter((project) => {
+        if (typeFilter !== "all" && project.projectType !== typeFilter) return false;
+        const date = new Date(project.updatedAt);
+        if (monthFilter !== "all" && String(date.getMonth()) !== monthFilter) return false;
+        if (yearFilter !== "all" && String(date.getFullYear()) !== yearFilter) return false;
+        return true;
+      }),
+    [monthFilter, projects, typeFilter, yearFilter],
+  );
 
   const hasActiveFilters =
     typeFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
@@ -170,13 +228,13 @@ export function DashboardView() {
     setYearFilter("all");
   };
 
-  const activeProjects = projects.filter((p) => p.stage !== "archived");
+  const activeProjects = projects.filter((project) => project.stage !== "archived");
   const totalDocuments = projects.reduce(
-    (count, p) => count + getProjectDocumentCount(p),
+    (count, project) => count + getProjectDocumentCount(project),
     0,
   );
   const pendingRevisions = projects.filter(
-    (p) => p.revisionStatus !== "done",
+    (project) => project.revisionStatus !== "done",
   ).length;
 
   const taskGroups = useMemo(() => {
@@ -185,15 +243,69 @@ export function DashboardView() {
       doing: [],
       done: [],
     };
-    for (const p of projects) {
-      groups[p.revisionStatus].push(p);
+
+    for (const project of projects) {
+      groups[project.revisionStatus].push(project);
     }
+
     return groups;
   }, [projects]);
 
+  const gtdCounts = useMemo(() => getBucketCounts(gtdItems), [gtdItems]);
+  const staleWaitingCount = useMemo(
+    () =>
+      gtdItems.filter(
+        (item) =>
+          item.bucket === "waiting" &&
+          !item.done &&
+          Date.now() - new Date(item.updatedAt).getTime() > 432000000,
+      ).length,
+    [gtdItems],
+  );
+  const gtdUpcomingCount = useMemo(
+    () =>
+      gtdItems.filter(
+        (item) =>
+          Boolean(item.dueDate) &&
+          !item.done &&
+          isDateWithinDays(item.dueDate as string, 7),
+      ).length,
+    [gtdItems],
+  );
+
+  const trackerTasks = useMemo(
+    () => trackerWorkspace?.projects.flatMap((project) => project.tasks) ?? [],
+    [trackerWorkspace],
+  );
+  const blockedTaskCount = trackerTasks.filter((task) => task.status === "blocked").length;
+  const waitingTaskCount = trackerTasks.filter((task) => task.status === "waiting").length;
+  const trackerOverdueCount = trackerTasks.filter((task) => isTrackerTaskOverdue(task)).length;
+  const trackerUpcomingCount = trackerTasks.filter((task) => isTrackerTaskUpcoming(task)).length;
+  const openReviewCount =
+    trackerWorkspace?.reviewItems.filter((item) => item.status === "pending").length ?? 0;
+
+  const aiInsight = useMemo(() => {
+    if (reviewStatus.tone === "danger") return reviewStatus.action;
+    if (reviewStatus.tone === "warning")
+      return "กันเวลา Weekly Review ภายใน 24 ชั่วโมงเพื่อ reset focus ของสัปดาห์";
+    if (blockedTaskCount > 0)
+      return `มี ${blockedTaskCount} blocked task ที่ควร unblock ก่อนรับงานใหม่`;
+    if (staleWaitingCount > 0)
+      return `มี ${staleWaitingCount} waiting item ที่ควร follow up เพื่อกันงานตกหล่น`;
+    if (trackerUpcomingCount + gtdUpcomingCount > 0)
+      return `มี ${trackerUpcomingCount + gtdUpcomingCount} deadline ภายใน 7 วัน ควรปิดงานเสี่ยงก่อน`;
+    return "Flow ตอนนี้นิ่ง ใช้เวลาใน platform สั้น ๆ แล้วกลับไป deep work ตาม routine";
+  }, [
+    blockedTaskCount,
+    gtdUpcomingCount,
+    reviewStatus.action,
+    reviewStatus.tone,
+    staleWaitingCount,
+    trackerUpcomingCount,
+  ]);
+
   return (
     <div ref={containerRef} className="min-h-screen">
-      {/* Header - BNJ style: white bg, blur, border-bottom */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
         <div className="mx-auto flex max-w-[1320px] items-center gap-4 px-6 py-5 lg:px-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -206,82 +318,183 @@ export function DashboardView() {
           />
           <div className="min-w-0">
             <p className="font-display text-lg font-semibold tracking-tight">
-              Client Rooms
+              AEC Workflow Platform
             </p>
-            <p className="caption-editorial text-xs">Owner Dashboard</p>
+            <p className="caption-editorial text-xs">Dashboard</p>
           </div>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             <Link
               href="/aec-workflow"
               className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
             >
-              <FileText className="size-4" />
-              AEC Workflow Platform
+              <BookOpenText className="size-4" />
+              User Manual
+            </Link>
+            <Link
+              href="/gtd"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <ListChecks className="size-4" />
+              GTD Workspace
             </Link>
             <Link
               href="/todos"
               className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
             >
               <ListTodo className="size-4" />
-              AI Project Tracker
+              Kanban Board
+            </Link>
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <Settings2 className="size-4" />
+              Settings & Export
             </Link>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1320px] space-y-16 px-6 py-12 lg:px-10">
-        {/* Hero Stats - BNJ editorial style */}
         <section className="fade-up space-y-6">
-          <div>
-            <p className="caption-editorial mb-2">Overview</p>
+          <div className="max-w-4xl">
+            <p className="caption-editorial mb-2">Dashboard</p>
             <h1 className="font-display text-4xl font-medium tracking-tight sm:text-5xl">
-              โปรเจกต์ทั้งหมด
+              หน้าเดียวเห็น GTD, Kanban, upcoming และ AI focus
             </h1>
+            <p className="mt-4 text-base leading-8 text-muted-foreground">
+              โครงสร้างหน้านี้ถูกปรับตามคู่มือผู้ใช้: เริ่มจากดู GTD stats,
+              สถานะรวมของ board, deadline ที่กำลังจะถึง และสรุปสั้น ๆ
+              ว่าสัปดาห์นี้ควรโฟกัสอะไร
+            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="fade-up rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
-              <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-                <FolderOpen className="size-4" />
-                <span className="caption-editorial text-xs">Active Projects</span>
-              </div>
-              <p className="font-display text-4xl font-medium">
-                {activeProjects.length}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                โปรเจกต์ที่อยู่ใน concept, revision หรือ construction
-              </p>
-            </div>
+          <div
+            className={cn(
+              "rounded-[1.75rem] border px-5 py-4",
+              reviewStatus.tone === "good" &&
+                "border-emerald-200 bg-emerald-50 text-emerald-800",
+              reviewStatus.tone === "warning" &&
+                "border-amber-200 bg-amber-50 text-amber-800",
+              reviewStatus.tone === "danger" &&
+                "border-rose-200 bg-rose-50 text-rose-800",
+            )}
+          >
+            <p className="text-sm font-semibold">{reviewStatus.title}</p>
+            <p className="mt-1 text-sm leading-7">{reviewStatus.body}</p>
+            <p className="mt-2 text-xs uppercase tracking-[0.12em] opacity-80">
+              {reviewStatus.action}
+            </p>
+          </div>
 
-            <div className="fade-up delay-100 rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
-              <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-                <FileText className="size-4" />
-                <span className="caption-editorial text-xs">Documents</span>
-              </div>
-              <p className="font-display text-4xl font-medium">
-                {totalDocuments}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                ไฟล์ทั้งหมดรวม Canva, PDF และ revision archives
-              </p>
-            </div>
-
-            <div className="fade-up delay-200 rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
-              <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-                <ClipboardList className="size-4" />
-                <span className="caption-editorial text-xs">Pending Revisions</span>
-              </div>
-              <p className="font-display text-4xl font-medium">
-                {pendingRevisions}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                งานที่ต้อง revise (Todo + Doing)
-              </p>
-            </div>
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <CommandCard
+              icon={<ListChecks className="size-4" />}
+              label="GTD Stats"
+              title={`${gtdCounts.inbox} inbox · ${gtdCounts.next} next · ${gtdCounts.waiting} waiting`}
+              body={`Stale waiting ${staleWaitingCount} รายการ และ weekly review ตอนนี้ "${reviewStatus.title}"`}
+            />
+            <CommandCard
+              icon={<ClipboardList className="size-4" />}
+              label="Kanban Overview"
+              title={`${trackerWorkspace?.projects.length ?? 0} projects · ${trackerTasks.length} tasks`}
+              body={
+                trackerWorkspace
+                  ? `${blockedTaskCount} blocked · ${waitingTaskCount} waiting · ${openReviewCount} pending review`
+                  : trackerStatus
+              }
+            />
+            <CommandCard
+              icon={<CalendarClock className="size-4" />}
+              label="Upcoming"
+              title={`${trackerOverdueCount} overdue · ${trackerUpcomingCount + gtdUpcomingCount} due soon`}
+              body="รวม deadline จาก GTD และ Kanban board เพื่อให้เห็นงานเสี่ยงก่อนเริ่มวัน"
+            />
+            <CommandCard
+              icon={<BrainCircuit className="size-4" />}
+              label="AI Insights"
+              title="Suggested focus"
+              body={aiInsight}
+            />
           </div>
         </section>
 
-        {/* Task Board - Colored columns */}
+        <section className="fade-up space-y-6">
+          <div>
+            <p className="caption-editorial mb-2">Quick Launch</p>
+            <h2 className="font-display text-3xl font-medium tracking-tight">
+              5 frameworks ใน workflow เดียว
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {manualFrameworkCards.map((framework) => (
+              <article
+                key={framework.name}
+                className="rounded-[1.5rem] border border-border bg-background p-5"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="caption-editorial text-[0.68rem]">{framework.name}</p>
+                  <span
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium",
+                      framework.status === "available" &&
+                        "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      framework.status === "partial" &&
+                        "border-amber-200 bg-amber-50 text-amber-700",
+                      framework.status === "planned" &&
+                        "border-border bg-background text-muted-foreground",
+                    )}
+                  >
+                    {framework.status}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm font-medium text-foreground">{framework.role}</p>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                  {framework.whenToUse}
+                </p>
+                <div className="mt-4">
+                  {framework.href ? (
+                    <Link
+                      href={framework.href}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                    >
+                      {framework.actionLabel}
+                    </Link>
+                  ) : (
+                    <span className="inline-flex rounded-full border border-dashed border-border px-4 py-2 text-sm text-muted-foreground">
+                      Planned module
+                    </span>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="fade-up space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <MetricSummaryCard
+              icon={<FolderOpen className="size-4" />}
+              label="Active Projects"
+              value={activeProjects.length}
+              body="โปรเจกต์ที่ยังต้องติดตามต่อในระบบ client rooms"
+            />
+            <MetricSummaryCard
+              icon={<FileText className="size-4" />}
+              label="Documents"
+              value={totalDocuments}
+              body="ไฟล์ทั้งหมดรวม Canva, PDF และ revision archives"
+            />
+            <MetricSummaryCard
+              icon={<ClipboardList className="size-4" />}
+              label="Pending Revisions"
+              value={pendingRevisions}
+              body="งานที่ยังต้อง revise ต่อใน client-facing workflow"
+            />
+          </div>
+        </section>
+
         <section className="fade-up space-y-6">
           <div>
             <p className="caption-editorial mb-2">Revision Tasks</p>
@@ -291,91 +504,98 @@ export function DashboardView() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            {(["todo", "doing", "done"] as RevisionStatus[]).map(
-              (status, colIdx) => (
-                <div
-                  key={status}
-                  className={`fade-up ${colIdx === 1 ? "delay-100" : colIdx === 2 ? "delay-200" : ""} rounded-lg border p-5 ${revisionColumnStyles[status]}`}
-                >
-                  <div className="mb-5 flex items-center gap-2.5">
-                    <span
-                      className={`size-2 rounded-full ${revisionDotStyles[status]}`}
-                    />
-                    <h3
-                      className={`text-sm font-semibold uppercase tracking-widest ${revisionHeaderStyles[status]}`}
-                    >
-                      {getRevisionStatusLabel(status)}
-                    </h3>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {taskGroups[status].length}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {taskGroups[status].length === 0 && (
-                      <p className="py-6 text-center text-xs text-muted-foreground">
-                        ไม่มีงาน
-                      </p>
+            {(["todo", "doing", "done"] as RevisionStatus[]).map((status, index) => (
+              <div
+                key={status}
+                className={cn(
+                  "fade-up rounded-lg border p-5",
+                  index === 1 && "delay-100",
+                  index === 2 && "delay-200",
+                  revisionColumnStyles[status],
+                )}
+              >
+                <div className="mb-5 flex items-center gap-2.5">
+                  <span className={cn("size-2 rounded-full", revisionDotStyles[status])} />
+                  <h3
+                    className={cn(
+                      "text-sm font-semibold uppercase tracking-widest",
+                      revisionHeaderStyles[status],
                     )}
-                    {taskGroups[status].map((project) => (
-                      <Link
-                        key={project.slug}
-                        href={`/p/${project.slug}`}
-                        className={`block rounded-lg border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] ${revisionCardStyles[status]}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {project.code}
-                          </span>
-                          <span className="caption-editorial text-[0.7rem]">
-                            {project.projectType}
-                          </span>
-                        </div>
-                        <p className="mt-2 font-display text-base font-medium leading-tight">
-                          {project.title}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {project.clientName}
-                        </p>
-                        <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
-                          {project.nextMilestone}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
+                  >
+                    {getRevisionStatusLabel(status)}
+                  </h3>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {taskGroups[status].length}
+                  </span>
                 </div>
-              ),
-            )}
+
+                <div className="space-y-3">
+                  {taskGroups[status].length === 0 ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      ไม่มีงาน
+                    </p>
+                  ) : null}
+
+                  {taskGroups[status].map((project) => (
+                    <Link
+                      key={project.slug}
+                      href={`/p/${project.slug}`}
+                      className={cn(
+                        "block rounded-lg border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
+                        revisionCardStyles[status],
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {project.code}
+                        </span>
+                        <span className="caption-editorial text-[0.7rem]">
+                          {project.projectType}
+                        </span>
+                      </div>
+                      <p className="mt-2 font-display text-base font-medium leading-tight">
+                        {project.title}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {project.clientName}
+                      </p>
+                      <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+                        {project.nextMilestone}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* Filters - BNJ pill style */}
         <section className="fade-up flex flex-wrap items-center gap-3">
           <FilterSelect
             label="ประเภท"
             value={typeFilter}
             onChange={setTypeFilter}
-            options={getProjectTypes().map((t) => ({ value: t, label: t }))}
+            options={getProjectTypes().map((type) => ({ value: type, label: type }))}
           />
           <FilterSelect
             label="เดือน"
             value={monthFilter}
             onChange={setMonthFilter}
-            options={availableMonths.map((m) => ({
-              value: String(m),
-              label: MONTH_LABELS[m] || String(m + 1),
+            options={availableMonths.map((month) => ({
+              value: String(month),
+              label: MONTH_LABELS[month] || String(month + 1),
             }))}
           />
           <FilterSelect
             label="ปี"
             value={yearFilter}
             onChange={setYearFilter}
-            options={availableYears.map((y) => ({
-              value: String(y),
-              label: String(y),
+            options={availableYears.map((year) => ({
+              value: String(year),
+              label: String(year),
             }))}
           />
-          {hasActiveFilters && (
+          {hasActiveFilters ? (
             <button
               onClick={clearFilters}
               className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
@@ -383,13 +603,12 @@ export function DashboardView() {
               <X className="size-3.5" />
               ล้าง filter
             </button>
-          )}
+          ) : null}
           <span className="text-sm text-muted-foreground">
             {filteredProjects.length} โปรเจกต์
           </span>
         </section>
 
-        {/* Project Grid - BNJ card style */}
         <section>
           <div className="fade-up mb-6">
             <p className="caption-editorial mb-2">Projects</p>
@@ -399,7 +618,7 @@ export function DashboardView() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {filteredProjects.length === 0 && (
+            {filteredProjects.length === 0 ? (
               <div className="col-span-full rounded-lg border border-border p-12 text-center">
                 <p className="text-lg text-muted-foreground">
                   ไม่พบโปรเจกต์ที่ตรงกับ filter
@@ -411,12 +630,13 @@ export function DashboardView() {
                   ล้าง filter ทั้งหมด
                 </button>
               </div>
-            )}
-            {filteredProjects.map((project, i) => (
+            ) : null}
+
+            {filteredProjects.map((project, index) => (
               <ProjectCard
                 key={project.slug}
                 project={project}
-                delay={i % 2 === 0 ? "" : "delay-100"}
+                delay={index % 2 === 0 ? "" : "delay-100"}
               />
             ))}
           </div>
@@ -426,7 +646,51 @@ export function DashboardView() {
   );
 }
 
-/* ── Project Card ────────────────────────────────────── */
+function CommandCard({
+  icon,
+  label,
+  title,
+  body,
+}: {
+  icon: ReactNode;
+  label: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <article className="rounded-[1.75rem] border border-border bg-background p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="caption-editorial text-xs">{label}</span>
+      </div>
+      <h2 className="mt-3 font-display text-3xl font-medium tracking-tight">{title}</h2>
+      <p className="mt-3 text-sm leading-7 text-muted-foreground">{body}</p>
+    </article>
+  );
+}
+
+function MetricSummaryCard({
+  icon,
+  label,
+  value,
+  body,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  body: string;
+}) {
+  return (
+    <article className="fade-up rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <div className="mb-3 flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="caption-editorial text-xs">{label}</span>
+      </div>
+      <p className="font-display text-4xl font-medium">{value}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+    </article>
+  );
+}
 
 function ProjectCard({
   project,
@@ -437,10 +701,12 @@ function ProjectCard({
 }) {
   return (
     <div
-      className={`fade-up ${delay} group rounded-lg border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]`}
+      className={cn(
+        "fade-up group rounded-lg border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
+        delay,
+      )}
     >
       <div className="p-6">
-        {/* Badges row */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="caption-editorial text-xs">{project.code}</span>
           <span className="text-muted-foreground">·</span>
@@ -450,25 +716,20 @@ function ProjectCard({
           </span>
         </div>
 
-        {/* Title */}
         <h3 className="font-display text-2xl font-medium tracking-tight">
           {project.title}
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {project.clientName} · {project.location} · อัปเดต{" "}
-          {formatPortalDate(project.updatedAt)}
+          {project.clientName} · {project.location} · อัปเดต {formatPortalDate(project.updatedAt)}
         </p>
 
-        {/* Overview */}
         <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
           {project.overview}
         </p>
 
-        {/* Footer */}
         <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
           <span className="text-sm text-muted-foreground">
-            {getProjectDocumentCount(project)} files · {project.viewerCount}{" "}
-            viewers
+            {getProjectDocumentCount(project)} files · {project.viewerCount} viewers
           </span>
           <Link
             href={`/p/${project.slug}`}
@@ -481,4 +742,21 @@ function ProjectCard({
       </div>
     </div>
   );
+}
+
+function isDateWithinDays(value: string, days: number) {
+  const date = new Date(value);
+  const now = new Date();
+  const diff = date.getTime() - now.getTime();
+  return diff >= 0 && diff <= days * 86400000;
+}
+
+function isTrackerTaskOverdue(task: TrackerTaskRecord) {
+  if (!task.dueDate || task.status === "done") return false;
+  return new Date(task.dueDate).getTime() < Date.now();
+}
+
+function isTrackerTaskUpcoming(task: TrackerTaskRecord) {
+  if (!task.dueDate || task.status === "done") return false;
+  return isDateWithinDays(task.dueDate, 7);
 }

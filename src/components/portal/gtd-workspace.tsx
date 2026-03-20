@@ -10,65 +10,29 @@ import {
   Copy,
   Inbox,
   ListChecks,
+  Settings2,
   Trash2,
 } from "lucide-react";
 
+import {
+  bucketLabels,
+  bucketOrder,
+  contextOptions,
+  createDefaultReviewState,
+  getBucketCounts,
+  getWeeklyReviewStatus,
+  gtdStorageKey as storageKey,
+  reviewSteps,
+  reviewStorageKey,
+  safeParseItems,
+  safeParseReview,
+  type GtdBucket,
+  type GtdContext,
+  type GtdItem,
+  type GtdPriority,
+  type WeeklyReviewState,
+} from "@/lib/gtd-system";
 import { cn } from "@/lib/utils";
-
-type GtdBucket = "inbox" | "next" | "projects" | "waiting" | "calendar" | "someday" | "reference";
-type GtdContext = "" | "computer" | "phone" | "site" | "office" | "errands" | "home";
-type GtdPriority = "high" | "medium" | "low";
-
-interface GtdItem {
-  id: string;
-  text: string;
-  bucket: GtdBucket;
-  context: GtdContext;
-  priority: GtdPriority;
-  dueDate: string | null;
-  note: string;
-  done: boolean;
-  doneAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface WeeklyReviewState {
-  steps: Record<string, boolean>;
-  focus: string;
-  notes: string;
-  lastCompletedAt: string | null;
-}
-
-const storageKey = "bnj:gtd-workspace:v1";
-const reviewStorageKey = "bnj:gtd-weekly-review:v1";
-const bucketOrder: GtdBucket[] = ["inbox", "next", "projects", "waiting", "calendar", "someday", "reference"];
-const bucketLabels: Record<GtdBucket, string> = {
-  inbox: "Inbox",
-  next: "Next Actions",
-  projects: "Projects",
-  waiting: "Waiting For",
-  calendar: "Calendar",
-  someday: "Someday",
-  reference: "Reference",
-};
-const contextOptions: Array<{ value: GtdContext | "all"; label: string }> = [
-  { value: "all", label: "All contexts" },
-  { value: "computer", label: "@computer" },
-  { value: "phone", label: "@phone" },
-  { value: "site", label: "@site" },
-  { value: "office", label: "@office" },
-  { value: "errands", label: "@errands" },
-  { value: "home", label: "@home" },
-];
-const reviewSteps = [
-  { id: "clear-inbox", title: "Clear the inbox", body: "จัด bucket ให้ทุก item ที่ยังค้างอยู่" },
-  { id: "review-next", title: "Review next actions", body: "เช็กว่างานที่หยิบทำได้จริงยังชัดอยู่" },
-  { id: "review-waiting", title: "Review waiting for", body: "ตามงานที่ค้างกับลูกค้า ทีม หรือ consultant" },
-  { id: "review-calendar", title: "Review calendar", body: "เช็ก due date และ commitment ที่กำลังจะถึง" },
-  { id: "review-projects", title: "Review projects", body: "ทุก project ควรมี next action อย่างน้อยหนึ่งอย่าง" },
-  { id: "set-focus", title: "Set weekly focus", body: "เลือก focus หลักของสัปดาห์นี้ให้ชัด" },
-] as const;
 const seededItems: GtdItem[] = [
   createSeededItem("gtd_seed_1", "สรุป feedback ลูกค้า Nordic Home Office หลัง review ล่าสุด", "inbox", "computer", "high", null, "", "2026-03-20T08:00:00.000Z"),
   createSeededItem("gtd_seed_2", "โทรตาม consultant เรื่อง revised MEP markups", "next", "phone", "high", null, "ถาม timeline ที่ confirm ได้จริงก่อนนัด client รอบถัดไป", "2026-03-19T09:30:00.000Z"),
@@ -92,8 +56,8 @@ export function GtdWorkspace() {
     const frameId = window.requestAnimationFrame(() => {
       const storedItems = window.localStorage.getItem(storageKey);
       const storedReview = window.localStorage.getItem(reviewStorageKey);
-      setItems(storedItems ? safeParseItems(storedItems) : seededItems);
-      setReview(storedReview ? safeParseReview(storedReview) : createDefaultReviewState());
+      setItems(safeParseItems(storedItems, seededItems));
+      setReview(safeParseReview(storedReview));
       setReferenceTime(Date.now());
     });
 
@@ -126,6 +90,7 @@ export function GtdWorkspace() {
       : items[0]?.id ?? null;
   const selectedItem = items.find((item) => item.id === resolvedSelectedItemId) ?? null;
   const completedReviewSteps = reviewSteps.filter((step) => review.steps[step.id]).length;
+  const reviewStatus = getWeeklyReviewStatus(review.lastCompletedAt, referenceTime);
 
   function addInboxItem() {
     const text = draftText.trim();
@@ -190,6 +155,10 @@ export function GtdWorkspace() {
             <ArrowLeft className="size-4 rotate-180" />
             Open tracker
           </Link>
+          <Link href="/settings" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+            <Settings2 className="size-4" />
+            Settings & Export
+          </Link>
         </div>
       </header>
 
@@ -204,6 +173,23 @@ export function GtdWorkspace() {
               <button type="button" onClick={addInboxItem} className="inline-flex h-12 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-foreground/90">Add to inbox</button>
             </div>
             {statusMessage ? <div className="mt-4 rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">{statusMessage}</div> : null}
+            <div
+              className={cn(
+                "mt-4 rounded-[1.4rem] border px-5 py-4 text-sm leading-7",
+                reviewStatus.tone === "good" &&
+                  "border-emerald-200 bg-emerald-50 text-emerald-800",
+                reviewStatus.tone === "warning" &&
+                  "border-amber-200 bg-amber-50 text-amber-800",
+                reviewStatus.tone === "danger" &&
+                  "border-rose-200 bg-rose-50 text-rose-800",
+              )}
+            >
+              <p className="font-medium">{reviewStatus.title}</p>
+              <p className="mt-1">{reviewStatus.body}</p>
+              <p className="mt-2 text-xs uppercase tracking-[0.12em] opacity-80">
+                {reviewStatus.action}
+              </p>
+            </div>
           </div>
           <div className="grid gap-4">
             <MetricCard icon={<Inbox className="size-4" />} label="Inbox" value={counts.inbox} body="สิ่งที่ยังไม่ได้ clarify" />
@@ -426,33 +412,6 @@ function QuickProcessButton({ label, onClick }: { label: string; onClick: () => 
       {label}
     </button>
   );
-}
-
-function createDefaultReviewState(): WeeklyReviewState {
-  return { steps: Object.fromEntries(reviewSteps.map((step) => [step.id, false])), focus: "", notes: "", lastCompletedAt: null };
-}
-
-function safeParseItems(value: string) {
-  try {
-    return JSON.parse(value) as GtdItem[];
-  } catch {
-    return seededItems;
-  }
-}
-
-function safeParseReview(value: string) {
-  try {
-    return JSON.parse(value) as WeeklyReviewState;
-  } catch {
-    return createDefaultReviewState();
-  }
-}
-
-function getBucketCounts(items: GtdItem[]) {
-  return bucketOrder.reduce((acc, bucket) => {
-    acc[bucket] = items.filter((item) => item.bucket === bucket && !item.done).length;
-    return acc;
-  }, {} as Record<GtdBucket, number>);
 }
 
 function sortItems(a: GtdItem, b: GtdItem) {

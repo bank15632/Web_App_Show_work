@@ -8,6 +8,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
@@ -550,6 +551,31 @@ export function TodoListView() {
               <Copy className="size-4" />
               Copy for AI chat
             </button>
+          </div>
+
+          <div className="rounded-[1.5rem] border border-border bg-background/85 px-5 py-4 text-sm leading-7 text-muted-foreground">
+            <p className="font-medium text-foreground">
+              GTD inbox = ที่จับทุกอย่างที่เข้าหัว ส่วน Kanban board นี้ = งานที่ผ่านการ
+              process แล้วและทีมต้องเห็น
+            </p>
+            <p className="mt-1">
+              ตามคู่มือ ให้ capture งานส่วนตัวใน GTD ก่อน แล้วค่อยส่งงานที่เกี่ยวกับโปรเจกต์ขึ้น
+              board นี้เมื่อ task ชัดเจนแล้ว
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link
+                href="/gtd"
+                className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Open GTD workspace
+              </Link>
+              <Link
+                href="/settings"
+                className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Settings & Export
+              </Link>
+            </div>
           </div>
 
           <WorkspaceHeader
