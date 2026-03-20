@@ -8,6 +8,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { AICopilot } from "@/components/portal/tracker/ai-copilot";
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
@@ -34,6 +35,7 @@ import type {
   TrackerTaskRecord,
   TrackerWorkspaceData,
 } from "@/lib/tracker/types";
+import { cn } from "@/lib/utils";
 import { filterTasksForSavedView } from "@/lib/tracker/views";
 
 type DialogState =
@@ -215,6 +217,8 @@ export function TodoListView() {
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(false);
+  const [isRightRailCollapsed, setIsRightRailCollapsed] = useState(false);
 
   useEffect(() => {
     void loadWorkspace();
@@ -373,22 +377,55 @@ export function TodoListView() {
   const projectReviewItems = workspace.reviewItems.filter(
     (item) => item.projectId === activeProject.id,
   );
+  const layoutClassName = isLeftRailCollapsed
+    ? isRightRailCollapsed
+      ? "lg:grid-cols-[minmax(0,1fr)]"
+      : "lg:grid-cols-[minmax(0,1fr)_360px]"
+    : isRightRailCollapsed
+      ? "lg:grid-cols-[290px_minmax(0,1fr)]"
+      : "lg:grid-cols-[290px_minmax(0,1fr)_360px]";
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto grid min-h-screen max-w-[1680px] lg:grid-cols-[290px_minmax(0,1fr)_360px]">
-        <ProjectRail
-          projects={workspace.projects}
-          activeProjectId={activeProject.id}
-          pendingReviewCount={pendingReviewCount}
-          onSelect={setActiveProjectId}
-          onCreateProject={() => {
-            setProjectDraft(createEmptyProjectDraft());
-            setDialog("project");
-          }}
-        />
+      <div
+        className={cn(
+          "mx-auto grid min-h-screen max-w-[1680px] transition-[grid-template-columns] duration-300",
+          layoutClassName,
+        )}
+      >
+        {!isLeftRailCollapsed ? (
+          <div className="min-h-0">
+            <ProjectRail
+              projects={workspace.projects}
+              activeProjectId={activeProject.id}
+              pendingReviewCount={pendingReviewCount}
+              onSelect={setActiveProjectId}
+              onCreateProject={() => {
+                setProjectDraft(createEmptyProjectDraft());
+                setDialog("project");
+              }}
+            />
+          </div>
+        ) : null}
 
         <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-5 py-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+            <SidebarToggleButton
+              collapsed={isLeftRailCollapsed}
+              side="left"
+              hideLabel="Hide projects"
+              showLabel="Show projects"
+              onClick={() => setIsLeftRailCollapsed((prev) => !prev)}
+            />
+            <SidebarToggleButton
+              collapsed={isRightRailCollapsed}
+              side="right"
+              hideLabel="Hide copilot"
+              showLabel="Show copilot"
+              onClick={() => setIsRightRailCollapsed((prev) => !prev)}
+            />
+          </div>
+
           <WorkspaceHeader
             project={activeProject}
             onPhaseChange={(phase) => {
@@ -562,34 +599,38 @@ export function TodoListView() {
           </div>
         </main>
 
-        <AICopilot
-          project={activeProject}
-          onAsk={(question) =>
-            requestJson<TrackerQueryResult>("/api/tracker/query", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                projectId: activeProject.id,
-                question,
-              }),
-            })
-          }
-          onGenerateWeekly={async () => {
-            await withWorkspaceMutation(
-              () =>
-                requestJson<{ workspace: TrackerWorkspaceData }>(
-                  "/api/tracker/weekly-report",
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ projectId: activeProject.id }),
-                  },
-                ),
-              "Weekly report proposal queued for review.",
-            );
-          }}
-          onOpenIntake={() => setDialog("meeting")}
-        />
+        {!isRightRailCollapsed ? (
+          <div className="min-h-0">
+            <AICopilot
+              project={activeProject}
+              onAsk={(question) =>
+                requestJson<TrackerQueryResult>("/api/tracker/query", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    projectId: activeProject.id,
+                    question,
+                  }),
+                })
+              }
+              onGenerateWeekly={async () => {
+                await withWorkspaceMutation(
+                  () =>
+                    requestJson<{ workspace: TrackerWorkspaceData }>(
+                      "/api/tracker/weekly-report",
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ projectId: activeProject.id }),
+                      },
+                    ),
+                  "Weekly report proposal queued for review.",
+                );
+              }}
+              onOpenIntake={() => setDialog("meeting")}
+            />
+          </div>
+        ) : null}
       </div>
 
       {dialog === "task" && taskDraft ? (
@@ -898,6 +939,48 @@ export function TodoListView() {
         </DialogFrame>
       ) : null}
     </div>
+  );
+}
+
+function SidebarToggleButton({
+  collapsed,
+  side,
+  hideLabel,
+  showLabel,
+  onClick,
+}: {
+  collapsed: boolean;
+  side: "left" | "right";
+  hideLabel: string;
+  showLabel: string;
+  onClick: () => void;
+}) {
+  const isLeftSide = side === "left";
+  const Icon = collapsed
+    ? isLeftSide
+      ? ChevronRight
+      : ChevronLeft
+    : isLeftSide
+      ? ChevronLeft
+      : ChevronRight;
+  const label = collapsed ? showLabel : hideLabel;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={collapsed}
+      className={cn(
+        "inline-flex h-10 items-center gap-2 rounded-full border bg-background px-4 text-sm font-medium transition-colors",
+        collapsed
+          ? "border-foreground text-foreground"
+          : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+      )}
+    >
+      {isLeftSide ? <Icon className="size-4" /> : null}
+      <span>{label}</span>
+      {!isLeftSide ? <Icon className="size-4" /> : null}
+    </button>
   );
 }
 
