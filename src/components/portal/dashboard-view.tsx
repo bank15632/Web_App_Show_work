@@ -210,13 +210,22 @@ export function DashboardView() {
             </p>
             <p className="caption-editorial text-xs">Owner Dashboard</p>
           </div>
-          <Link
-            href="/todos"
-            className="ml-auto inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-          >
-            <ListTodo className="size-4" />
-            AI Project Tracker
-          </Link>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+            <Link
+              href="/aec-workflow"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <FileText className="size-4" />
+              AEC Workflow Platform
+            </Link>
+            <Link
+              href="/todos"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <ListTodo className="size-4" />
+              AI Project Tracker
+            </Link>
+          </div>
         </div>
       </header>
 
