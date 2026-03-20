@@ -8,9 +8,8 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 
-import { AICopilot } from "@/components/portal/tracker/ai-copilot";
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
 import { ReviewQueue } from "@/components/portal/tracker/review-queue";
@@ -29,7 +28,6 @@ import type {
   TrackerLegacyTodoImport,
   TrackerProjectDetail,
   TrackerProjectMutationInput,
-  TrackerQueryResult,
   TrackerSavedView,
   TrackerTaskMutationInput,
   TrackerTaskRecord,
@@ -138,6 +136,114 @@ function formatFullDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatLabel(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function buildAiChatBrief({
+  project,
+  filteredTasks,
+  revisionArtifacts,
+  weeklyReports,
+  savedView,
+  domainTab,
+}: {
+  project: TrackerProjectDetail;
+  filteredTasks: TrackerTaskRecord[];
+  revisionArtifacts: TrackerArtifactRecord[];
+  weeklyReports: TrackerArtifactRecord[];
+  savedView: TrackerSavedView;
+  domainTab: TrackerDomainTab;
+}) {
+  const openTasks = project.tasks.filter((task) => task.status !== "done");
+  const lines = [
+    "You are helping me review an architecture project tracker.",
+    "Use only the approved data below. If something is missing, say so clearly.",
+    "",
+    "# Project snapshot",
+    `Project: ${project.name} (${project.code || project.slug})`,
+    `Phase: ${formatLabel(project.phase)}`,
+    `Status: ${formatLabel(project.status)}`,
+    `Client: ${project.clientName || "BNJ Studio"}`,
+    `Location: ${project.location || "Bangkok"}`,
+    `Current filter: ${formatLabel(savedView)}`,
+    `Current section: ${formatLabel(domainTab)}`,
+    `Open tasks: ${openTasks.length}`,
+    `Total tasks: ${project.tasks.length}`,
+    `Overview: ${project.overview || "-"}`,
+    "",
+    "# Tasks in current view",
+  ];
+
+  if (filteredTasks.length === 0) {
+    lines.push("- None");
+  } else {
+    filteredTasks.forEach((task, index) => {
+      lines.push(`${index + 1}. ${task.title}`);
+      lines.push(`   Status: ${taskStatusLabels[task.status]}`);
+      lines.push(`   Priority: ${formatLabel(task.priority)}`);
+      lines.push(`   Type: ${taskTypeLabels[task.taskType]}`);
+      if (task.assignee) lines.push(`   Assignee: ${task.assignee}`);
+      if (task.dueDate) lines.push(`   Due: ${formatFullDate(task.dueDate)}`);
+      if (task.description) lines.push(`   Details: ${task.description}`);
+      if (task.blocker) lines.push(`   Blocker: ${task.blocker}`);
+      if (task.nextAction) lines.push(`   Next action: ${task.nextAction}`);
+      lines.push("");
+    });
+  }
+
+  lines.push("# Recent decisions");
+  if (project.decisions.length === 0) {
+    lines.push("- None");
+  } else {
+    project.decisions.slice(0, 5).forEach((decision, index) => {
+      lines.push(`${index + 1}. ${decision.title} (${formatFullDate(decision.decidedAt)})`);
+      lines.push(`   ${decision.decisionText}`);
+    });
+  }
+
+  lines.push("", "# Recent revision summaries");
+  if (revisionArtifacts.length === 0) {
+    lines.push("- None");
+  } else {
+    revisionArtifacts.slice(0, 5).forEach((artifact, index) => {
+      lines.push(`${index + 1}. ${artifact.title}`);
+      lines.push(`   ${artifact.extractedSummary || artifact.sourceText || "No summary yet."}`);
+    });
+  }
+
+  lines.push("", "# Recent weekly reports");
+  if (weeklyReports.length === 0) {
+    lines.push("- None");
+  } else {
+    weeklyReports.slice(0, 3).forEach((report, index) => {
+      lines.push(`${index + 1}. ${report.title}`);
+      lines.push(`   ${report.extractedSummary || "No summary yet."}`);
+    });
+  }
+
+  lines.push(
+    "",
+    "Please answer in Thai and keep recommendations practical and specific.",
+  );
+
+  return lines.join("\n").trim();
+}
+
+function downloadTextFile(filename: string, contents: string) {
+  const blob = new Blob([contents], { type: "text/markdown;charset=utf-8" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 function readLegacyTodos(): TrackerLegacyTodoImport[] {
   const items: TrackerLegacyTodoImport[] = [];
   const dedupe = new Set<string>();
@@ -218,7 +324,6 @@ export function TodoListView() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(false);
-  const [isRightRailCollapsed, setIsRightRailCollapsed] = useState(false);
 
   useEffect(() => {
     void loadWorkspace();
@@ -346,6 +451,25 @@ export function TodoListView() {
     else setDomainTab("tasks");
   }
 
+  async function handleCopyAiBrief() {
+    const brief = buildAiChatBrief({
+      project: activeProject,
+      filteredTasks,
+      revisionArtifacts,
+      weeklyReports,
+      savedView,
+      domainTab,
+    });
+
+    try {
+      await navigator.clipboard.writeText(brief);
+      setStatusMessage("Copied project brief for AI chat.");
+    } catch {
+      downloadTextFile(`${activeProject.slug}-ai-brief.md`, brief);
+      setStatusMessage("Clipboard blocked, downloaded an AI brief instead.");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -378,12 +502,8 @@ export function TodoListView() {
     (item) => item.projectId === activeProject.id,
   );
   const layoutClassName = isLeftRailCollapsed
-    ? isRightRailCollapsed
-      ? "lg:grid-cols-[minmax(0,1fr)]"
-      : "lg:grid-cols-[minmax(0,1fr)_360px]"
-    : isRightRailCollapsed
-      ? "lg:grid-cols-[290px_minmax(0,1fr)]"
-      : "lg:grid-cols-[290px_minmax(0,1fr)_360px]";
+    ? "lg:grid-cols-[minmax(0,1fr)]"
+    : "lg:grid-cols-[290px_minmax(0,1fr)]";
 
   return (
     <div className="min-h-screen bg-background">
@@ -409,7 +529,7 @@ export function TodoListView() {
         ) : null}
 
         <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-5 py-6 lg:px-8">
-          <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <SidebarToggleButton
               collapsed={isLeftRailCollapsed}
               side="left"
@@ -417,13 +537,16 @@ export function TodoListView() {
               showLabel="Show projects"
               onClick={() => setIsLeftRailCollapsed((prev) => !prev)}
             />
-            <SidebarToggleButton
-              collapsed={isRightRailCollapsed}
-              side="right"
-              hideLabel="Hide copilot"
-              showLabel="Show copilot"
-              onClick={() => setIsRightRailCollapsed((prev) => !prev)}
-            />
+            <button
+              type="button"
+              onClick={() => {
+                void handleCopyAiBrief();
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <Copy className="size-4" />
+              Copy for AI chat
+            </button>
           </div>
 
           <WorkspaceHeader
@@ -598,39 +721,6 @@ export function TodoListView() {
             ) : null}
           </div>
         </main>
-
-        {!isRightRailCollapsed ? (
-          <div className="min-h-0">
-            <AICopilot
-              project={activeProject}
-              onAsk={(question) =>
-                requestJson<TrackerQueryResult>("/api/tracker/query", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    projectId: activeProject.id,
-                    question,
-                  }),
-                })
-              }
-              onGenerateWeekly={async () => {
-                await withWorkspaceMutation(
-                  () =>
-                    requestJson<{ workspace: TrackerWorkspaceData }>(
-                      "/api/tracker/weekly-report",
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ projectId: activeProject.id }),
-                      },
-                    ),
-                  "Weekly report proposal queued for review.",
-                );
-              }}
-              onOpenIntake={() => setDialog("meeting")}
-            />
-          </div>
-        ) : null}
       </div>
 
       {dialog === "task" && taskDraft ? (
