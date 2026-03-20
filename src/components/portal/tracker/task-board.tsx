@@ -215,15 +215,17 @@ export function TaskBoard({
             void handleDragEnd(event);
           }}
         >
-          <div className="grid gap-4 xl:grid-cols-5">
-            {trackerTaskStatuses.map((status) => (
-              <TaskColumn
-                key={status}
-                status={status}
-                tasks={board[status]}
-                onEditTask={onEditTask}
-              />
-            ))}
+          <div className="-mx-1 overflow-x-auto pb-2">
+            <div className="grid min-w-[89rem] grid-cols-[repeat(5,minmax(17rem,1fr))] gap-4 px-1">
+              {trackerTaskStatuses.map((status) => (
+                <TaskColumn
+                  key={status}
+                  status={status}
+                  tasks={board[status]}
+                  onEditTask={onEditTask}
+                />
+              ))}
+            </div>
           </div>
           <DragOverlay>
             {activeTask ? <TaskCard task={activeTask} dragging onEdit={() => undefined} /> : null}
@@ -252,7 +254,7 @@ function TaskColumn({
       ref={setNodeRef}
       className={`rounded-[1.75rem] border bg-background p-4 transition-colors ${
         isOver ? "border-foreground" : "border-border"
-      }`}
+      } min-w-0`}
     >
       <div className="mb-4 flex items-center gap-2">
         <span
@@ -263,7 +265,7 @@ function TaskColumn({
         <span className="text-sm text-muted-foreground">{tasks.length}</span>
       </div>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {tasks.length === 0 ? (
             <div className="rounded-[1.25rem] border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
               Drop tasks here
@@ -327,39 +329,41 @@ function TaskCard({
 
   return (
     <article
-      className={`rounded-[1.4rem] border bg-stone-50/50 p-4 transition-all ${
+      className={`rounded-[1.4rem] border bg-stone-50/50 p-5 transition-all ${
         dragging ? "border-foreground shadow-[0_16px_40px_rgba(0,0,0,0.12)]" : "border-border hover:border-foreground/30"
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-4">
         <button
           type="button"
-          className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
+          className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
           {...dragHandleProps}
         >
           <GripVertical className="size-4" />
         </button>
         <div className="min-w-0 flex-1">
           <button type="button" onClick={onEdit} className="w-full text-left">
-            <h4 className="text-sm font-medium leading-6 text-foreground">{task.title}</h4>
+            <h4 className="text-pretty text-base font-semibold leading-7 text-foreground">
+              {task.title}
+            </h4>
           </button>
           {task.description ? (
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 text-pretty text-sm leading-7 text-muted-foreground">
               {task.description}
             </p>
           ) : null}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-medium ${priorityTone[task.priority]}`}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${priorityTone[task.priority]}`}
             >
               {priorityLabels[task.priority]}
             </span>
-            <span className="rounded-full border border-border px-2.5 py-1 text-[0.7rem] text-muted-foreground">
+            <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
               {taskTypeLabels[task.taskType]}
             </span>
             {task.dueDate ? (
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.7rem] ${
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
                   isTaskOverdue(task)
                     ? "border-rose-200 bg-rose-50 text-rose-700"
                     : "border-border text-muted-foreground"
