@@ -353,6 +353,13 @@ export function DashboardView() {
               <Settings2 className="size-4" />
               Settings & Export
             </Link>
+            <Link
+              href="/client-rooms"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <FolderOpen className="size-4" />
+              Client Rooms CMS
+            </Link>
           </div>
         </div>
       </header>

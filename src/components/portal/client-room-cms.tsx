@@ -1,0 +1,648 @@
+"use client";
+
+import { type ReactNode, useEffect, useState } from "react";
+import { Copy, ExternalLink, ImagePlus, LoaderCircle, Plus, Rocket, Save } from "lucide-react";
+
+import { ClientRoomDocumentsEditor } from "@/components/portal/client-room-documents-editor";
+import { ClientRoomGalleryEditor } from "@/components/portal/client-room-gallery-editor";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  buildClientRoomSharePath,
+  type ClientRoomDraftData,
+  type ClientRoomProjectRecord,
+  type ClientRoomProjectSummary,
+} from "@/lib/client-rooms/types";
+
+type UploadKind = "hero" | "gallery" | "document";
+
+function textareaClassName() {
+  return "min-h-28 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+}
+
+function buildAbsoluteUrl(path: string | null) {
+  if (!path) {
+    return null;
+  }
+
+  if (typeof window === "undefined") {
+    return path;
+  }
+
+  return new URL(path, window.location.origin).toString();
+}
+
+export function ClientRoomCms() {
+  const [projects, setProjects] = useState<ClientRoomProjectSummary[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [project, setProject] = useState<ClientRoomProjectRecord | null>(null);
+  const [newProjectTitle, setNewProjectTitle] = useState("Untitled Client Room");
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [uploadingTarget, setUploadingTarget] = useState("");
+  const [statusMessage, setStatusMessage] = useState("กำลังโหลด client rooms...");
+
+  useEffect(() => {
+    void loadProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadProjects(nextProjectId?: string) {
+    setIsLoadingProjects(true);
+
+    try {
+      const response = await fetch("/api/client-rooms/projects", { cache: "no-store" });
+      const data = (await response.json()) as {
+        error?: string;
+        projects?: ClientRoomProjectSummary[];
+      };
+
+      if (!response.ok || !data.projects) {
+        throw new Error(data.error || "โหลดรายการ client rooms ไม่สำเร็จ");
+      }
+
+      setProjects(data.projects);
+      const targetId = nextProjectId ?? selectedProjectId ?? data.projects[0]?.id ?? "";
+
+      if (targetId) {
+        setSelectedProjectId(targetId);
+        await loadProject(targetId);
+      } else {
+        setProject(null);
+        setSelectedProjectId("");
+        setStatusMessage("ยังไม่มี client room เริ่มจากสร้างโปรเจกต์แรก");
+      }
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "โหลดรายการ client rooms ไม่สำเร็จ",
+      );
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }
+
+  async function loadProject(projectId: string) {
+    setIsLoadingProject(true);
+    setStatusMessage("กำลังโหลดข้อมูลโปรเจกต์...");
+
+    try {
+      const response = await fetch(`/api/client-rooms/projects/${projectId}`, {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        project?: ClientRoomProjectRecord;
+      };
+
+      if (!response.ok || !data.project) {
+        throw new Error(data.error || "โหลดโปรเจกต์ไม่สำเร็จ");
+      }
+
+      setProject(data.project);
+      setStatusMessage("พร้อมแก้ไข draft และ publish ลิงก์ลูกค้า");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "โหลดโปรเจกต์ไม่สำเร็จ");
+    } finally {
+      setIsLoadingProject(false);
+    }
+  }
+
+  async function createProject() {
+    setStatusMessage("กำลังสร้าง client room ใหม่...");
+
+    try {
+      const response = await fetch("/api/client-rooms/projects", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ title: newProjectTitle }),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        project?: ClientRoomProjectRecord;
+      };
+
+      if (!response.ok || !data.project) {
+        throw new Error(data.error || "สร้าง client room ไม่สำเร็จ");
+      }
+
+      setNewProjectTitle("Untitled Client Room");
+      await loadProjects(data.project.id);
+      setStatusMessage("สร้าง client room ใหม่แล้ว");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "สร้าง client room ไม่สำเร็จ");
+    }
+  }
+
+  function updateDraft(updater: (draft: ClientRoomDraftData) => ClientRoomDraftData) {
+    setProject((current) =>
+      current
+        ? {
+            ...current,
+            draftData: updater(current.draftData),
+          }
+        : current,
+    );
+  }
+
+  function setDraftField<Key extends keyof ClientRoomDraftData>(
+    key: Key,
+    value: ClientRoomDraftData[Key],
+  ) {
+    updateDraft((draft) => ({
+      ...draft,
+      [key]: value,
+    }));
+  }
+
+  async function saveCurrentProjectDraft() {
+    if (!project) {
+      return null;
+    }
+
+    setIsSaving(true);
+    setStatusMessage("กำลังบันทึก draft...");
+
+    try {
+      const response = await fetch(`/api/client-rooms/projects/${project.id}`, {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          draftData: project.draftData,
+        }),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        project?: ClientRoomProjectRecord;
+      };
+
+      if (!response.ok || !data.project) {
+        throw new Error(data.error || "บันทึก draft ไม่สำเร็จ");
+      }
+
+      setProject(data.project);
+      setProjects((current) =>
+        current.map((item) =>
+          item.id === data.project?.id
+            ? {
+                ...item,
+                title: data.project.title,
+                clientName: data.project.clientName,
+                slug: data.project.slug,
+                updatedAt: data.project.updatedAt,
+              }
+            : item,
+        ),
+      );
+      setStatusMessage("บันทึก draft แล้ว");
+      return data.project;
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "บันทึก draft ไม่สำเร็จ");
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function publishProject() {
+    if (!project) {
+      return;
+    }
+
+    setIsPublishing(true);
+    setStatusMessage("กำลัง publish snapshot สำหรับลูกค้า...");
+
+    try {
+      const savedProject = await saveCurrentProjectDraft();
+      const projectId = savedProject?.id ?? project.id;
+      const response = await fetch(`/api/client-rooms/projects/${projectId}/publish`, {
+        method: "POST",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        project?: ClientRoomProjectRecord;
+      };
+
+      if (!response.ok || !data.project) {
+        throw new Error(data.error || "publish ไม่สำเร็จ");
+      }
+
+      setProject(data.project);
+      setProjects((current) =>
+        current.map((item) =>
+          item.id === data.project?.id
+            ? {
+                ...item,
+                title: data.project.title,
+                clientName: data.project.clientName,
+                slug: data.project.slug,
+                shareToken: data.project.shareToken,
+                updatedAt: data.project.updatedAt,
+                publishedAt: data.project.publishedAt,
+              }
+            : item,
+        ),
+      );
+      setStatusMessage("publish สำเร็จ ลิงก์ลูกค้าถูก freeze ตาม snapshot ล่าสุดแล้ว");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "publish ไม่สำเร็จ");
+    } finally {
+      setIsPublishing(false);
+    }
+  }
+
+  async function uploadAsset(kind: UploadKind, file: File) {
+    if (!project) {
+      throw new Error("ยังไม่ได้เลือก client room");
+    }
+
+    setUploadingTarget(`${kind}:${file.name}`);
+    setStatusMessage(`กำลังอัปโหลด ${file.name}...`);
+
+    try {
+      const formData = new FormData();
+      formData.append("kind", kind);
+      formData.append("file", file);
+
+      const response = await fetch(`/api/client-rooms/projects/${project.id}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        url?: string;
+      };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "อัปโหลดไฟล์ไม่สำเร็จ");
+      }
+
+      setStatusMessage(`อัปโหลด ${file.name} แล้ว`);
+      return data.url;
+    } finally {
+      setUploadingTarget("");
+    }
+  }
+
+  async function handleHeroUpload(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    try {
+      const url = await uploadAsset("hero", file);
+      setDraftField("heroImageUrl", url);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "อัปโหลด hero image ไม่สำเร็จ");
+    }
+  }
+
+  async function copyShareLink() {
+    if (!project?.shareToken) {
+      return;
+    }
+
+    const absoluteUrl = buildAbsoluteUrl(buildClientRoomSharePath(project.shareToken));
+    if (!absoluteUrl) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(absoluteUrl);
+    setStatusMessage("คัดลอกลิงก์ลูกค้าแล้ว");
+  }
+
+  const sharePath = project?.shareToken
+    ? buildClientRoomSharePath(project.shareToken)
+    : null;
+  const shareUrl = buildAbsoluteUrl(sharePath);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-5 py-4 md:px-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-bnj.svg"
+            alt="BNJ Studio"
+            width={120}
+            height={60}
+            className="h-8 w-auto shrink-0"
+          />
+          <div className="min-w-0">
+            <p className="text-[0.68rem] uppercase tracking-[0.24em] text-muted-foreground">
+              Client Room CMS
+            </p>
+            <p className="truncate font-display text-2xl leading-none">
+              Draft, Publish, Share
+            </p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void saveCurrentProjectDraft()}
+              disabled={!project || isSaving || isPublishing}
+            >
+              {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
+              Save Draft
+            </Button>
+            <Button
+              onClick={() => void publishProject()}
+              disabled={!project || isSaving || isPublishing}
+            >
+              {isPublishing ? <LoaderCircle className="animate-spin" /> : <Rocket />}
+              Publish
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-[1500px] gap-6 px-5 py-6 md:px-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>สร้าง Client Room</CardTitle>
+              <CardDescription>
+                แก้ draft ในหน้านี้ แล้วค่อย publish เป็นลิงก์ลูกค้าแบบอ่านอย่างเดียว
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                value={newProjectTitle}
+                onChange={(event) => setNewProjectTitle(event.target.value)}
+                placeholder="ชื่อโปรเจกต์"
+              />
+              <Button className="w-full" onClick={() => void createProject()}>
+                <Plus />
+                สร้างโปรเจกต์ใหม่
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Projects</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {isLoadingProjects ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderCircle className="size-4 animate-spin" />
+                  กำลังโหลดรายการ...
+                </div>
+              ) : null}
+
+              {!isLoadingProjects && projects.length === 0 ? (
+                <p className="text-sm text-muted-foreground">ยังไม่มี client room</p>
+              ) : null}
+
+              {projects.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedProjectId(item.id);
+                    void loadProject(item.id);
+                  }}
+                  className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                    selectedProjectId === item.id
+                      ? "border-foreground bg-secondary/60"
+                      : "border-border hover:border-foreground/40 hover:bg-secondary/30"
+                  }`}
+                >
+                  <p className="font-medium">{item.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.clientName || "ยังไม่ระบุชื่อลูกค้า"}
+                  </p>
+                  <p className="mt-2 text-[0.72rem] text-muted-foreground">
+                    slug: {item.slug}
+                  </p>
+                  <p className="text-[0.72rem] text-muted-foreground">
+                    {item.publishedAt ? "Published แล้ว" : "ยังไม่ publish"}
+                  </p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm leading-7 text-muted-foreground">{statusMessage}</p>
+            </CardContent>
+          </Card>
+        </aside>
+
+        <section className="space-y-6">
+          {!project ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>ยังไม่ได้เลือกโปรเจกต์</CardTitle>
+                <CardDescription>
+                  สร้างหรือเลือก client room จากคอลัมน์ซ้ายก่อน
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : null}
+
+          {project ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Share Link</CardTitle>
+                  <CardDescription>
+                    ลิงก์นี้อ่านจาก published snapshot เท่านั้น ลูกค้าแก้ข้อมูลไม่ได้จากหน้านี้
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Input value={shareUrl ?? "ยังไม่ publish"} readOnly />
+                    <Button
+                      variant="outline"
+                      onClick={() => void copyShareLink()}
+                      disabled={!shareUrl}
+                    >
+                      <Copy />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (sharePath) {
+                          window.open(sharePath, "_blank", "noopener,noreferrer");
+                        }
+                      }}
+                      disabled={!sharePath}
+                    >
+                      <ExternalLink />
+                      เปิดหน้าลูกค้า
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    ถ้าคุณแก้ draft เพิ่มเติม ลิงก์ลูกค้าจะยังคงเป็นข้อมูลเดิมจนกว่าจะกด
+                    Publish อีกครั้ง
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>ข้อมูลหลัก</CardTitle>
+                  <CardDescription>
+                    ส่วนนี้ใช้ใน hero และข้อมูลพื้นฐานด้านบนของหน้า client room
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <Field label="ชื่อโปรเจกต์">
+                    <Input
+                      value={project.draftData.title}
+                      onChange={(event) => setDraftField("title", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Slug">
+                    <Input
+                      value={project.draftData.slug}
+                      onChange={(event) => setDraftField("slug", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="ชื่อลูกค้า">
+                    <Input
+                      value={project.draftData.clientName}
+                      onChange={(event) => setDraftField("clientName", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="ประเภทโปรเจกต์">
+                    <select
+                      value={project.draftData.projectType}
+                      onChange={(event) =>
+                        setDraftField(
+                          "projectType",
+                          event.target.value as ClientRoomDraftData["projectType"],
+                        )
+                      }
+                      className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      <option value="House">House</option>
+                      <option value="Condo">Condo</option>
+                      <option value="Commercial">Commercial</option>
+                    </select>
+                  </Field>
+                  <Field label="ที่ตั้ง">
+                    <Input
+                      value={project.draftData.location}
+                      onChange={(event) => setDraftField("location", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="พื้นที่">
+                    <Input
+                      value={project.draftData.area}
+                      onChange={(event) => setDraftField("area", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="ปี">
+                    <Input
+                      value={project.draftData.year}
+                      onChange={(event) => setDraftField("year", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Hero image URL">
+                    <Input
+                      value={project.draftData.heroImageUrl}
+                      onChange={(event) => setDraftField("heroImageUrl", event.target.value)}
+                      placeholder="/api/client-rooms/assets/..."
+                    />
+                  </Field>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">ภาพหลักของโปรเจกต์</label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
+                        {uploadingTarget.startsWith("hero:") ? (
+                          <LoaderCircle className="size-4 animate-spin" />
+                        ) : (
+                          <ImagePlus className="size-4" />
+                        )}
+                        Upload Hero Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) =>
+                            void handleHeroUpload(event.target.files?.[0] ?? null)
+                          }
+                        />
+                      </label>
+                    </div>
+                    {project.draftData.heroImageUrl ? (
+                      <div className="overflow-hidden rounded-2xl border border-border bg-secondary/30">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={project.draftData.heroImageUrl}
+                          alt={project.draftData.title}
+                          className="aspect-[16/9] w-full object-cover"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Overview</label>
+                    <textarea
+                      value={project.draftData.overview}
+                      onChange={(event) => setDraftField("overview", event.target.value)}
+                      className={textareaClassName()}
+                      placeholder="คำอธิบายภาพรวมของโครงการ"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <ClientRoomDocumentsEditor
+                draft={project.draftData}
+                onChange={updateDraft}
+                onUpload={uploadAsset}
+                uploadingTarget={uploadingTarget}
+                onStatus={setStatusMessage}
+              />
+
+              <ClientRoomGalleryEditor
+                draft={project.draftData}
+                onChange={updateDraft}
+                onUpload={uploadAsset}
+                uploadingTarget={uploadingTarget}
+                onStatus={setStatusMessage}
+              />
+            </>
+          ) : null}
+
+          {isLoadingProject ? (
+            <Card>
+              <CardContent className="flex items-center gap-2 py-6">
+                <LoaderCircle className="size-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">กำลังโหลดโปรเจกต์...</span>
+              </CardContent>
+            </Card>
+          ) : null}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">{label}</label>
+      {children}
+    </div>
+  );
+}

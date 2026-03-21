@@ -74,6 +74,7 @@ export interface ClientProject {
   ownerNote: string;
   area: string;
   year: string;
+  heroImageUrl?: string;
   sections: ProjectSection[];
   gallery: GalleryRoom[];
 }

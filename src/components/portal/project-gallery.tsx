@@ -38,16 +38,26 @@ export function ProjectGallery({ rooms }: { rooms: GalleryRoom[] }) {
         <div className="space-y-10">
           {activeRoom.images.map((image) => (
             <div key={image.id} className="space-y-3">
-              {/* Placeholder — replace with real <img> when uploaded */}
-              <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-2xl bg-secondary">
-                <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                  <ImageIcon className="size-16 opacity-30" />
-                  <p className="text-sm font-medium">{image.caption}</p>
-                  <p className="text-xs opacity-60">
-                    รูปจะแสดงที่นี่เมื่อ upload แล้ว
-                  </p>
+              {image.src ? (
+                <div className="overflow-hidden rounded-2xl bg-secondary">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.src}
+                    alt={image.caption}
+                    className="aspect-[16/10] w-full object-cover"
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-2xl bg-secondary">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <ImageIcon className="size-16 opacity-30" />
+                    <p className="text-sm font-medium">{image.caption}</p>
+                    <p className="text-xs opacity-60">
+                      รูปจะแสดงที่นี่เมื่อ upload แล้ว
+                    </p>
+                  </div>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">{image.caption}</p>
             </div>
           ))}
