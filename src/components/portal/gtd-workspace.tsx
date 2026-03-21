@@ -39,11 +39,13 @@ import {
 } from "@/lib/gtd/client";
 import { cn } from "@/lib/utils";
 const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
+type GtdListMode = "active" | "archived";
 
 export function GtdWorkspace() {
   const [items, setItems] = useState<GtdItem[]>([]);
   const [activeBucket, setActiveBucket] = useState<GtdBucket>("inbox");
   const [activeContext, setActiveContext] = useState<GtdContext | "all">("all");
+  const [activeListMode, setActiveListMode] = useState<GtdListMode>("active");
   const [draftText, setDraftText] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [itemDraft, setItemDraft] = useState<GtdItem | null>(null);
@@ -88,22 +90,28 @@ export function GtdWorkspace() {
   }, []);
 
   const counts = getBucketCounts(items);
+  const archivedCount = items.filter((item) => item.done).length;
   const doneThisWeek = items.filter((item) => Boolean(item.doneAt && referenceTime - new Date(item.doneAt).getTime() < 604800000)).length;
   const overdueCount = items.filter((item) => Boolean(item.dueDate && !item.done && new Date(item.dueDate).getTime() < referenceTime)).length;
   const staleWaitingCount = items.filter((item) => item.bucket === "waiting" && !item.done && referenceTime - new Date(item.updatedAt).getTime() > 432000000).length;
   const filteredItems = useMemo(
-    () =>
-      items
-        .filter((item) => item.bucket === activeBucket)
+    () => {
+      if (activeListMode === "archived") {
+        return items.filter((item) => item.done).sort(sortArchivedItems);
+      }
+
+      return items
+        .filter((item) => !item.done && item.bucket === activeBucket)
         .filter((item) => activeBucket !== "next" || activeContext === "all" || item.context === activeContext)
-        .sort(sortItems),
-    [activeBucket, activeContext, items],
+        .sort(sortItems);
+    },
+    [activeBucket, activeContext, activeListMode, items],
   );
   const resolvedSelectedItemId =
-    selectedItemId && items.some((item) => item.id === selectedItemId)
+    selectedItemId && filteredItems.some((item) => item.id === selectedItemId)
       ? selectedItemId
-      : items[0]?.id ?? null;
-  const selectedItem = items.find((item) => item.id === resolvedSelectedItemId) ?? null;
+      : filteredItems[0]?.id ?? null;
+  const selectedItem = filteredItems.find((item) => item.id === resolvedSelectedItemId) ?? null;
   const completedReviewSteps = reviewSteps.filter((step) => review.steps[step.id]).length;
   const reviewStatus = getWeeklyReviewStatus(review.lastCompletedAt, referenceTime);
 
@@ -144,6 +152,7 @@ export function GtdWorkspace() {
       applyWorkspace(data.workspace);
       setDraftText("");
       setSelectedItemId(data.item.id);
+      setActiveListMode("active");
       setActiveBucket("inbox");
       setStatusMessage("Added to inbox.");
     } catch (error) {
@@ -210,10 +219,17 @@ export function GtdWorkspace() {
   }
 
   function toggleDone(item: GtdItem) {
+    if (item.done) {
+      setActiveListMode("active");
+      setActiveBucket(item.bucket);
+      setActiveContext(item.bucket === "next" && item.context ? item.context : "all");
+      setSelectedItemId(item.id);
+    }
+
     void updateItem(
       item.id,
       { done: !item.done, doneAt: item.done ? null : new Date().toISOString() },
-      item.done ? "Marked as active again." : "Marked as done.",
+      item.done ? "Marked as active again." : "Marked as done and moved to Archived.",
     );
   }
 
@@ -224,6 +240,7 @@ export function GtdWorkspace() {
       { bucket, done: false, doneAt: null },
       `Moved to ${bucketLabels[bucket]}.`,
     );
+    setActiveListMode("active");
     setActiveBucket(bucket);
   }
 
@@ -364,23 +381,55 @@ export function GtdWorkspace() {
               <button
                 key={bucket}
                 type="button"
-                onClick={() => setActiveBucket(bucket)}
+                onClick={() => {
+                  setActiveListMode("active");
+                  setActiveBucket(bucket);
+                }}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors",
-                  activeBucket === bucket
+                  activeListMode === "active" && activeBucket === bucket
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground",
                 )}
               >
                 <span>{bucketLabels[bucket]}</span>
-                <span className={cn("rounded-full px-2 py-0.5 text-xs", activeBucket === bucket ? "bg-background/15 text-background" : "bg-secondary text-foreground")}>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs",
+                    activeListMode === "active" && activeBucket === bucket
+                      ? "bg-background/15 text-background"
+                      : "bg-secondary text-foreground",
+                  )}
+                >
                   {counts[bucket]}
                 </span>
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setActiveListMode("archived")}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors",
+                activeListMode === "archived"
+                  ? "border-sky-200 bg-sky-50 text-sky-700"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground",
+              )}
+            >
+              <span>Archived</span>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-xs",
+                  activeListMode === "archived"
+                    ? "bg-sky-100 text-sky-700"
+                    : "bg-secondary text-foreground",
+                )}
+              >
+                {archivedCount}
+              </span>
+            </button>
           </div>
 
-          {activeBucket === "next" ? (
+          {activeListMode === "active" && activeBucket === "next" ? (
             <div className="flex flex-wrap gap-2">
               {contextOptions.map((context) => (
                 <button
@@ -405,7 +454,9 @@ export function GtdWorkspace() {
           <div className="space-y-4">
             {filteredItems.length === 0 ? (
               <div className="rounded-[2rem] border border-dashed border-border bg-background px-6 py-14 text-center text-muted-foreground">
-                No items in {bucketLabels[activeBucket].toLowerCase()}.
+                {activeListMode === "archived"
+                  ? "No archived items yet."
+                  : `No items in ${bucketLabels[activeBucket].toLowerCase()}.`}
               </div>
             ) : null}
 
@@ -511,7 +562,14 @@ export function GtdWorkspace() {
                     className="w-full rounded-[1.4rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground"
                   />
 
-                  {selectedItem.bucket === "inbox" ? (
+                  {selectedItem.done ? (
+                    <div className="rounded-[1.4rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                      Archived on {formatShortDate(selectedItem.doneAt ?? selectedItem.updatedAt)}.
+                      Use Mark active to restore it to {bucketLabels[selectedItem.bucket]}.
+                    </div>
+                  ) : null}
+
+                  {selectedItem.bucket === "inbox" && !selectedItem.done ? (
                     <div className="rounded-[1.4rem] bg-secondary/50 p-4">
                       <p className="caption-editorial text-[0.68rem]">Clarify Flow</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -679,6 +737,13 @@ function sortItems(a: GtdItem, b: GtdItem) {
   if (a.dueDate && b.dueDate) return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   if (a.dueDate) return -1;
   if (b.dueDate) return 1;
+  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+}
+
+function sortArchivedItems(a: GtdItem, b: GtdItem) {
+  const aDoneAt = a.doneAt ? new Date(a.doneAt).getTime() : 0;
+  const bDoneAt = b.doneAt ? new Date(b.doneAt).getTime() : 0;
+  if (aDoneAt !== bDoneAt) return bDoneAt - aDoneAt;
   return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 }
 
