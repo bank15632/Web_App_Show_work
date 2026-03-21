@@ -1,20 +1,24 @@
 "use client";
 
-import { ChevronDown, Plus, Upload } from "lucide-react";
+import { ChevronDown, Plus, Trash2, Upload } from "lucide-react";
 
 import { phaseAccents, phaseLabels, projectStatuses } from "@/lib/tracker/constants";
 import type { TrackerPhase, TrackerProjectDetail, TrackerProjectStatus } from "@/lib/tracker/types";
 
 export function WorkspaceHeader({
+  isWorking,
   project,
   onPhaseChange,
   onStatusChange,
+  onDeleteProject,
   onNewTask,
   onOpenIntake,
 }: {
+  isWorking: boolean;
   project: TrackerProjectDetail;
   onPhaseChange: (phase: TrackerPhase) => void;
   onStatusChange: (status: TrackerProjectStatus) => void;
+  onDeleteProject: () => void;
   onNewTask: () => void;
   onOpenIntake: () => void;
 }) {
@@ -64,6 +68,7 @@ export function WorkspaceHeader({
           <button
             type="button"
             onClick={onOpenIntake}
+            disabled={isWorking}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-sm font-medium transition-colors hover:border-foreground"
           >
             <Upload className="size-4" />
@@ -72,10 +77,20 @@ export function WorkspaceHeader({
           <button
             type="button"
             onClick={onNewTask}
+            disabled={isWorking}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
           >
             <Plus className="size-4" />
             Add Task
+          </button>
+          <button
+            type="button"
+            onClick={onDeleteProject}
+            disabled={isWorking}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Trash2 className="size-4" />
+            Delete Project
           </button>
         </div>
       </div>

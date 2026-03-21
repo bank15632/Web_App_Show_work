@@ -622,6 +622,46 @@ export async function updateProject(
   return project;
 }
 
+export async function deleteProject(env: TrackerEnv, projectId: string) {
+  await ensureTrackerReady(env);
+  const existing = await getProjectById(env, projectId);
+  if (!existing) {
+    return false;
+  }
+
+  const artifactRows = await queryAll<{ file_path: string | null }>(
+    env.DB,
+    "SELECT file_path FROM artifacts WHERE project_id = ?",
+    projectId,
+  );
+  const artifactPaths = Array.from(
+    new Set(
+      artifactRows.flatMap((row) => (row.file_path ? [row.file_path] : [])),
+    ),
+  );
+
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM audit_logs WHERE project_id = ?").bind(projectId),
+    env.DB.prepare("DELETE FROM review_items WHERE project_id = ?").bind(projectId),
+    env.DB.prepare("DELETE FROM tasks WHERE project_id = ?").bind(projectId),
+    env.DB.prepare("DELETE FROM decisions WHERE project_id = ?").bind(projectId),
+    env.DB.prepare("DELETE FROM artifacts WHERE project_id = ?").bind(projectId),
+    env.DB.prepare("DELETE FROM projects WHERE id = ?").bind(projectId),
+  ]);
+
+  const cleanupResults = await Promise.allSettled(
+    artifactPaths.map((objectKey) => env.ARTIFACTS_BUCKET.delete(objectKey)),
+  );
+
+  cleanupResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error("Failed to delete tracker artifact", artifactPaths[index], result.reason);
+    }
+  });
+
+  return true;
+}
+
 export async function createTask(
   env: TrackerEnv,
   projectId: string,

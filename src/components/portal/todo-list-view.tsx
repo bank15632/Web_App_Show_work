@@ -477,6 +477,37 @@ export function TodoListView() {
     }
   }
 
+  async function handleDeleteProject(project: TrackerProjectDetail) {
+    const confirmed = window.confirm(
+      `Delete "${project.name}" and all of its tasks, decisions, review items, and uploads? This cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    setWorking(true);
+    try {
+      const data = await requestJson<{ deleted: boolean; workspace: TrackerWorkspaceData }>(
+        `/api/tracker/projects/${project.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      startTransition(() => {
+        setWorkspace(data.workspace);
+        setActiveProjectId(data.workspace.projects[0]?.id ?? null);
+      });
+      setDialog(null);
+      setStatusMessage(`Deleted project "${project.name}".`);
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Failed to delete project",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -626,6 +657,7 @@ export function TodoListView() {
           </div>
 
           <WorkspaceHeader
+            isWorking={working}
             project={activeProject}
             onPhaseChange={(phase) => {
               void withWorkspaceMutation(
@@ -654,6 +686,9 @@ export function TodoListView() {
                   ),
                 "Project status updated.",
               );
+            }}
+            onDeleteProject={() => {
+              void handleDeleteProject(activeProject);
             }}
             onNewTask={() => {
               setTaskDraft(createEmptyTaskDraft(activeProject.phase));
