@@ -17,6 +17,7 @@ import { ClientRoomGalleryEditor } from "@/components/portal/client-room-gallery
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { uploadClientRoomAssetMultipart } from "@/lib/client-rooms/upload";
 import {
   buildClientRoomSharePath,
   type ClientRoomDraftData,
@@ -53,7 +54,12 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<{
+    label: string;
+    progress: number;
+  } | null>(null);
   const [statusMessage, setStatusMessage] = useState("กำลังโหลด client rooms...");
+  const isUploading = uploadingTarget.length > 0;
 
   useEffect(() => {
     void loadProjects();
@@ -215,6 +221,14 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                 title: data.project.title,
                 clientName: data.project.clientName,
                 slug: data.project.slug,
+                projectType: data.project.draftData.projectType,
+                location: data.project.draftData.location,
+                year: data.project.draftData.year,
+                overview: data.project.draftData.overview,
+                documentCount: data.project.draftData.sections.reduce(
+                  (count, section) => count + section.items.length,
+                  0,
+                ),
                 updatedAt: data.project.updatedAt,
               }
             : item,
@@ -262,6 +276,14 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                 title: data.project.title,
                 clientName: data.project.clientName,
                 slug: data.project.slug,
+                projectType: data.project.draftData.projectType,
+                location: data.project.draftData.location,
+                year: data.project.draftData.year,
+                overview: data.project.draftData.overview,
+                documentCount: data.project.draftData.sections.reduce(
+                  (count, section) => count + section.items.length,
+                  0,
+                ),
                 shareToken: data.project.shareToken,
                 updatedAt: data.project.updatedAt,
                 publishedAt: data.project.publishedAt,
@@ -331,30 +353,34 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
     }
 
     setUploadingTarget(`${kind}:${file.name}`);
+    setUploadProgress({
+      label: file.name,
+      progress: 0,
+    });
     setStatusMessage(`กำลังอัปโหลด ${file.name}...`);
 
     try {
-      const formData = new FormData();
-      formData.append("kind", kind);
-      formData.append("file", file);
-
-      const response = await fetch(`/api/client-rooms/projects/${project.id}/assets`, {
-        method: "POST",
-        body: formData,
+      const url = await uploadClientRoomAssetMultipart({
+        projectId: project.id,
+        kind,
+        file,
+        onProgress: (progress) => {
+          setUploadProgress({
+            label: file.name,
+            progress,
+          });
+          setStatusMessage(`กำลังอัปโหลด ${file.name}... ${progress}%`);
+        },
       });
-      const data = (await response.json()) as {
-        error?: string;
-        url?: string;
-      };
-
-      if (!response.ok || !data.url) {
-        throw new Error(data.error || "อัปโหลดไฟล์ไม่สำเร็จ");
-      }
 
       setStatusMessage(`อัปโหลด ${file.name} แล้ว`);
-      return data.url;
+      return url;
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : `อัปโหลด ${file.name} ไม่สำเร็จ`);
+      throw error;
     } finally {
       setUploadingTarget("");
+      setUploadProgress(null);
     }
   }
 
@@ -414,14 +440,14 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
             <Button
               variant="outline"
               onClick={() => void saveCurrentProjectDraft()}
-              disabled={!project || isSaving || isPublishing || isDeleting}
+              disabled={!project || isSaving || isPublishing || isDeleting || isUploading}
             >
               {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
               Save Draft
             </Button>
             <Button
               onClick={() => void publishProject()}
-              disabled={!project || isSaving || isPublishing || isDeleting}
+              disabled={!project || isSaving || isPublishing || isDeleting || isUploading}
             >
               {isPublishing ? <LoaderCircle className="animate-spin" /> : <Rocket />}
               Publish
@@ -429,7 +455,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
             <Button
               variant="destructive"
               onClick={() => void deleteCurrentProject()}
-              disabled={!project || isSaving || isPublishing || isDeleting}
+              disabled={!project || isSaving || isPublishing || isDeleting || isUploading}
             >
               {isDeleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
               Delete Project
@@ -452,8 +478,9 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                 value={newProjectTitle}
                 onChange={(event) => setNewProjectTitle(event.target.value)}
                 placeholder="ชื่อโปรเจกต์"
+                disabled={isUploading}
               />
-              <Button className="w-full" onClick={() => void createProject()}>
+              <Button className="w-full" onClick={() => void createProject()} disabled={isUploading}>
                 <Plus />
                 สร้างโปรเจกต์ใหม่
               </Button>
@@ -483,6 +510,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                     setSelectedProjectId(item.id);
                     void loadProject(item.id);
                   }}
+                  disabled={isUploading}
                   className={`w-full rounded-xl border p-3 text-left transition-colors ${
                     selectedProjectId === item.id
                       ? "border-foreground bg-secondary/60"
@@ -508,8 +536,22 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
             <CardHeader>
               <CardTitle>Status</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <p className="text-sm leading-7 text-muted-foreground">{statusMessage}</p>
+              {uploadProgress ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span className="truncate">{uploadProgress.label}</span>
+                    <span>{uploadProgress.progress}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full bg-foreground transition-[width]"
+                      style={{ width: `${uploadProgress.progress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </aside>

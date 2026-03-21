@@ -62,6 +62,10 @@ function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]+/g, "-");
 }
 
+function buildClientRoomObjectKey(projectId: string, fileName: string) {
+  return `client-rooms/${projectId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${sanitizeFileName(fileName)}`;
+}
+
 function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
   if (!value) {
     return fallback;
@@ -431,20 +435,52 @@ export async function createClientRoomAsset(
   },
 ) {
   await ensureClientRoomsReady(env);
-  const existing = await getClientRoomProjectById(env, input.projectId);
-  if (!existing) {
-    throw new Error("Client room not found");
-  }
-
-  const assetId = createId("client_room_asset");
-  const createdAt = nowIso();
-  const objectKey = `client-rooms/${input.projectId}/${Date.now()}-${sanitizeFileName(input.fileName)}`;
+  await assertClientRoomExists(env, input.projectId);
+  const objectKey = createClientRoomObjectKey(input.projectId, input.fileName);
 
   await env.ARTIFACTS_BUCKET.put(objectKey, input.bytes, {
     httpMetadata: {
       contentType: input.mimeType,
     },
   });
+
+  return createClientRoomAssetRecord(env, {
+    projectId: input.projectId,
+    kind: input.kind,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    objectKey,
+  });
+}
+
+export async function assertClientRoomExists(env: TrackerEnv, projectId: string) {
+  const existing = await getClientRoomProjectById(env, projectId);
+  if (!existing) {
+    throw new Error("Client room not found");
+  }
+
+  return existing;
+}
+
+export function createClientRoomObjectKey(projectId: string, fileName: string) {
+  return buildClientRoomObjectKey(projectId, fileName);
+}
+
+export async function createClientRoomAssetRecord(
+  env: TrackerEnv,
+  input: {
+    projectId: string;
+    kind: ClientRoomAssetKind;
+    fileName: string;
+    mimeType: string;
+    objectKey: string;
+  },
+) {
+  await ensureClientRoomsReady(env);
+  await assertClientRoomExists(env, input.projectId);
+
+  const assetId = createId("client_room_asset");
+  const createdAt = nowIso();
 
   await runStatement(
     env.DB,
@@ -455,7 +491,7 @@ export async function createClientRoomAsset(
     input.projectId,
     input.kind,
     input.fileName,
-    objectKey,
+    input.objectKey,
     input.mimeType,
     createdAt,
   );
