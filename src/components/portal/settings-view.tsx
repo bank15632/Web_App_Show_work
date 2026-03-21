@@ -21,13 +21,10 @@ import {
   type AecSettingsState,
 } from "@/lib/aec-settings";
 import { manualSettingsCards } from "@/lib/aec-user-manual";
+import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
   contextOptions,
   getWeeklyReviewStatus,
-  gtdStorageKey,
-  reviewStorageKey,
-  safeParseItems,
-  safeParseReview,
 } from "@/lib/gtd-system";
 import { getProjects } from "@/lib/portal-data";
 import type { TrackerWorkspaceData } from "@/lib/tracker/types";
@@ -68,13 +65,37 @@ export function SettingsView() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let ignore = false;
     const storedSettings = window.localStorage.getItem(aecSettingsStorageKey);
-    const reviewState = safeParseReview(window.localStorage.getItem(reviewStorageKey));
-    const reviewStatus = getWeeklyReviewStatus(reviewState.lastCompletedAt);
 
     setSettings(safeParseAecSettings(storedSettings));
-    setReviewStatusLabel(reviewStatus.title);
     setIsReady(true);
+
+    async function loadReviewStatus() {
+      try {
+        const workspace = await fetchGtdWorkspace();
+        if (!ignore) {
+          setReviewStatusLabel(
+            getWeeklyReviewStatus(workspace.review.lastCompletedAt).title,
+          );
+        }
+      } catch {
+        if (!ignore) setReviewStatusLabel("ยังไม่สามารถอ่านสถานะ Weekly Review ได้");
+      }
+    }
+
+    void loadReviewStatus();
+
+    const handleWindowFocus = () => {
+      void loadReviewStatus();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      ignore = true;
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -533,8 +554,8 @@ export function SettingsView() {
             <p className="caption-editorial">Persistence</p>
           </div>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
-            การตั้งค่าในหน้านี้ถูกเก็บไว้ใน browser ปัจจุบันผ่าน local storage
-            เพื่อให้ flow ของ GTD, dashboard และ export ใช้ค่าชุดเดียวกันทันที
+            การตั้งค่า profile และ notification ถูกเก็บไว้ใน browser ปัจจุบัน
+            ส่วน GTD และ tracker ที่ export จะดึงจากฐานข้อมูลปัจจุบันของ workspace
           </p>
         </section>
       </main>
@@ -552,17 +573,13 @@ function RoleCard({ role, body }: { role: string; body: string }) {
 }
 
 async function collectExportPayload(settings: AecSettingsState) {
-  const gtdItems = safeParseItems(window.localStorage.getItem(gtdStorageKey));
-  const review = safeParseReview(window.localStorage.getItem(reviewStorageKey));
+  const gtdWorkspace = await fetchGtdWorkspace();
   const tracker = await getTrackerWorkspace().catch(() => null);
 
   return {
     exportedAt: new Date().toISOString(),
     settings,
-    gtd: {
-      items: gtdItems,
-      review,
-    },
+    gtd: gtdWorkspace,
     tracker,
     clientProjects: getProjects(),
   };

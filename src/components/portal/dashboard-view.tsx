@@ -22,12 +22,9 @@ import { manualFrameworkCards } from "@/lib/aec-user-manual";
 import {
   getBucketCounts,
   getWeeklyReviewStatus,
-  gtdStorageKey,
-  reviewStorageKey,
-  safeParseItems,
-  safeParseReview,
   type GtdItem,
 } from "@/lib/gtd-system";
+import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
   type ClientProject,
   type RevisionStatus,
@@ -149,45 +146,50 @@ export function DashboardView() {
   const [trackerWorkspace, setTrackerWorkspace] = useState<TrackerWorkspaceData | null>(null);
   const [trackerStatus, setTrackerStatus] = useState("กำลังดึงข้อมูล Kanban board...");
   const [reviewStatus, setReviewStatus] = useState(getWeeklyReviewStatus(null));
+  const [referenceTime, setReferenceTime] = useState(() => Date.now());
 
   useEffect(() => {
-    const storedItems = safeParseItems(window.localStorage.getItem(gtdStorageKey));
-    const storedReview = safeParseReview(window.localStorage.getItem(reviewStorageKey));
-
-    setGtdItems(storedItems);
-    setReviewStatus(getWeeklyReviewStatus(storedReview.lastCompletedAt));
-
     let ignore = false;
 
     async function loadWorkspace() {
-      try {
-        const response = await fetch("/api/tracker/workspace", { cache: "no-store" });
-        const data = (await response.json()) as {
-          error?: string;
-          workspace?: TrackerWorkspaceData;
-        };
+      const [gtdResult, trackerResult] = await Promise.allSettled([
+        fetchGtdWorkspace(),
+        getTrackerWorkspace(),
+      ]);
 
-        if (!response.ok || !data.workspace) {
-          throw new Error(data.error || "Tracker workspace unavailable.");
-        }
+      if (ignore) return;
 
-        if (!ignore) {
-          setTrackerWorkspace(data.workspace);
-          setTrackerStatus("Kanban board พร้อมใช้งาน");
-        }
-      } catch (error) {
-        if (!ignore) {
-          setTrackerWorkspace(null);
-          setTrackerStatus(
-            error instanceof Error ? error.message : "Tracker workspace unavailable.",
-          );
-        }
+      if (gtdResult.status === "fulfilled") {
+        setGtdItems(gtdResult.value.items);
+        setReviewStatus(getWeeklyReviewStatus(gtdResult.value.review.lastCompletedAt));
       }
+
+      if (trackerResult.status === "fulfilled") {
+        setTrackerWorkspace(trackerResult.value);
+        setTrackerStatus("Kanban board พร้อมใช้งาน");
+      } else {
+        setTrackerWorkspace(null);
+        setTrackerStatus(
+          trackerResult.reason instanceof Error
+            ? trackerResult.reason.message
+            : "Tracker workspace unavailable.",
+        );
+      }
+
+      setReferenceTime(Date.now());
     }
 
     void loadWorkspace();
+
+    const handleWindowFocus = () => {
+      void loadWorkspace();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+
     return () => {
       ignore = true;
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, []);
 
@@ -258,9 +260,9 @@ export function DashboardView() {
         (item) =>
           item.bucket === "waiting" &&
           !item.done &&
-          Date.now() - new Date(item.updatedAt).getTime() > 432000000,
+          referenceTime - new Date(item.updatedAt).getTime() > 432000000,
       ).length,
-    [gtdItems],
+    [gtdItems, referenceTime],
   );
   const gtdUpcomingCount = useMemo(
     () =>
@@ -268,9 +270,9 @@ export function DashboardView() {
         (item) =>
           Boolean(item.dueDate) &&
           !item.done &&
-          isDateWithinDays(item.dueDate as string, 7),
+          isDateWithinDays(item.dueDate as string, 7, referenceTime),
       ).length,
-    [gtdItems],
+    [gtdItems, referenceTime],
   );
 
   const trackerTasks = useMemo(
@@ -279,8 +281,8 @@ export function DashboardView() {
   );
   const blockedTaskCount = trackerTasks.filter((task) => task.status === "blocked").length;
   const waitingTaskCount = trackerTasks.filter((task) => task.status === "waiting").length;
-  const trackerOverdueCount = trackerTasks.filter((task) => isTrackerTaskOverdue(task)).length;
-  const trackerUpcomingCount = trackerTasks.filter((task) => isTrackerTaskUpcoming(task)).length;
+  const trackerOverdueCount = trackerTasks.filter((task) => isTrackerTaskOverdue(task, referenceTime)).length;
+  const trackerUpcomingCount = trackerTasks.filter((task) => isTrackerTaskUpcoming(task, referenceTime)).length;
   const openReviewCount =
     trackerWorkspace?.reviewItems.filter((item) => item.status === "pending").length ?? 0;
 
@@ -744,19 +746,29 @@ function ProjectCard({
   );
 }
 
-function isDateWithinDays(value: string, days: number) {
+function isDateWithinDays(value: string, days: number, referenceTime: number) {
   const date = new Date(value);
-  const now = new Date();
-  const diff = date.getTime() - now.getTime();
+  const diff = date.getTime() - referenceTime;
   return diff >= 0 && diff <= days * 86400000;
 }
 
-function isTrackerTaskOverdue(task: TrackerTaskRecord) {
+function isTrackerTaskOverdue(task: TrackerTaskRecord, referenceTime: number) {
   if (!task.dueDate || task.status === "done") return false;
-  return new Date(task.dueDate).getTime() < Date.now();
+  return new Date(task.dueDate).getTime() < referenceTime;
 }
 
-function isTrackerTaskUpcoming(task: TrackerTaskRecord) {
+function isTrackerTaskUpcoming(task: TrackerTaskRecord, referenceTime: number) {
   if (!task.dueDate || task.status === "done") return false;
-  return isDateWithinDays(task.dueDate, 7);
+  return isDateWithinDays(task.dueDate, 7, referenceTime);
+}
+
+async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
+  const response = await fetch("/api/tracker/workspace", { cache: "no-store" });
+  const data = (await response.json()) as { error?: string; workspace?: TrackerWorkspaceData };
+
+  if (!response.ok || !data.workspace) {
+    throw new Error(data.error || "Tracker workspace unavailable.");
+  }
+
+  return data.workspace;
 }

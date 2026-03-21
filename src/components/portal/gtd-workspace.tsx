@@ -21,56 +21,71 @@ import {
   createDefaultReviewState,
   getBucketCounts,
   getWeeklyReviewStatus,
-  gtdStorageKey as storageKey,
+  gtdSeedItems,
   reviewSteps,
-  reviewStorageKey,
-  safeParseItems,
-  safeParseReview,
   type GtdBucket,
   type GtdContext,
   type GtdItem,
   type GtdPriority,
+  type GtdWorkspaceData,
   type WeeklyReviewState,
 } from "@/lib/gtd-system";
+import {
+  createGtdItemRequest,
+  deleteGtdItemRequest,
+  fetchGtdWorkspace,
+  updateGtdItemRequest,
+  updateGtdReviewRequest,
+} from "@/lib/gtd/client";
 import { cn } from "@/lib/utils";
-const seededItems: GtdItem[] = [
-  createSeededItem("gtd_seed_1", "สรุป feedback ลูกค้า Nordic Home Office หลัง review ล่าสุด", "inbox", "computer", "high", null, "", "2026-03-20T08:00:00.000Z"),
-  createSeededItem("gtd_seed_2", "โทรตาม consultant เรื่อง revised MEP markups", "next", "phone", "high", null, "ถาม timeline ที่ confirm ได้จริงก่อนนัด client รอบถัดไป", "2026-03-19T09:30:00.000Z"),
-  createSeededItem("gtd_seed_3", "รอผู้รับเหมาส่งราคา built-in ห้องนั่งเล่น", "waiting", "", "medium", "2026-03-24", "ถ้าเกินอังคารให้ follow up ทันที", "2026-03-18T04:15:00.000Z"),
-  createSeededItem("gtd_seed_4", "เตรียม weekly review สำหรับทีม design", "calendar", "office", "medium", "2026-03-21", "รวบรวม blockers และงานที่ยังไม่มี next action", "2026-03-20T02:00:00.000Z"),
-  createSeededItem("gtd_seed_5", "แตก template A3 report สำหรับ phase lean analytics", "someday", "computer", "low", null, "รอ phase 3 ก่อนค่อยหยิบขึ้นมา", "2026-03-17T07:45:00.000Z"),
-];
 const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
 
 export function GtdWorkspace() {
-  const [items, setItems] = useState<GtdItem[]>(seededItems);
+  const [items, setItems] = useState<GtdItem[]>(gtdSeedItems);
   const [activeBucket, setActiveBucket] = useState<GtdBucket>("inbox");
   const [activeContext, setActiveContext] = useState<GtdContext | "all">("all");
   const [draftText, setDraftText] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [itemDraft, setItemDraft] = useState<GtdItem | null>(null);
   const [review, setReview] = useState<WeeklyReviewState>(createDefaultReviewState);
   const [statusMessage, setStatusMessage] = useState("");
   const [referenceTime, setReferenceTime] = useState(initialReferenceTime);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let ignore = false;
+
+    async function refreshWorkspace(silent = false) {
+      try {
+        const workspace = await fetchGtdWorkspace();
+        if (!ignore) applyWorkspace(workspace);
+      } catch (error) {
+        if (!ignore && !silent) {
+          setStatusMessage(
+            error instanceof Error ? error.message : "Failed to load GTD workspace.",
+          );
+        }
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    }
+
     const frameId = window.requestAnimationFrame(() => {
-      const storedItems = window.localStorage.getItem(storageKey);
-      const storedReview = window.localStorage.getItem(reviewStorageKey);
-      setItems(safeParseItems(storedItems, seededItems));
-      setReview(safeParseReview(storedReview));
-      setReferenceTime(Date.now());
+      void refreshWorkspace();
     });
 
-    return () => window.cancelAnimationFrame(frameId);
+    const handleWindowFocus = () => {
+      void refreshWorkspace(true);
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      ignore = true;
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(items));
-  }, [items]);
-
-  useEffect(() => {
-    window.localStorage.setItem(reviewStorageKey, JSON.stringify(review));
-  }, [review]);
 
   const counts = getBucketCounts(items);
   const doneThisWeek = items.filter((item) => Boolean(item.doneAt && referenceTime - new Date(item.doneAt).getTime() < 604800000)).length;
@@ -92,40 +107,175 @@ export function GtdWorkspace() {
   const completedReviewSteps = reviewSteps.filter((step) => review.steps[step.id]).length;
   const reviewStatus = getWeeklyReviewStatus(review.lastCompletedAt, referenceTime);
 
-  function addInboxItem() {
-    const text = draftText.trim();
-    if (!text) return;
-    const nextItem = createSeed(text, "inbox", "", "medium");
-    setItems((prev) => [nextItem, ...prev]);
+  useEffect(() => {
+    setItemDraft(selectedItem ? { ...selectedItem } : null);
+  }, [selectedItem]);
+
+  function applyWorkspace(workspace: GtdWorkspaceData) {
+    setItems(workspace.items);
+    setReview(workspace.review);
     setReferenceTime(Date.now());
-    setDraftText("");
-    setSelectedItemId(nextItem.id);
-    setActiveBucket("inbox");
-    setStatusMessage("Added to inbox.");
   }
 
-  function updateItem(itemId: string, patch: Partial<GtdItem>) {
+  async function loadWorkspace({ silent = false }: { silent?: boolean } = {}) {
+    try {
+      const workspace = await fetchGtdWorkspace();
+      applyWorkspace(workspace);
+    } catch (error) {
+      if (!silent) {
+        setStatusMessage(
+          error instanceof Error ? error.message : "Failed to refresh GTD workspace.",
+        );
+      }
+    }
+  }
+
+  async function addInboxItem() {
+    const text = draftText.trim();
+    if (!text) return;
+
+    try {
+      const data = await createGtdItemRequest({
+        text,
+        bucket: "inbox",
+        context: "",
+        priority: "medium",
+      });
+      applyWorkspace(data.workspace);
+      setDraftText("");
+      setSelectedItemId(data.item.id);
+      setActiveBucket("inbox");
+      setStatusMessage("Added to inbox.");
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Failed to add inbox item.",
+      );
+    }
+  }
+
+  async function updateItem(
+    itemId: string,
+    patch: Partial<GtdItem>,
+    successMessage?: string,
+  ) {
+    const optimisticUpdatedAt = new Date().toISOString();
+
     setReferenceTime(Date.now());
-    setItems((prev) => prev.map((item) => item.id === itemId ? { ...item, ...patch, updatedAt: new Date().toISOString() } : item));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              ...patch,
+              updatedAt: optimisticUpdatedAt,
+            }
+          : item,
+      ),
+    );
+
+    try {
+      await updateGtdItemRequest(itemId, {
+        text: patch.text,
+        bucket: patch.bucket,
+        context: patch.context,
+        priority: patch.priority,
+        dueDate: patch.dueDate,
+        note: patch.note,
+        done: patch.done,
+        doneAt: patch.doneAt,
+      });
+      if (successMessage) setStatusMessage(successMessage);
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Failed to update GTD item.",
+      );
+      void loadWorkspace({ silent: true });
+    }
+  }
+
+  function updateItemDraft(patch: Partial<GtdItem>) {
+    setItemDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  async function saveItemDraft() {
+    if (!selectedItem || !itemDraft) return;
+
+    const patch: Partial<GtdItem> = {};
+
+    if (itemDraft.text !== selectedItem.text) patch.text = itemDraft.text;
+    if (itemDraft.note !== selectedItem.note) patch.note = itemDraft.note;
+    if (Object.keys(patch).length === 0) return;
+
+    await updateItem(selectedItem.id, patch);
   }
 
   function toggleDone(item: GtdItem) {
-    updateItem(item.id, { done: !item.done, doneAt: item.done ? null : new Date().toISOString() });
-    setStatusMessage(item.done ? "Marked as active again." : "Marked as done.");
+    void updateItem(
+      item.id,
+      { done: !item.done, doneAt: item.done ? null : new Date().toISOString() },
+      item.done ? "Marked as active again." : "Marked as done.",
+    );
   }
 
   function processInboxItem(bucket: GtdBucket) {
     if (!selectedItem) return;
-    updateItem(selectedItem.id, { bucket, done: false });
+    void updateItem(
+      selectedItem.id,
+      { bucket, done: false, doneAt: null },
+      `Moved to ${bucketLabels[bucket]}.`,
+    );
     setActiveBucket(bucket);
-    setStatusMessage(`Moved to ${bucketLabels[bucket]}.`);
   }
 
-  function deleteItem(itemId: string) {
+  async function deleteItem(itemId: string) {
     setReferenceTime(Date.now());
     setItems((prev) => prev.filter((item) => item.id !== itemId));
     if (selectedItemId === itemId) setSelectedItemId(null);
-    setStatusMessage("Item deleted.");
+
+    try {
+      await deleteGtdItemRequest(itemId);
+      setStatusMessage("Item deleted.");
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Failed to delete item.",
+      );
+      void loadWorkspace({ silent: true });
+    }
+  }
+
+  async function updateReviewState(
+    patch: Partial<WeeklyReviewState> & { reset?: boolean; steps?: Record<string, boolean> },
+    successMessage?: string,
+  ) {
+    const nextReview = patch.reset
+      ? createDefaultReviewState()
+      : {
+          ...review,
+          ...patch,
+          steps: {
+            ...review.steps,
+            ...(patch.steps ?? {}),
+          },
+        };
+
+    setReview(nextReview);
+    setReferenceTime(Date.now());
+
+    try {
+      await updateGtdReviewRequest({
+        steps: patch.steps,
+        focus: patch.focus,
+        notes: patch.notes,
+        lastCompletedAt: patch.lastCompletedAt,
+        reset: patch.reset,
+      });
+      if (successMessage) setStatusMessage(successMessage);
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Failed to update weekly review.",
+      );
+      void loadWorkspace({ silent: true });
+    }
   }
 
   async function copyWeeklyReviewBrief() {
@@ -172,6 +322,11 @@ export function GtdWorkspace() {
               <input value={draftText} onChange={(event) => setDraftText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addInboxItem(); }} placeholder="Quick capture: พิมพ์งานที่นึกออกแล้วกด Enter" className="h-12 flex-1 rounded-full border border-border bg-background px-5 text-sm outline-none transition-colors focus:border-foreground" />
               <button type="button" onClick={addInboxItem} className="inline-flex h-12 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-foreground/90">Add to inbox</button>
             </div>
+            {isLoading ? (
+              <div className="mt-4 rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                Loading GTD workspace...
+              </div>
+            ) : null}
             {statusMessage ? <div className="mt-4 rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">{statusMessage}</div> : null}
             <div
               className={cn(
@@ -257,7 +412,7 @@ export function GtdWorkspace() {
                 onClick={() => setSelectedItemId(item.id)}
                 className={cn(
                   "w-full rounded-[1.6rem] border bg-background p-5 text-left transition-all",
-                  item.id === selectedItemId ? "border-foreground shadow-[0_18px_40px_rgba(0,0,0,0.06)]" : "border-border hover:border-foreground/40",
+                  item.id === resolvedSelectedItemId ? "border-foreground shadow-[0_18px_40px_rgba(0,0,0,0.06)]" : "border-border hover:border-foreground/40",
                 )}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -284,23 +439,73 @@ export function GtdWorkspace() {
               <p className="caption-editorial">Item Detail</p>
               {selectedItem ? (
                 <div className="mt-4 space-y-4">
-                  <input value={selectedItem.text} onChange={(event) => updateItem(selectedItem.id, { text: event.target.value })} className="h-12 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground" />
+                  <input
+                    value={itemDraft?.text ?? ""}
+                    onChange={(event) => updateItemDraft({ text: event.target.value })}
+                    onBlur={() => {
+                      void saveItemDraft();
+                    }}
+                    className="h-12 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                  />
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <select value={selectedItem.bucket} onChange={(event) => updateItem(selectedItem.id, { bucket: event.target.value as GtdBucket })} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground">
+                    <select
+                      value={itemDraft?.bucket ?? selectedItem.bucket}
+                      onChange={(event) => {
+                        const bucket = event.target.value as GtdBucket;
+                        updateItemDraft({ bucket });
+                        setActiveBucket(bucket);
+                        void updateItem(selectedItem.id, { bucket });
+                      }}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                    >
                       {bucketOrder.map((bucket) => <option key={bucket} value={bucket}>{bucketLabels[bucket]}</option>)}
                     </select>
-                    <select value={selectedItem.context} onChange={(event) => updateItem(selectedItem.id, { context: event.target.value as GtdContext })} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground">
+                    <select
+                      value={itemDraft?.context ?? selectedItem.context}
+                      onChange={(event) => {
+                        const context = event.target.value as GtdContext;
+                        updateItemDraft({ context });
+                        void updateItem(selectedItem.id, { context });
+                      }}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                    >
                       <option value="">No context</option>
                       {contextOptions.filter((option) => option.value !== "all").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
-                    <select value={selectedItem.priority} onChange={(event) => updateItem(selectedItem.id, { priority: event.target.value as GtdPriority })} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground">
+                    <select
+                      value={itemDraft?.priority ?? selectedItem.priority}
+                      onChange={(event) => {
+                        const priority = event.target.value as GtdPriority;
+                        updateItemDraft({ priority });
+                        void updateItem(selectedItem.id, { priority });
+                      }}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                    >
                       <option value="high">High</option>
                       <option value="medium">Medium</option>
                       <option value="low">Low</option>
                     </select>
-                    <input type="date" value={selectedItem.dueDate ?? ""} onChange={(event) => updateItem(selectedItem.id, { dueDate: event.target.value || null })} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground" />
+                    <input
+                      type="date"
+                      value={itemDraft?.dueDate ?? selectedItem.dueDate ?? ""}
+                      onChange={(event) => {
+                        const dueDate = event.target.value || null;
+                        updateItemDraft({ dueDate });
+                        void updateItem(selectedItem.id, { dueDate });
+                      }}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                    />
                   </div>
-                  <textarea value={selectedItem.note} onChange={(event) => updateItem(selectedItem.id, { note: event.target.value })} rows={5} placeholder="Notes, delegated owner, next step, or meeting context..." className="w-full rounded-[1.4rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground" />
+                  <textarea
+                    value={itemDraft?.note ?? ""}
+                    onChange={(event) => updateItemDraft({ note: event.target.value })}
+                    onBlur={() => {
+                      void saveItemDraft();
+                    }}
+                    rows={5}
+                    placeholder="Notes, delegated owner, next step, or meeting context..."
+                    className="w-full rounded-[1.4rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground"
+                  />
 
                   {selectedItem.bucket === "inbox" ? (
                     <div className="rounded-[1.4rem] bg-secondary/50 p-4">
@@ -338,7 +543,13 @@ export function GtdWorkspace() {
                   <p className="caption-editorial">Weekly Review</p>
                   <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">{completedReviewSteps}/{reviewSteps.length}</h2>
                 </div>
-                <button type="button" onClick={() => { setReview(createDefaultReviewState()); setStatusMessage("Weekly review reset."); }} className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void updateReviewState({ reset: true }, "Weekly review reset.");
+                  }}
+                  className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                >
                   Reset
                 </button>
               </div>
@@ -347,7 +558,11 @@ export function GtdWorkspace() {
                   <button
                     key={step.id}
                     type="button"
-                    onClick={() => setReview((prev) => ({ ...prev, steps: { ...prev.steps, [step.id]: !prev.steps[step.id] } }))}
+                    onClick={() => {
+                      void updateReviewState({
+                        steps: { [step.id]: !review.steps[step.id] },
+                      });
+                    }}
                     className={cn(
                       "w-full rounded-[1.25rem] border p-4 text-left transition-colors",
                       review.steps[step.id] ? "border-emerald-200 bg-emerald-50" : "border-border bg-secondary/30 hover:border-foreground/40",
@@ -367,12 +582,42 @@ export function GtdWorkspace() {
               </div>
 
               <div className="mt-5 space-y-3">
-                <input value={review.focus} onChange={(event) => setReview((prev) => ({ ...prev, focus: event.target.value }))} placeholder="Weekly focus: เป้าหมายหลักของสัปดาห์นี้" className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground" />
-                <textarea value={review.notes} onChange={(event) => setReview((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Review notes, bottlenecks, or commitments..." rows={4} className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground" />
+                <input
+                  value={review.focus}
+                  onChange={(event) =>
+                    setReview((prev) => ({ ...prev, focus: event.target.value }))
+                  }
+                  onBlur={() => {
+                    void updateReviewState({ focus: review.focus });
+                  }}
+                  placeholder="Weekly focus: เป้าหมายหลักของสัปดาห์นี้"
+                  className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                />
+                <textarea
+                  value={review.notes}
+                  onChange={(event) =>
+                    setReview((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                  onBlur={() => {
+                    void updateReviewState({ notes: review.notes });
+                  }}
+                  placeholder="Review notes, bottlenecks, or commitments..."
+                  rows={4}
+                  className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground"
+                />
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
-                <button type="button" onClick={() => { setReview((prev) => ({ ...prev, lastCompletedAt: new Date().toISOString() })); setStatusMessage("Weekly review marked complete."); }} className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void updateReviewState(
+                      { lastCompletedAt: new Date().toISOString() },
+                      "Weekly review marked complete.",
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                >
                   <ClipboardCheck className="size-4" />
                   Complete review
                 </button>
@@ -471,28 +716,6 @@ function formatRelativeAge(value: string, referenceTime: number) {
   if (diffDays === 0) return "Updated today";
   if (diffDays === 1) return "Updated 1 day ago";
   return `Updated ${diffDays} days ago`;
-}
-
-function createId() {
-  return `gtd_${crypto.randomUUID()}`;
-}
-
-function createSeed(text: string, bucket: GtdBucket, context: GtdContext, priority: GtdPriority, dueDate: string | null = null, note = ""): GtdItem {
-  const now = new Date().toISOString();
-  return { id: createId(), text, bucket, context, priority, dueDate, note, done: false, doneAt: null, createdAt: now, updatedAt: now };
-}
-
-function createSeededItem(
-  id: string,
-  text: string,
-  bucket: GtdBucket,
-  context: GtdContext,
-  priority: GtdPriority,
-  dueDate: string | null,
-  note: string,
-  timestamp: string,
-): GtdItem {
-  return { id, text, bucket, context, priority, dueDate, note, done: false, doneAt: null, createdAt: timestamp, updatedAt: timestamp };
 }
 
 function downloadTextFile(filename: string, contents: string) {

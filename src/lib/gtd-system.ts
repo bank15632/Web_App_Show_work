@@ -47,6 +47,30 @@ export interface WeeklyReviewStatus {
   daysSince: number | null;
 }
 
+export interface GtdWorkspaceData {
+  items: GtdItem[];
+  review: WeeklyReviewState;
+}
+
+export interface GtdItemMutationInput {
+  text: string;
+  bucket?: GtdBucket;
+  context?: GtdContext;
+  priority?: GtdPriority;
+  dueDate?: string | null;
+  note?: string;
+  done?: boolean;
+  doneAt?: string | null;
+}
+
+export interface GtdReviewMutationInput {
+  steps?: Record<string, boolean>;
+  focus?: string;
+  notes?: string;
+  lastCompletedAt?: string | null;
+  reset?: boolean;
+}
+
 export const gtdStorageKey = "bnj:gtd-workspace:v1";
 export const reviewStorageKey = "bnj:gtd-weekly-review:v1";
 
@@ -112,6 +136,59 @@ export const reviewSteps = [
     body: "เลือก focus หลักของสัปดาห์นี้ให้ชัด",
   },
 ] as const;
+
+export const gtdSeedItems: GtdItem[] = [
+  createSeededItem(
+    "gtd_seed_1",
+    "สรุป feedback ลูกค้า Nordic Home Office หลัง review ล่าสุด",
+    "inbox",
+    "computer",
+    "high",
+    null,
+    "",
+    "2026-03-20T08:00:00.000Z",
+  ),
+  createSeededItem(
+    "gtd_seed_2",
+    "โทรตาม consultant เรื่อง revised MEP markups",
+    "next",
+    "phone",
+    "high",
+    null,
+    "ถาม timeline ที่ confirm ได้จริงก่อนนัด client รอบถัดไป",
+    "2026-03-19T09:30:00.000Z",
+  ),
+  createSeededItem(
+    "gtd_seed_3",
+    "รอผู้รับเหมาส่งราคา built-in ห้องนั่งเล่น",
+    "waiting",
+    "",
+    "medium",
+    "2026-03-24",
+    "ถ้าเกินอังคารให้ follow up ทันที",
+    "2026-03-18T04:15:00.000Z",
+  ),
+  createSeededItem(
+    "gtd_seed_4",
+    "เตรียม weekly review สำหรับทีม design",
+    "calendar",
+    "office",
+    "medium",
+    "2026-03-21",
+    "รวบรวม blockers และงานที่ยังไม่มี next action",
+    "2026-03-20T02:00:00.000Z",
+  ),
+  createSeededItem(
+    "gtd_seed_5",
+    "แตก template A3 report สำหรับ phase lean analytics",
+    "someday",
+    "computer",
+    "low",
+    null,
+    "รอ phase 3 ก่อนค่อยหยิบขึ้นมา",
+    "2026-03-17T07:45:00.000Z",
+  ),
+];
 
 export function createDefaultReviewState(): WeeklyReviewState {
   return {
@@ -219,5 +296,30 @@ export function getWeeklyReviewStatus(
     body: "สถานะตอนนี้ยังอยู่ในช่วงที่ระบบควรใช้งานได้ลื่น สามารถโฟกัส deep work ต่อได้",
     action: "รักษา WIP ให้ต่ำและ process inbox ทุกเย็น",
     daysSince: elapsedDays,
+  };
+}
+
+function createSeededItem(
+  id: string,
+  text: string,
+  bucket: GtdBucket,
+  context: GtdContext,
+  priority: GtdPriority,
+  dueDate: string | null,
+  note: string,
+  timestamp: string,
+): GtdItem {
+  return {
+    id,
+    text,
+    bucket,
+    context,
+    priority,
+    dueDate,
+    note,
+    done: false,
+    doneAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
   };
 }
