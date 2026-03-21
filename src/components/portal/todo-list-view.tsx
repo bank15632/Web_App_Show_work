@@ -8,7 +8,6 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import Link from "next/link";
 import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
@@ -18,6 +17,8 @@ import { SavedViewBar } from "@/components/portal/tracker/saved-view-bar";
 import { TaskBoard } from "@/components/portal/tracker/task-board";
 import { WeeklyReportPanel } from "@/components/portal/tracker/weekly-report-panel";
 import { WorkspaceHeader } from "@/components/portal/tracker/workspace-header";
+import { SystemGuidePanel } from "@/components/portal/system-guide";
+import { getManualSystemGuide } from "@/lib/aec-user-manual";
 import {
   taskStatusLabels,
   taskTypeLabels,
@@ -36,6 +37,7 @@ import type {
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 import { filterTasksForSavedView } from "@/lib/tracker/views";
+const kanbanGuide = getManualSystemGuide("kanban");
 
 type DialogState =
   | null
@@ -553,30 +555,9 @@ export function TodoListView() {
             </button>
           </div>
 
-          <div className="rounded-[1.5rem] border border-border bg-background/85 px-5 py-4 text-sm leading-7 text-muted-foreground">
-            <p className="font-medium text-foreground">
-              GTD inbox = ที่จับทุกอย่างที่เข้าหัว ส่วน Kanban board นี้ = งานที่ผ่านการ
-              process แล้วและทีมต้องเห็น
-            </p>
-            <p className="mt-1">
-              ตามคู่มือ ให้ capture งานส่วนตัวใน GTD ก่อน แล้วค่อยส่งงานที่เกี่ยวกับโปรเจกต์ขึ้น
-              board นี้เมื่อ task ชัดเจนแล้ว
-            </p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Link
-                href="/gtd"
-                className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-              >
-                Open GTD workspace
-              </Link>
-              <Link
-                href="/settings"
-                className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-              >
-                Settings & Export
-              </Link>
-            </div>
-          </div>
+          {kanbanGuide ? (
+            <SystemGuidePanel guide={kanbanGuide} className="mb-5" />
+          ) : null}
 
           <WorkspaceHeader
             project={activeProject}

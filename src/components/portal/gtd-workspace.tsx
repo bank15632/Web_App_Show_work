@@ -30,6 +30,7 @@ import {
   type GtdWorkspaceData,
   type WeeklyReviewState,
 } from "@/lib/gtd-system";
+import { getManualSystemGuide } from "@/lib/aec-user-manual";
 import {
   createGtdItemRequest,
   deleteGtdItemRequest,
@@ -37,8 +38,10 @@ import {
   updateGtdItemRequest,
   updateGtdReviewRequest,
 } from "@/lib/gtd/client";
+import { SystemGuidePanel } from "@/components/portal/system-guide";
 import { cn } from "@/lib/utils";
 const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
+const gtdGuide = getManualSystemGuide("gtd");
 
 export function GtdWorkspace() {
   const [items, setItems] = useState<GtdItem[]>(gtdSeedItems);
@@ -355,6 +358,8 @@ export function GtdWorkspace() {
         </section>
 
         <section className="space-y-4">
+          {gtdGuide ? <SystemGuidePanel guide={gtdGuide} /> : null}
+
           <div className="flex flex-wrap gap-3">
             {bucketOrder.map((bucket) => (
               <button
