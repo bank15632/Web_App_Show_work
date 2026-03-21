@@ -24,6 +24,8 @@ export const gtdItemCreateSchema = z.object({
   priority: gtdPrioritySchema.optional(),
   dueDate: z.string().trim().nullable().optional(),
   note: z.string().trim().optional(),
+  linkedProjectId: z.string().trim().nullable().optional(),
+  linkedTaskId: z.string().trim().nullable().optional(),
   done: z.boolean().optional(),
   doneAt: z.string().trim().nullable().optional(),
 });
@@ -36,6 +38,8 @@ export const gtdItemPatchSchema = z
     priority: gtdPrioritySchema.optional(),
     dueDate: z.string().trim().nullable().optional(),
     note: z.string().trim().optional(),
+    linkedProjectId: z.string().trim().nullable().optional(),
+    linkedTaskId: z.string().trim().nullable().optional(),
     done: z.boolean().optional(),
     doneAt: z.string().trim().nullable().optional(),
   })

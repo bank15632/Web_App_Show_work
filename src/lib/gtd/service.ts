@@ -21,6 +21,8 @@ interface GtdItemRow {
   priority: string;
   due_date: string | null;
   note: string;
+  linked_project_id: string | null;
+  linked_task_id: string | null;
   done: number;
   done_at: string | null;
   created_at: string;
@@ -105,6 +107,8 @@ function mapItemRow(row: GtdItemRow): GtdItem {
     priority: row.priority as GtdItem["priority"],
     dueDate: row.due_date,
     note: row.note,
+    linkedProjectId: row.linked_project_id,
+    linkedTaskId: row.linked_task_id,
     done: row.done === 1,
     doneAt: row.done_at,
     createdAt: row.created_at,
@@ -202,6 +206,8 @@ export async function createGtdItem(
     priority: input.priority ?? "medium",
     dueDate: input.dueDate ?? null,
     note: input.note ?? "",
+    linkedProjectId: input.linkedProjectId ?? null,
+    linkedTaskId: input.linkedTaskId ?? null,
     done: input.done ?? false,
     doneAt: input.done ? input.doneAt ?? now : null,
     createdAt: now,
@@ -211,8 +217,9 @@ export async function createGtdItem(
   await runStatement(
     env.DB,
     `INSERT INTO gtd_items (
-      id, text, bucket, context, priority, due_date, note, done, done_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, text, bucket, context, priority, due_date, note, linked_project_id, linked_task_id,
+      done, done_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     item.id,
     item.text,
     item.bucket,
@@ -220,6 +227,8 @@ export async function createGtdItem(
     item.priority,
     item.dueDate,
     item.note,
+    item.linkedProjectId,
+    item.linkedTaskId,
     item.done ? 1 : 0,
     item.doneAt,
     item.createdAt,
@@ -266,6 +275,10 @@ export async function updateGtdItem(
     priority: patch.priority ?? mapped.priority,
     dueDate: patch.dueDate !== undefined ? patch.dueDate : mapped.dueDate,
     note: patch.note ?? mapped.note,
+    linkedProjectId:
+      patch.linkedProjectId !== undefined ? patch.linkedProjectId : mapped.linkedProjectId,
+    linkedTaskId:
+      patch.linkedTaskId !== undefined ? patch.linkedTaskId : mapped.linkedTaskId,
     done,
     doneAt: nextDoneAt,
     updatedAt: now,
@@ -275,7 +288,7 @@ export async function updateGtdItem(
     env.DB,
     `UPDATE gtd_items
       SET text = ?, bucket = ?, context = ?, priority = ?, due_date = ?, note = ?,
-          done = ?, done_at = ?, updated_at = ?
+          linked_project_id = ?, linked_task_id = ?, done = ?, done_at = ?, updated_at = ?
       WHERE id = ?`,
     nextItem.text,
     nextItem.bucket,
@@ -283,6 +296,8 @@ export async function updateGtdItem(
     nextItem.priority,
     nextItem.dueDate,
     nextItem.note,
+    nextItem.linkedProjectId,
+    nextItem.linkedTaskId,
     nextItem.done ? 1 : 0,
     nextItem.doneAt,
     nextItem.updatedAt,

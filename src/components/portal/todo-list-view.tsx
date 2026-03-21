@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpenText, ChevronLeft, ChevronRight, Copy } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
@@ -310,6 +311,8 @@ function readLegacyTodos(): TrackerLegacyTodoImport[] {
 }
 
 export function TodoListView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [workspace, setWorkspace] = useState<TrackerWorkspaceData | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [savedView, setSavedView] = useState<TrackerSavedView>("today");
@@ -325,6 +328,7 @@ export function TodoListView() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(false);
+  const [hasHandledLaunchTarget, setHasHandledLaunchTarget] = useState(false);
 
   useEffect(() => {
     void loadWorkspace();
@@ -334,6 +338,32 @@ export function TodoListView() {
     if (!workspace || activeProjectId) return;
     setActiveProjectId(workspace.projects[0]?.id ?? null);
   }, [workspace, activeProjectId]);
+
+  useEffect(() => {
+    if (!workspace || hasHandledLaunchTarget) return;
+
+    const projectId = searchParams.get("project");
+    const taskId = searchParams.get("task");
+    if (!projectId && !taskId) return;
+
+    const project =
+      workspace.projects.find((entry) => entry.id === projectId) ??
+      workspace.projects.find((entry) => entry.tasks.some((task) => task.id === taskId)) ??
+      null;
+
+    if (project) {
+      setActiveProjectId(project.id);
+      setDomainTab("tasks");
+
+      const task = taskId ? project.tasks.find((entry) => entry.id === taskId) ?? null : null;
+      if (task) {
+        setEditingTask(task);
+      }
+    }
+
+    setHasHandledLaunchTarget(true);
+    router.replace("/todos", { scroll: false });
+  }, [hasHandledLaunchTarget, router, searchParams, workspace]);
 
   const activeProject = useMemo(() => {
     if (!workspace) return null;

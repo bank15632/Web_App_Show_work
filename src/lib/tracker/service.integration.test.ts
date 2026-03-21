@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { buildWeeklyReportReview } from "@/lib/tracker/ai";
 import {
   answerWorkspaceQuery,
+  createProject,
   createReviewItems,
   createTask,
   deleteTask,
@@ -14,16 +15,36 @@ import {
 } from "@/lib/tracker/service";
 import type { TrackerReviewProposal } from "@/lib/tracker/types";
 
+async function createTestProject(name: string) {
+  return createProject(env, {
+    name,
+    code: "TEST",
+    clientName: "BNJ Studio",
+    projectType: "Internal",
+    location: "Bangkok",
+    phase: "concept",
+    status: "active",
+    overview: "",
+    nextMilestone: "",
+    ownerNote: "",
+    area: "",
+    year: "2026",
+  });
+}
+
 describe("tracker service integration", () => {
-  it("seeds the workspace from existing portal data", async () => {
+  it("starts blank and creates projects on demand", async () => {
+    const initialWorkspace = await getWorkspaceData(env);
+    expect(initialWorkspace.projects).toHaveLength(0);
+
+    const project = await createTestProject("Seedless tracker workspace");
     const workspace = await getWorkspaceData(env);
-    expect(workspace.projects.length).toBeGreaterThan(0);
-    expect(workspace.projects.some((project) => project.code === "B7X2")).toBe(true);
+
+    expect(workspace.projects.some((entry) => entry.id === project.id)).toBe(true);
   });
 
   it("supports task CRUD against D1", async () => {
-    const workspace = await getWorkspaceData(env);
-    const project = workspace.projects[0];
+    const project = await createTestProject("CRUD tracker project");
 
     const created = await createTask(env, project.id, {
       phase: project.phase,
@@ -59,8 +80,7 @@ describe("tracker service integration", () => {
   });
 
   it("keeps AI changes review-gated for approve and reject paths", async () => {
-    const workspace = await getWorkspaceData(env);
-    const project = workspace.projects[0];
+    const project = await createTestProject("Review-gated project");
     const approveProposal: TrackerReviewProposal = {
       version: "v1",
       action: "task.create",
@@ -127,8 +147,8 @@ describe("tracker service integration", () => {
   });
 
   it("queues and approves weekly reports, then answers NL queries over approved data", async () => {
+    const project = await createTestProject("Weekly report project");
     let workspace = await getWorkspaceData(env);
-    const project = workspace.projects[0];
 
     await createTask(env, project.id, {
       phase: project.phase,

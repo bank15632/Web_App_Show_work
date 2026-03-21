@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS gtd_items (
   priority TEXT NOT NULL DEFAULT 'medium',
   due_date TEXT,
   note TEXT NOT NULL DEFAULT '',
+  linked_project_id TEXT,
+  linked_task_id TEXT,
   done INTEGER NOT NULL DEFAULT 0,
   done_at TEXT,
   created_at TEXT NOT NULL,

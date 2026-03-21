@@ -26,6 +26,8 @@ export interface GtdItem {
   priority: GtdPriority;
   dueDate: string | null;
   note: string;
+  linkedProjectId: string | null;
+  linkedTaskId: string | null;
   done: boolean;
   doneAt: string | null;
   createdAt: string;
@@ -59,6 +61,8 @@ export interface GtdItemMutationInput {
   priority?: GtdPriority;
   dueDate?: string | null;
   note?: string;
+  linkedProjectId?: string | null;
+  linkedTaskId?: string | null;
   done?: boolean;
   doneAt?: string | null;
 }
@@ -317,6 +321,8 @@ function createSeededItem(
     priority,
     dueDate,
     note,
+    linkedProjectId: null,
+    linkedTaskId: null,
     done: false,
     doneAt: null,
     createdAt: timestamp,

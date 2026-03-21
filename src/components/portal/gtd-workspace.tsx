@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowUpRight,
   BookOpenText,
   CalendarDays,
   Check,
@@ -37,9 +38,22 @@ import {
   updateGtdItemRequest,
   updateGtdReviewRequest,
 } from "@/lib/gtd/client";
+import { phaseLabels, taskTypeLabels } from "@/lib/tracker/constants";
+import {
+  createTrackerTaskRequest,
+  fetchTrackerWorkspace,
+} from "@/lib/tracker/client";
+import type {
+  TrackerProjectDetail,
+  TrackerTaskType,
+} from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
 type GtdListMode = "active" | "archived";
+type KanbanBridgeDraft = {
+  projectId: string;
+  taskType: TrackerTaskType;
+};
 
 export function GtdWorkspace() {
   const [items, setItems] = useState<GtdItem[]>([]);
@@ -53,6 +67,14 @@ export function GtdWorkspace() {
   const [statusMessage, setStatusMessage] = useState("");
   const [referenceTime, setReferenceTime] = useState(initialReferenceTime);
   const [isLoading, setIsLoading] = useState(true);
+  const [trackerProjects, setTrackerProjects] = useState<TrackerProjectDetail[]>([]);
+  const [isKanbanDialogOpen, setIsKanbanDialogOpen] = useState(false);
+  const [isTrackerLoading, setIsTrackerLoading] = useState(false);
+  const [isSendingToKanban, setIsSendingToKanban] = useState(false);
+  const [kanbanDraft, setKanbanDraft] = useState<KanbanBridgeDraft>({
+    projectId: "",
+    taskType: "design",
+  });
 
   useEffect(() => {
     let ignore = false;
@@ -89,6 +111,10 @@ export function GtdWorkspace() {
     };
   }, []);
 
+  useEffect(() => {
+    void loadTrackerProjects({ silent: true });
+  }, []);
+
   const counts = getBucketCounts(items);
   const archivedCount = items.filter((item) => item.done).length;
   const doneThisWeek = items.filter((item) => Boolean(item.doneAt && referenceTime - new Date(item.doneAt).getTime() < 604800000)).length;
@@ -119,10 +145,37 @@ export function GtdWorkspace() {
     setItemDraft(selectedItem ? { ...selectedItem } : null);
   }, [selectedItem]);
 
+  useEffect(() => {
+    if (trackerProjects.length === 0 || kanbanDraft.projectId) return;
+
+    setKanbanDraft((prev) => ({
+      ...prev,
+      projectId: trackerProjects[0]?.id ?? "",
+    }));
+  }, [kanbanDraft.projectId, trackerProjects]);
+
   function applyWorkspace(workspace: GtdWorkspaceData) {
     setItems(workspace.items);
     setReview(workspace.review);
     setReferenceTime(Date.now());
+  }
+
+  async function loadTrackerProjects({ silent = false }: { silent?: boolean } = {}) {
+    setIsTrackerLoading(true);
+    try {
+      const workspace = await fetchTrackerWorkspace();
+      setTrackerProjects(workspace.projects);
+      return workspace.projects;
+    } catch (error) {
+      if (!silent) {
+        setStatusMessage(
+          error instanceof Error ? error.message : "Failed to load Kanban projects.",
+        );
+      }
+      return [] satisfies TrackerProjectDetail[];
+    } finally {
+      setIsTrackerLoading(false);
+    }
   }
 
   async function loadWorkspace({ silent = false }: { silent?: boolean } = {}) {
@@ -190,6 +243,8 @@ export function GtdWorkspace() {
         priority: patch.priority,
         dueDate: patch.dueDate,
         note: patch.note,
+        linkedProjectId: patch.linkedProjectId,
+        linkedTaskId: patch.linkedTaskId,
         done: patch.done,
         doneAt: patch.doneAt,
       });
@@ -257,6 +312,65 @@ export function GtdWorkspace() {
         error instanceof Error ? error.message : "Failed to delete item.",
       );
       void loadWorkspace({ silent: true });
+    }
+  }
+
+  async function openKanbanDialog() {
+    const projects =
+      trackerProjects.length > 0
+        ? trackerProjects
+        : await loadTrackerProjects();
+
+    if (projects.length > 0) {
+      setKanbanDraft((prev) => ({
+        ...prev,
+        projectId: prev.projectId || projects[0]?.id || "",
+      }));
+    }
+
+    setIsKanbanDialogOpen(true);
+  }
+
+  async function sendSelectedItemToKanban() {
+    if (!selectedItem) return;
+
+    const project = trackerProjects.find((entry) => entry.id === kanbanDraft.projectId);
+    if (!project) {
+      setStatusMessage("Select a Kanban project first.");
+      return;
+    }
+
+    setIsSendingToKanban(true);
+    try {
+      const taskResponse = await createTrackerTaskRequest(project.id, {
+        phase: project.phase,
+        taskType: kanbanDraft.taskType,
+        title: selectedItem.text,
+        description: selectedItem.note,
+        status: "todo",
+        priority: selectedItem.priority,
+        dueDate: selectedItem.dueDate,
+        sourceType: "gtd.bridge",
+        sourceRef: selectedItem.id,
+        nextAction: selectedItem.note,
+        humanVerified: true,
+      });
+
+      const gtdResponse = await updateGtdItemRequest(selectedItem.id, {
+        linkedProjectId: project.id,
+        linkedTaskId: taskResponse.task.id,
+      });
+
+      applyWorkspace(gtdResponse.workspace);
+      setSelectedItemId(selectedItem.id);
+      setIsKanbanDialogOpen(false);
+      setStatusMessage(`Sent to Kanban project "${project.name}".`);
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Failed to send item to Kanban.",
+      );
+    } finally {
+      setIsSendingToKanban(false);
     }
   }
 
@@ -569,6 +683,16 @@ export function GtdWorkspace() {
                     </div>
                   ) : null}
 
+                  {selectedItem.linkedProjectId && selectedItem.linkedTaskId ? (
+                    <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      <p className="font-medium">Linked to Kanban.</p>
+                      <p className="mt-1">
+                        This GTD item is connected to a tracker task. Open it in Kanban to
+                        update board status or execution details.
+                      </p>
+                    </div>
+                  ) : null}
+
                   {selectedItem.bucket === "inbox" && !selectedItem.done ? (
                     <div className="rounded-[1.4rem] bg-secondary/50 p-4">
                       <p className="caption-editorial text-[0.68rem]">Clarify Flow</p>
@@ -584,6 +708,26 @@ export function GtdWorkspace() {
                   ) : null}
 
                   <div className="flex flex-wrap gap-3">
+                    {!selectedItem.done ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void openKanbanDialog();
+                        }}
+                        className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                      >
+                        {selectedItem.linkedTaskId ? "Create another Kanban task" : "Send to Kanban"}
+                      </button>
+                    ) : null}
+                    {selectedItem.linkedProjectId && selectedItem.linkedTaskId ? (
+                      <Link
+                        href={`/todos?project=${selectedItem.linkedProjectId}&task=${selectedItem.linkedTaskId}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100"
+                      >
+                        <ArrowUpRight className="size-4" />
+                        Open in Kanban
+                      </Link>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => toggleDone(selectedItem)}
@@ -705,6 +849,103 @@ export function GtdWorkspace() {
           </div>
         </section>
       </main>
+
+      {isKanbanDialogOpen ? (
+        <OverlayDialog
+          title={selectedItem?.linkedTaskId ? "Create Another Kanban Task" : "Send To Kanban"}
+          onClose={() => setIsKanbanDialogOpen(false)}
+        >
+          <div className="space-y-4">
+            <p className="text-sm leading-7 text-muted-foreground">
+              Create a tracker task from this GTD item and keep a link back to the Kanban board.
+            </p>
+
+            {isTrackerLoading ? (
+              <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
+                Loading Kanban projects...
+              </div>
+            ) : trackerProjects.length === 0 ? (
+              <div className="space-y-3 rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                <p>No Kanban project found yet. Create a project in the Kanban board first.</p>
+                <Link
+                  href="/todos"
+                  className="inline-flex items-center rounded-full border border-amber-300 px-4 py-2 font-medium transition-colors hover:bg-amber-100"
+                >
+                  Open Kanban board
+                </Link>
+              </div>
+            ) : (
+              <>
+                <label className="grid gap-2">
+                  <span className="caption-editorial text-[0.68rem]">Project</span>
+                  <select
+                    value={kanbanDraft.projectId}
+                    onChange={(event) =>
+                      setKanbanDraft((prev) => ({
+                        ...prev,
+                        projectId: event.target.value,
+                      }))
+                    }
+                    className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                  >
+                    {trackerProjects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.code} · {project.name} · {phaseLabels[project.phase]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="caption-editorial text-[0.68rem]">Task Type</span>
+                  <select
+                    value={kanbanDraft.taskType}
+                    onChange={(event) =>
+                      setKanbanDraft((prev) => ({
+                        ...prev,
+                        taskType: event.target.value as TrackerTaskType,
+                      }))
+                    }
+                    className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                  >
+                    {Object.entries(taskTypeLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">
+                  <p>Title: {selectedItem?.text ?? "-"}</p>
+                  <p>Priority: {selectedItem?.priority ?? "-"}</p>
+                  <p>Due date: {selectedItem?.dueDate ? formatShortDate(selectedItem.dueDate) : "No due date"}</p>
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsKanbanDialogOpen(false)}
+                    className="rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void sendSelectedItemToKanban();
+                    }}
+                    disabled={isSendingToKanban}
+                    className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSendingToKanban ? "Creating..." : "Create in Kanban"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </OverlayDialog>
+      ) : null}
     </div>
   );
 }
@@ -727,6 +968,38 @@ function QuickProcessButton({ label, onClick }: { label: string; onClick: () => 
     <button type="button" onClick={onClick} className="rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
       {label}
     </button>
+  );
+}
+
+function OverlayDialog({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/25 p-4">
+      <div className="w-full max-w-xl rounded-[2rem] border border-border bg-background p-6 shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="caption-editorial">GTD Bridge</p>
+            <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">{title}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5">{children}</div>
+      </div>
+    </div>
   );
 }
 
