@@ -1,7 +1,16 @@
 "use client";
 
 import { type ReactNode, useEffect, useState } from "react";
-import { Copy, ExternalLink, ImagePlus, LoaderCircle, Plus, Rocket, Save } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  ImagePlus,
+  LoaderCircle,
+  Plus,
+  Rocket,
+  Save,
+  Trash2,
+} from "lucide-react";
 
 import { ClientRoomDocumentsEditor } from "@/components/portal/client-room-documents-editor";
 import { ClientRoomGalleryEditor } from "@/components/portal/client-room-gallery-editor";
@@ -42,6 +51,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
   const [isLoadingProject, setIsLoadingProject] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState("");
   const [statusMessage, setStatusMessage] = useState("กำลังโหลด client rooms...");
 
@@ -267,6 +277,54 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
     }
   }
 
+  async function deleteCurrentProject() {
+    if (!project) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${project.title}" and all uploaded files for this client room? This cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setStatusMessage(`กำลังลบ "${project.title}"...`);
+
+    try {
+      const deletingProjectId = project.id;
+      const response = await fetch(`/api/client-rooms/projects/${deletingProjectId}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        deleted?: boolean;
+        projects?: ClientRoomProjectSummary[];
+      };
+
+      if (!response.ok || !data.deleted || !data.projects) {
+        throw new Error(data.error || "ลบ project ไม่สำเร็จ");
+      }
+
+      const nextProjectId = data.projects[0]?.id ?? "";
+      setProjects(data.projects);
+      setProject(null);
+      setSelectedProjectId(nextProjectId);
+
+      if (nextProjectId) {
+        await loadProject(nextProjectId);
+        setStatusMessage("ลบ project แล้ว และเปิด project ถัดไปให้แล้ว");
+      } else {
+        setStatusMessage("ลบ project แล้ว ตอนนี้ยังไม่มี client room ในระบบ");
+      }
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "ลบ project ไม่สำเร็จ");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   async function uploadAsset(kind: UploadKind, file: File) {
     if (!project) {
       throw new Error("ยังไม่ได้เลือก client room");
@@ -356,17 +414,25 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
             <Button
               variant="outline"
               onClick={() => void saveCurrentProjectDraft()}
-              disabled={!project || isSaving || isPublishing}
+              disabled={!project || isSaving || isPublishing || isDeleting}
             >
               {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
               Save Draft
             </Button>
             <Button
               onClick={() => void publishProject()}
-              disabled={!project || isSaving || isPublishing}
+              disabled={!project || isSaving || isPublishing || isDeleting}
             >
               {isPublishing ? <LoaderCircle className="animate-spin" /> : <Rocket />}
               Publish
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void deleteCurrentProject()}
+              disabled={!project || isSaving || isPublishing || isDeleting}
+            >
+              {isDeleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+              Delete Project
             </Button>
           </div>
         </div>

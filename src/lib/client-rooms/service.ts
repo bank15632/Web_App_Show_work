@@ -365,6 +365,45 @@ export async function publishClientRoomProject(
   return project;
 }
 
+export async function deleteClientRoomProject(
+  env: TrackerEnv,
+  projectId: string,
+) {
+  await ensureClientRoomsReady(env);
+  const existing = await getClientRoomProjectById(env, projectId);
+  if (!existing) {
+    return false;
+  }
+
+  const assetRows = await queryAll<{ object_key: string }>(
+    env.DB,
+    "SELECT object_key FROM client_room_assets WHERE project_id = ?",
+    projectId,
+  );
+  const objectKeys = Array.from(new Set(assetRows.map((row) => row.object_key)));
+
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM client_room_assets WHERE project_id = ?").bind(projectId),
+    env.DB.prepare("DELETE FROM client_room_projects WHERE id = ?").bind(projectId),
+  ]);
+
+  const cleanupResults = await Promise.allSettled(
+    objectKeys.map((objectKey) => env.ARTIFACTS_BUCKET.delete(objectKey)),
+  );
+
+  cleanupResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error(
+        "Failed to delete client room asset",
+        objectKeys[index],
+        result.reason,
+      );
+    }
+  });
+
+  return true;
+}
+
 export async function getPublishedClientRoomByShareToken(
   env: TrackerEnv,
   shareToken: string,
