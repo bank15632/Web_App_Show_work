@@ -526,7 +526,16 @@ export function GtdWorkspace() {
                   ) : null}
 
                   <div className="flex flex-wrap gap-3">
-                    <button type="button" onClick={() => toggleDone(selectedItem)} className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90">
+                    <button
+                      type="button"
+                      onClick={() => toggleDone(selectedItem)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                        selectedItem.done
+                          ? "border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                          : "bg-emerald-600 text-white hover:bg-emerald-500",
+                      )}
+                    >
                       <Check className="size-4" />
                       {selectedItem.done ? "Mark active" : "Mark done"}
                     </button>
