@@ -3,7 +3,6 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { gtdMigrationSql } from "@/lib/gtd/sql";
 import {
   createDefaultReviewState,
-  gtdSeedItems,
   type GtdItem,
   type GtdItemMutationInput,
   type GtdReviewMutationInput,
@@ -149,45 +148,9 @@ async function ensureReviewRow(db: D1Database) {
   );
 }
 
-async function ensureGtdSeeded(db: D1Database) {
-  const existing = await queryFirst<{ count: number }>(
-    db,
-    "SELECT COUNT(*) AS count FROM gtd_items",
-  );
-
-  if ((existing?.count ?? 0) > 0) return;
-
-  const statements = gtdSeedItems.map((item) =>
-    db
-      .prepare(
-        `INSERT INTO gtd_items (
-          id, text, bucket, context, priority, due_date, note, done, done_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        item.id,
-        item.text,
-        item.bucket,
-        item.context,
-        item.priority,
-        item.dueDate,
-        item.note,
-        item.done ? 1 : 0,
-        item.doneAt,
-        item.createdAt,
-        item.updatedAt,
-      ),
-  );
-
-  if (statements.length > 0) {
-    await db.batch(statements);
-  }
-}
-
 async function initializeGtd(db: D1Database) {
   await execSqlBatch(db, gtdMigrationSql);
   await ensureReviewRow(db);
-  await ensureGtdSeeded(db);
 }
 
 export async function ensureGtdReady(env: TrackerEnv) {

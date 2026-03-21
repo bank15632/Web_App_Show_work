@@ -22,7 +22,6 @@ import {
   createDefaultReviewState,
   getBucketCounts,
   getWeeklyReviewStatus,
-  gtdSeedItems,
   reviewSteps,
   type GtdBucket,
   type GtdContext,
@@ -42,7 +41,7 @@ import { cn } from "@/lib/utils";
 const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
 
 export function GtdWorkspace() {
-  const [items, setItems] = useState<GtdItem[]>(gtdSeedItems);
+  const [items, setItems] = useState<GtdItem[]>([]);
   const [activeBucket, setActiveBucket] = useState<GtdBucket>("inbox");
   const [activeContext, setActiveContext] = useState<GtdContext | "all">("all");
   const [draftText, setDraftText] = useState("");

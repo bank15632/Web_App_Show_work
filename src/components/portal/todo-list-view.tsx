@@ -335,42 +335,14 @@ export function TodoListView() {
     setActiveProjectId(workspace.projects[0]?.id ?? null);
   }, [workspace, activeProjectId]);
 
-  useEffect(() => {
-    if (!workspace) return;
-    if (window.localStorage.getItem(trackerStorageKeys.imported)) return;
-
-    const items = readLegacyTodos();
-    if (items.length === 0) {
-      window.localStorage.setItem(trackerStorageKeys.imported, "1");
-      return;
-    }
-
-    setWorking(true);
-    requestJson<{ workspace: TrackerWorkspaceData }>("/api/tracker/import/legacy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
-    })
-      .then((data) => {
-        startTransition(() => {
-          setWorkspace(data.workspace);
-        });
-        setStatusMessage(`Imported ${items.length} legacy todo item(s).`);
-        window.localStorage.setItem(trackerStorageKeys.imported, "1");
-      })
-      .catch((error: unknown) => {
-        setStatusMessage(
-          error instanceof Error ? error.message : "Legacy import failed",
-        );
-      })
-      .finally(() => {
-        setWorking(false);
-      });
-  }, [workspace]);
-
   const activeProject = useMemo(() => {
-    if (!workspace || !activeProjectId) return null;
-    return workspace.projects.find((project) => project.id === activeProjectId) ?? null;
+    if (!workspace) return null;
+    if (!activeProjectId) return workspace.projects[0] ?? null;
+    return (
+      workspace.projects.find((project) => project.id === activeProjectId) ??
+      workspace.projects[0] ??
+      null
+    );
   }, [workspace, activeProjectId]);
 
   const pendingReviewCount = useMemo(
@@ -474,6 +446,37 @@ export function TodoListView() {
     }
   }
 
+  async function handleLegacyImport() {
+    const items = readLegacyTodos();
+
+    if (items.length === 0) {
+      setStatusMessage("No legacy browser data found to import.");
+      return;
+    }
+
+    setWorking(true);
+    try {
+      const data = await requestJson<{ workspace: TrackerWorkspaceData }>(
+        "/api/tracker/import/legacy",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items }),
+        },
+      );
+      startTransition(() => {
+        setWorkspace(data.workspace);
+      });
+      setStatusMessage(`Imported ${items.length} legacy todo item(s).`);
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Legacy import failed",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -488,10 +491,70 @@ export function TodoListView() {
   if (!workspace || !activeProject) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
+        <div className="max-w-xl text-center">
           <p className="caption-editorial">Tracker</p>
           <h1 className="mt-2 font-display text-4xl font-medium">No project workspace</h1>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">
+            Workspace นี้ว่างอยู่จริงแล้ว สามารถเริ่มจากการสร้างโปรเจกต์แรก
+            หรือค่อย import ข้อมูล legacy จาก browser เครื่องนี้ด้วยตัวเองภายหลัง
+          </p>
+          {statusMessage ? (
+            <div className="mt-4 rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+              {statusMessage}
+            </div>
+          ) : null}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setProjectDraft(createEmptyProjectDraft());
+                setDialog("project");
+              }}
+              className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+            >
+              Create first project
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleLegacyImport();
+              }}
+              disabled={working}
+              className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Import legacy local data
+            </button>
+            <Link
+              href="/todos/guide"
+              className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              Open Kanban guide
+            </Link>
+          </div>
         </div>
+        {dialog === "project" ? (
+          <DialogFrame title="Create project" onClose={() => setDialog(null)}>
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void withWorkspaceMutation(
+                  () =>
+                    requestJson<{ workspace: TrackerWorkspaceData }>("/api/tracker/projects", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(projectDraft),
+                    }),
+                  "Project created.",
+                );
+                setDialog(null);
+              }}
+            >
+              <ProjectFormFields draft={projectDraft} onChange={setProjectDraft} />
+              <DialogActions onCancel={() => setDialog(null)} working={working} />
+            </form>
+          </DialogFrame>
+        ) : null}
       </div>
     );
   }
