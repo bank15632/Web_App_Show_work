@@ -146,10 +146,10 @@ export function AecWorkflowView() {
                 <div className="mt-4">
                   {framework.href ? (
                     <Link
-                      href={framework.href}
+                      href={framework.guideHref ?? framework.href}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
                     >
-                      {framework.actionLabel}
+                      {framework.guideActionLabel ?? framework.actionLabel}
                     </Link>
                   ) : (
                     <span className="inline-flex rounded-full border border-dashed border-border px-4 py-2 text-sm text-muted-foreground">

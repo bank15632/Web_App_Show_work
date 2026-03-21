@@ -8,7 +8,8 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import Link from "next/link";
+import { BookOpenText, ChevronLeft, ChevronRight, Copy } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
@@ -17,8 +18,6 @@ import { SavedViewBar } from "@/components/portal/tracker/saved-view-bar";
 import { TaskBoard } from "@/components/portal/tracker/task-board";
 import { WeeklyReportPanel } from "@/components/portal/tracker/weekly-report-panel";
 import { WorkspaceHeader } from "@/components/portal/tracker/workspace-header";
-import { SystemGuidePanel } from "@/components/portal/system-guide";
-import { getManualSystemGuide } from "@/lib/aec-user-manual";
 import {
   taskStatusLabels,
   taskTypeLabels,
@@ -37,7 +36,6 @@ import type {
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 import { filterTasksForSavedView } from "@/lib/tracker/views";
-const kanbanGuide = getManualSystemGuide("kanban");
 
 type DialogState =
   | null
@@ -536,13 +534,22 @@ export function TodoListView() {
 
         <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-5 py-6 lg:px-8">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <SidebarToggleButton
-              collapsed={isLeftRailCollapsed}
-              side="left"
-              hideLabel="Hide projects"
-              showLabel="Show projects"
-              onClick={() => setIsLeftRailCollapsed((prev) => !prev)}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <SidebarToggleButton
+                collapsed={isLeftRailCollapsed}
+                side="left"
+                hideLabel="Hide projects"
+                showLabel="Show projects"
+                onClick={() => setIsLeftRailCollapsed((prev) => !prev)}
+              />
+              <Link
+                href="/todos/guide"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                <BookOpenText className="size-4" />
+                Kanban Guide
+              </Link>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -554,10 +561,6 @@ export function TodoListView() {
               Copy for AI chat
             </button>
           </div>
-
-          {kanbanGuide ? (
-            <SystemGuidePanel guide={kanbanGuide} className="mb-5" />
-          ) : null}
 
           <WorkspaceHeader
             project={activeProject}

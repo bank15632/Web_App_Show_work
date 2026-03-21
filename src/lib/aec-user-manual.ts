@@ -5,6 +5,8 @@ export interface ManualFrameworkCard {
   status: "available" | "partial" | "planned";
   href?: string;
   actionLabel?: string;
+  guideHref?: string;
+  guideActionLabel?: string;
 }
 
 export interface ManualDashboardPanel {
@@ -70,6 +72,8 @@ export const manualFrameworkCards: ManualFrameworkCard[] = [
     status: "available",
     href: "/gtd",
     actionLabel: "Open GTD workspace",
+    guideHref: "/gtd/guide",
+    guideActionLabel: "Open GTD guide",
   },
   {
     name: "Kanban",
@@ -78,6 +82,8 @@ export const manualFrameworkCards: ManualFrameworkCard[] = [
     status: "available",
     href: "/todos",
     actionLabel: "Open Kanban board",
+    guideHref: "/todos/guide",
+    guideActionLabel: "Open Kanban guide",
   },
   {
     name: "Lean",
@@ -100,8 +106,10 @@ export const manualFrameworkCards: ManualFrameworkCard[] = [
     role: "วิเคราะห์ + แนะนำ",
     whenToUse: "ทุกสัปดาห์: สรุป, พยากรณ์, แนะนำ next action",
     status: "partial",
-    href: "/ai-assistant",
-    actionLabel: "Open AI guide",
+    href: "/todos",
+    actionLabel: "Use AI brief",
+    guideHref: "/ai-assistant",
+    guideActionLabel: "Open AI guide",
   },
 ];
 

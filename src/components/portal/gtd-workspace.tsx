@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  BookOpenText,
   CalendarDays,
   Check,
   ClipboardCheck,
@@ -30,7 +31,6 @@ import {
   type GtdWorkspaceData,
   type WeeklyReviewState,
 } from "@/lib/gtd-system";
-import { getManualSystemGuide } from "@/lib/aec-user-manual";
 import {
   createGtdItemRequest,
   deleteGtdItemRequest,
@@ -38,10 +38,8 @@ import {
   updateGtdItemRequest,
   updateGtdReviewRequest,
 } from "@/lib/gtd/client";
-import { SystemGuidePanel } from "@/components/portal/system-guide";
 import { cn } from "@/lib/utils";
 const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
-const gtdGuide = getManualSystemGuide("gtd");
 
 export function GtdWorkspace() {
   const [items, setItems] = useState<GtdItem[]>(gtdSeedItems);
@@ -312,6 +310,10 @@ export function GtdWorkspace() {
             <Settings2 className="size-4" />
             Settings & Export
           </Link>
+          <Link href="/gtd/guide" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+            <BookOpenText className="size-4" />
+            GTD Guide
+          </Link>
         </div>
       </header>
 
@@ -358,8 +360,6 @@ export function GtdWorkspace() {
         </section>
 
         <section className="space-y-4">
-          {gtdGuide ? <SystemGuidePanel guide={gtdGuide} /> : null}
-
           <div className="flex flex-wrap gap-3">
             {bucketOrder.map((bucket) => (
               <button
