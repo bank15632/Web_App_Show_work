@@ -26,7 +26,7 @@ import {
   contextOptions,
   getWeeklyReviewStatus,
 } from "@/lib/gtd-system";
-import { getProjects } from "@/lib/portal-data";
+import type { ClientRoomProjectSummary } from "@/lib/client-rooms/types";
 import type { TrackerWorkspaceData } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 
@@ -152,15 +152,15 @@ export function SettingsView() {
           contents: toCsv(
             payload.clientProjects.map((project) => ({
               slug: project.slug,
-              code: project.code,
               title: project.title,
               clientName: project.clientName,
               projectType: project.projectType,
               location: project.location,
-              stage: project.stage,
-              revisionStatus: project.revisionStatus,
+              year: project.year,
+              shareToken: project.shareToken ?? "",
               updatedAt: project.updatedAt,
-              nextMilestone: project.nextMilestone,
+              publishedAt: project.publishedAt ?? "",
+              documentCount: project.documentCount,
             })),
           ),
         },
@@ -575,13 +575,14 @@ function RoleCard({ role, body }: { role: string; body: string }) {
 async function collectExportPayload(settings: AecSettingsState) {
   const gtdWorkspace = await fetchGtdWorkspace();
   const tracker = await getTrackerWorkspace().catch(() => null);
+  const clientProjects = await getClientRoomProjects().catch(() => []);
 
   return {
     exportedAt: new Date().toISOString(),
     settings,
     gtd: gtdWorkspace,
     tracker,
-    clientProjects: getProjects(),
+    clientProjects,
   };
 }
 
@@ -594,6 +595,20 @@ async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
   }
 
   return data.workspace;
+}
+
+async function getClientRoomProjects(): Promise<ClientRoomProjectSummary[]> {
+  const response = await fetch("/api/client-rooms/projects", { cache: "no-store" });
+  const data = (await response.json()) as {
+    error?: string;
+    projects?: ClientRoomProjectSummary[];
+  };
+
+  if (!response.ok || !data.projects) {
+    throw new Error(data.error || "Client rooms unavailable.");
+  }
+
+  return data.projects;
 }
 
 function toCsv(rows: Array<Record<string, unknown>>) {

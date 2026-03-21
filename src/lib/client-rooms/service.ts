@@ -115,6 +115,10 @@ function normalizeDraftData(input: unknown): ClientRoomDraftData {
   return normalizeClientRoomDraft(parsed);
 }
 
+function getDocumentCount(draft: ClientRoomDraftData) {
+  return draft.sections.reduce((count, section) => count + section.items.length, 0);
+}
+
 function mapProjectRow(row: ClientRoomProjectRow): ClientRoomProjectRecord {
   const fallbackDraft = createEmptyClientRoomDraft({
     title: row.title,
@@ -201,16 +205,30 @@ export async function listClientRoomProjects(
      ORDER BY COALESCE(published_at, updated_at) DESC, updated_at DESC, title ASC`,
   );
 
-  return rows.map((row) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    clientName: row.client_name,
-    shareToken: row.share_token,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    publishedAt: row.published_at,
-  }));
+  return rows.map((row) => {
+    const fallbackDraft = createEmptyClientRoomDraft({
+      title: row.title,
+      clientName: row.client_name,
+      slug: row.slug,
+    });
+    const draft = normalizeDraftData(safeJsonParse(row.draft_json, fallbackDraft));
+
+    return {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      clientName: row.client_name,
+      projectType: draft.projectType,
+      location: draft.location,
+      year: draft.year,
+      overview: draft.overview,
+      documentCount: getDocumentCount(draft),
+      shareToken: row.share_token,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      publishedAt: row.published_at,
+    };
+  });
 }
 
 export async function getClientRoomProjectById(

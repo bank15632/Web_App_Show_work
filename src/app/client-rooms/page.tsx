@@ -1,5 +1,10 @@
 import { ClientRoomCms } from "@/components/portal/client-room-cms";
 
-export default function ClientRoomsPage() {
-  return <ClientRoomCms />;
+type ClientRoomsPageProps = {
+  searchParams?: Promise<{ projectId?: string }>;
+};
+
+export default async function ClientRoomsPage({ searchParams }: ClientRoomsPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  return <ClientRoomCms initialProjectId={params?.projectId ?? ""} />;
 }

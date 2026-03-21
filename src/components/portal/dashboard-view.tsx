@@ -17,8 +17,8 @@ import {
   X,
 } from "lucide-react";
 
-import { ProjectStageBadge } from "@/components/portal/project-stage-badge";
 import { manualFrameworkCards } from "@/lib/aec-user-manual";
+import { buildClientRoomSharePath, type ClientRoomProjectSummary } from "@/lib/client-rooms/types";
 import {
   getBucketCounts,
   getWeeklyReviewStatus,
@@ -26,13 +26,8 @@ import {
 } from "@/lib/gtd-system";
 import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
-  type ClientProject,
-  type RevisionStatus,
   formatPortalDate,
-  getProjectDocumentCount,
   getProjectTypes,
-  getProjects,
-  getRevisionStatusLabel,
 } from "@/lib/portal-data";
 import type { TrackerTaskRecord, TrackerWorkspaceData } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
@@ -52,28 +47,30 @@ const MONTH_LABELS: Record<number, string> = {
   11: "ธ.ค.",
 };
 
-const revisionColumnStyles: Record<RevisionStatus, string> = {
-  todo: "border-amber-200 bg-amber-50",
-  doing: "border-blue-200 bg-blue-50",
-  done: "border-emerald-200 bg-emerald-50",
+type ClientRoomStatus = "draft" | "dirty" | "live";
+
+const clientRoomColumnStyles: Record<ClientRoomStatus, string> = {
+  draft: "border-amber-200 bg-amber-50",
+  dirty: "border-blue-200 bg-blue-50",
+  live: "border-emerald-200 bg-emerald-50",
 };
 
-const revisionHeaderStyles: Record<RevisionStatus, string> = {
-  todo: "text-amber-700",
-  doing: "text-blue-700",
-  done: "text-emerald-700",
+const clientRoomHeaderStyles: Record<ClientRoomStatus, string> = {
+  draft: "text-amber-700",
+  dirty: "text-blue-700",
+  live: "text-emerald-700",
 };
 
-const revisionDotStyles: Record<RevisionStatus, string> = {
-  todo: "bg-amber-500",
-  doing: "bg-blue-500",
-  done: "bg-emerald-500",
+const clientRoomDotStyles: Record<ClientRoomStatus, string> = {
+  draft: "bg-amber-500",
+  dirty: "bg-blue-500",
+  live: "bg-emerald-500",
 };
 
-const revisionCardStyles: Record<RevisionStatus, string> = {
-  todo: "border-amber-200/70 hover:border-amber-300",
-  doing: "border-blue-200/70 hover:border-blue-300",
-  done: "border-emerald-200/70 hover:border-emerald-300",
+const clientRoomCardStyles: Record<ClientRoomStatus, string> = {
+  draft: "border-amber-200/70 hover:border-amber-300",
+  dirty: "border-blue-200/70 hover:border-blue-300",
+  live: "border-emerald-200/70 hover:border-emerald-300",
 };
 
 function useScrollAnimation() {
@@ -136,12 +133,13 @@ function FilterSelect({
 }
 
 export function DashboardView() {
-  const projects = getProjects();
   const containerRef = useScrollAnimation();
 
   const [typeFilter, setTypeFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
+  const [clientRoomProjects, setClientRoomProjects] = useState<ClientRoomProjectSummary[]>([]);
+  const [clientRoomStatus, setClientRoomStatus] = useState("กำลังดึงข้อมูล client rooms...");
   const [gtdItems, setGtdItems] = useState<GtdItem[]>([]);
   const [trackerWorkspace, setTrackerWorkspace] = useState<TrackerWorkspaceData | null>(null);
   const [trackerStatus, setTrackerStatus] = useState("กำลังดึงข้อมูล Kanban board...");
@@ -152,9 +150,10 @@ export function DashboardView() {
     let ignore = false;
 
     async function loadWorkspace() {
-      const [gtdResult, trackerResult] = await Promise.allSettled([
+      const [gtdResult, trackerResult, clientRoomResult] = await Promise.allSettled([
         fetchGtdWorkspace(),
         getTrackerWorkspace(),
+        getClientRoomProjects(),
       ]);
 
       if (ignore) return;
@@ -173,6 +172,22 @@ export function DashboardView() {
           trackerResult.reason instanceof Error
             ? trackerResult.reason.message
             : "Tracker workspace unavailable.",
+        );
+      }
+
+      if (clientRoomResult.status === "fulfilled") {
+        setClientRoomProjects(clientRoomResult.value);
+        setClientRoomStatus(
+          clientRoomResult.value.length > 0
+            ? "Client room CMS พร้อมใช้งาน"
+            : "ยังไม่มี client room ในระบบ",
+        );
+      } else {
+        setClientRoomProjects([]);
+        setClientRoomStatus(
+          clientRoomResult.reason instanceof Error
+            ? clientRoomResult.reason.message
+            : "Client room CMS unavailable.",
         );
       }
 
@@ -195,30 +210,30 @@ export function DashboardView() {
 
   const availableYears = useMemo(
     () =>
-      [...new Set(projects.map((project) => new Date(project.updatedAt).getFullYear()))].sort(
+      [...new Set(clientRoomProjects.map((project) => new Date(project.updatedAt).getFullYear()))].sort(
         (a, b) => b - a,
       ),
-    [projects],
+    [clientRoomProjects],
   );
 
   const availableMonths = useMemo(
     () =>
-      [...new Set(projects.map((project) => new Date(project.updatedAt).getMonth()))].sort(
+      [...new Set(clientRoomProjects.map((project) => new Date(project.updatedAt).getMonth()))].sort(
         (a, b) => a - b,
       ),
-    [projects],
+    [clientRoomProjects],
   );
 
   const filteredProjects = useMemo(
     () =>
-      projects.filter((project) => {
+      clientRoomProjects.filter((project) => {
         if (typeFilter !== "all" && project.projectType !== typeFilter) return false;
         const date = new Date(project.updatedAt);
         if (monthFilter !== "all" && String(date.getMonth()) !== monthFilter) return false;
         if (yearFilter !== "all" && String(date.getFullYear()) !== yearFilter) return false;
         return true;
       }),
-    [monthFilter, projects, typeFilter, yearFilter],
+    [clientRoomProjects, monthFilter, typeFilter, yearFilter],
   );
 
   const hasActiveFilters =
@@ -230,28 +245,28 @@ export function DashboardView() {
     setYearFilter("all");
   };
 
-  const activeProjects = projects.filter((project) => project.stage !== "archived");
-  const totalDocuments = projects.reduce(
-    (count, project) => count + getProjectDocumentCount(project),
+  const activeProjects = clientRoomProjects.length;
+  const totalDocuments = clientRoomProjects.reduce(
+    (count, project) => count + project.documentCount,
     0,
   );
-  const pendingRevisions = projects.filter(
-    (project) => project.revisionStatus !== "done",
+  const pendingPublishes = clientRoomProjects.filter(
+    (project) => getClientRoomStatus(project) !== "live",
   ).length;
 
-  const taskGroups = useMemo(() => {
-    const groups: Record<RevisionStatus, ClientProject[]> = {
-      todo: [],
-      doing: [],
-      done: [],
+  const clientRoomGroups = useMemo(() => {
+    const groups: Record<ClientRoomStatus, ClientRoomProjectSummary[]> = {
+      draft: [],
+      dirty: [],
+      live: [],
     };
 
-    for (const project of projects) {
-      groups[project.revisionStatus].push(project);
+    for (const project of clientRoomProjects) {
+      groups[getClientRoomStatus(project)].push(project);
     }
 
     return groups;
-  }, [projects]);
+  }, [clientRoomProjects]);
 
   const gtdCounts = useMemo(() => getBucketCounts(gtdItems), [gtdItems]);
   const staleWaitingCount = useMemo(
@@ -486,77 +501,77 @@ export function DashboardView() {
             <MetricSummaryCard
               icon={<FolderOpen className="size-4" />}
               label="Active Projects"
-              value={activeProjects.length}
-              body="โปรเจกต์ที่ยังต้องติดตามต่อในระบบ client rooms"
+              value={activeProjects}
+              body="จำนวน client rooms ที่ถูกสร้างใน CMS ปัจจุบัน"
             />
             <MetricSummaryCard
               icon={<FileText className="size-4" />}
               label="Documents"
               value={totalDocuments}
-              body="ไฟล์ทั้งหมดรวม Canva, PDF และ revision archives"
+              body="จำนวนเอกสาร draft ทั้งหมดที่ถูกใส่ไว้ใน CMS"
             />
             <MetricSummaryCard
               icon={<ClipboardList className="size-4" />}
-              label="Pending Revisions"
-              value={pendingRevisions}
-              body="งานที่ยังต้อง revise ต่อใน client-facing workflow"
+              label="Need Publish"
+              value={pendingPublishes}
+              body="draft ที่ยังไม่เคย publish หรือมีข้อมูลใหม่กว่าลิงก์ลูกค้า"
             />
           </div>
         </section>
 
         <section className="fade-up space-y-6">
           <div>
-            <p className="caption-editorial mb-2">Revision Tasks</p>
+            <p className="caption-editorial mb-2">Client Room Status</p>
             <h2 className="font-display text-3xl font-medium tracking-tight">
-              ติดตามสถานะงาน Revise
+              ติดตามสถานะการเผยแพร่
             </h2>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            {(["todo", "doing", "done"] as RevisionStatus[]).map((status, index) => (
+            {(["draft", "dirty", "live"] as ClientRoomStatus[]).map((status, index) => (
               <div
                 key={status}
                 className={cn(
                   "fade-up rounded-lg border p-5",
                   index === 1 && "delay-100",
                   index === 2 && "delay-200",
-                  revisionColumnStyles[status],
+                  clientRoomColumnStyles[status],
                 )}
               >
                 <div className="mb-5 flex items-center gap-2.5">
-                  <span className={cn("size-2 rounded-full", revisionDotStyles[status])} />
+                  <span className={cn("size-2 rounded-full", clientRoomDotStyles[status])} />
                   <h3
                     className={cn(
                       "text-sm font-semibold uppercase tracking-widest",
-                      revisionHeaderStyles[status],
+                      clientRoomHeaderStyles[status],
                     )}
                   >
-                    {getRevisionStatusLabel(status)}
+                    {getClientRoomStatusLabel(status)}
                   </h3>
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {taskGroups[status].length}
+                    {clientRoomGroups[status].length}
                   </span>
                 </div>
 
                 <div className="space-y-3">
-                  {taskGroups[status].length === 0 ? (
+                  {clientRoomGroups[status].length === 0 ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
                       ไม่มีงาน
                     </p>
                   ) : null}
 
-                  {taskGroups[status].map((project) => (
+                  {clientRoomGroups[status].map((project) => (
                     <Link
-                      key={project.slug}
-                      href={`/p/${project.slug}`}
+                      key={project.id}
+                      href={`/client-rooms?projectId=${project.id}`}
                       className={cn(
                         "block rounded-lg border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
-                        revisionCardStyles[status],
+                        clientRoomCardStyles[status],
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {project.code}
+                          {project.slug}
                         </span>
                         <span className="caption-editorial text-[0.7rem]">
                           {project.projectType}
@@ -569,7 +584,7 @@ export function DashboardView() {
                         {project.clientName}
                       </p>
                       <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
-                        {project.nextMilestone}
+                        {getClientRoomStatusBody(project)}
                       </p>
                     </Link>
                   ))}
@@ -620,9 +635,9 @@ export function DashboardView() {
 
         <section>
           <div className="fade-up mb-6">
-            <p className="caption-editorial mb-2">Projects</p>
+            <p className="caption-editorial mb-2">Client Rooms</p>
             <h2 className="font-display text-3xl font-medium tracking-tight">
-              เลือกเปิดหน้าลูกค้า
+              จัดการและเปิดลิงก์แชร์
             </h2>
           </div>
 
@@ -630,7 +645,9 @@ export function DashboardView() {
             {filteredProjects.length === 0 ? (
               <div className="col-span-full rounded-lg border border-border p-12 text-center">
                 <p className="text-lg text-muted-foreground">
-                  ไม่พบโปรเจกต์ที่ตรงกับ filter
+                  {clientRoomProjects.length === 0
+                    ? clientRoomStatus
+                    : "ไม่พบโปรเจกต์ที่ตรงกับ filter"}
                 </p>
                 <button
                   onClick={clearFilters}
@@ -643,7 +660,7 @@ export function DashboardView() {
 
             {filteredProjects.map((project, index) => (
               <ProjectCard
-                key={project.slug}
+                key={project.id}
                 project={project}
                 delay={index % 2 === 0 ? "" : "delay-100"}
               />
@@ -705,9 +722,12 @@ function ProjectCard({
   project,
   delay,
 }: {
-  project: ClientProject;
+  project: ClientRoomProjectSummary;
   delay: string;
 }) {
+  const status = getClientRoomStatus(project);
+  const sharePath = project.shareToken ? buildClientRoomSharePath(project.shareToken) : null;
+
   return (
     <div
       className={cn(
@@ -717,11 +737,19 @@ function ProjectCard({
     >
       <div className="p-6">
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="caption-editorial text-xs">{project.code}</span>
-          <span className="text-muted-foreground">·</span>
-          <ProjectStageBadge stage={project.stage} />
+          <span className="caption-editorial text-xs">{project.slug}</span>
           <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
             {project.projectType}
+          </span>
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-xs font-medium",
+              status === "draft" && "border-amber-200 bg-amber-50 text-amber-700",
+              status === "dirty" && "border-blue-200 bg-blue-50 text-blue-700",
+              status === "live" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+            )}
+          >
+            {getClientRoomStatusLabel(status)}
           </span>
         </div>
 
@@ -729,28 +757,76 @@ function ProjectCard({
           {project.title}
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {project.clientName} · {project.location} · อัปเดต {formatPortalDate(project.updatedAt)}
+          {project.clientName} · {project.location || "ยังไม่ระบุที่ตั้ง"} · อัปเดต{" "}
+          {formatPortalDate(project.updatedAt)}
         </p>
 
         <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
           {project.overview}
         </p>
 
-        <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
           <span className="text-sm text-muted-foreground">
-            {getProjectDocumentCount(project)} files · {project.viewerCount} viewers
+            {project.documentCount} files · {project.publishedAt ? "published" : "draft only"}
           </span>
-          <Link
-            href={`/p/${project.slug}`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
-          >
-            เปิดหน้าลูกค้า
-            <ArrowRight className="size-3.5" />
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/client-rooms?projectId=${project.id}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
+            >
+              แก้ไขใน CMS
+              <ArrowRight className="size-3.5" />
+            </Link>
+            {sharePath ? (
+              <Link
+                href={sharePath}
+                target="_blank"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                เปิดลิงก์ลูกค้า
+              </Link>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+function getClientRoomStatus(project: ClientRoomProjectSummary): ClientRoomStatus {
+  if (!project.publishedAt) {
+    return "draft";
+  }
+
+  if (new Date(project.updatedAt).getTime() > new Date(project.publishedAt).getTime()) {
+    return "dirty";
+  }
+
+  return "live";
+}
+
+function getClientRoomStatusLabel(status: ClientRoomStatus) {
+  switch (status) {
+    case "draft":
+      return "Draft Only";
+    case "dirty":
+      return "Unpublished Changes";
+    case "live":
+      return "Live";
+  }
+}
+
+function getClientRoomStatusBody(project: ClientRoomProjectSummary) {
+  const status = getClientRoomStatus(project);
+
+  switch (status) {
+    case "draft":
+      return "ยังไม่เคย publish ลิงก์ลูกค้า";
+    case "dirty":
+      return "มี draft ใหม่กว่าลิงก์ลูกค้า กด publish อีกครั้งเมื่อพร้อม";
+    case "live":
+      return `เผยแพร่ล่าสุด ${project.publishedAt ? formatPortalDate(project.publishedAt) : "-"}`;
+  }
 }
 
 function isDateWithinDays(value: string, days: number, referenceTime: number) {
@@ -778,4 +854,18 @@ async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
   }
 
   return data.workspace;
+}
+
+async function getClientRoomProjects(): Promise<ClientRoomProjectSummary[]> {
+  const response = await fetch("/api/client-rooms/projects", { cache: "no-store" });
+  const data = (await response.json()) as {
+    error?: string;
+    projects?: ClientRoomProjectSummary[];
+  };
+
+  if (!response.ok || !data.projects) {
+    throw new Error(data.error || "Client rooms unavailable.");
+  }
+
+  return data.projects;
 }

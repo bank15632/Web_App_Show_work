@@ -78,6 +78,11 @@ export interface ClientRoomProjectSummary {
   slug: string;
   title: string;
   clientName: string;
+  projectType: ClientRoomProjectType;
+  location: string;
+  year: string;
+  overview: string;
+  documentCount: number;
   shareToken: string | null;
   createdAt: string;
   updatedAt: string;

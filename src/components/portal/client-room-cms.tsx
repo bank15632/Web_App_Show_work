@@ -33,7 +33,7 @@ function buildAbsoluteUrl(path: string | null) {
   return new URL(path, window.location.origin).toString();
 }
 
-export function ClientRoomCms() {
+export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: string }) {
   const [projects, setProjects] = useState<ClientRoomProjectSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [project, setProject] = useState<ClientRoomProjectRecord | null>(null);
@@ -49,6 +49,16 @@ export function ClientRoomCms() {
     void loadProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const projectId = initialProjectId;
+    if (!projectId || projectId === selectedProjectId) {
+      return;
+    }
+
+    setSelectedProjectId(projectId);
+    void loadProject(projectId);
+  }, [initialProjectId, selectedProjectId]);
 
   async function loadProjects(nextProjectId?: string) {
     setIsLoadingProjects(true);
