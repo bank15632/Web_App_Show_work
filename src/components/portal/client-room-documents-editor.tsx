@@ -40,6 +40,10 @@ function parseRooms(value: string) {
     .filter((room) => room.name);
 }
 
+function buildDocumentTitle(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, "").trim() || fileName;
+}
+
 export function ClientRoomDocumentsEditor({
   draft,
   onChange,
@@ -53,6 +57,30 @@ export function ClientRoomDocumentsEditor({
   uploadingTarget: string;
   onStatus: (message: string) => void;
 }) {
+  function addDocuments(sectionId: ClientRoomSectionId, documents: ClientRoomDocument[]) {
+    const hasNewLatest = documents.some((document) => document.latest);
+
+    onChange((currentDraft) => ({
+      ...currentDraft,
+      sections: currentDraft.sections.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              items: [
+                ...documents,
+                ...(hasNewLatest
+                  ? section.items.map((item) => ({
+                      ...item,
+                      latest: false,
+                    }))
+                  : section.items),
+              ],
+            }
+          : section,
+      ),
+    }));
+  }
+
   function updateDocument(
     sectionId: ClientRoomSectionId,
     documentId: string,
@@ -107,6 +135,55 @@ export function ClientRoomDocumentsEditor({
     }));
   }
 
+  async function handleSectionUpload(sectionId: ClientRoomSectionId, files: FileList | null) {
+    const nextFiles = Array.from(files ?? []);
+    if (nextFiles.length === 0) {
+      return;
+    }
+
+    const section = draft.sections.find((item) => item.id === sectionId);
+    const shouldMarkLatest = !section || section.items.length === 0;
+    const documents: ClientRoomDocument[] = nextFiles.map((file, index) => ({
+      ...createEmptyClientRoomDocument("pdf"),
+      title: buildDocumentTitle(file.name),
+      kind: "pdf",
+      latest: shouldMarkLatest && index === 0,
+    }));
+
+    addDocuments(sectionId, documents);
+
+    let successCount = 0;
+    const failedFiles: string[] = [];
+
+    for (const [index, file] of nextFiles.entries()) {
+      const document = documents[index];
+
+      try {
+        onStatus(`กำลังอัปโหลดเอกสาร ${index + 1}/${nextFiles.length}: ${file.name}`);
+        const url = await onUpload("document", file);
+        updateDocument(sectionId, document.id, (current) => ({
+          ...current,
+          kind: file.type === "application/pdf" ? "pdf" : current.kind,
+          viewerUrl: url,
+          downloadUrl: url,
+        }));
+        successCount += 1;
+      } catch (error) {
+        failedFiles.push(file.name);
+        onStatus(error instanceof Error ? error.message : `อัปโหลด ${file.name} ไม่สำเร็จ`);
+      }
+    }
+
+    if (failedFiles.length > 0) {
+      onStatus(
+        `อัปโหลดเอกสารสำเร็จ ${successCount}/${nextFiles.length} ไฟล์ ไฟล์ที่ยังต้อง retry: ${failedFiles.join(", ")}`,
+      );
+      return;
+    }
+
+    onStatus(`อัปโหลดเอกสาร ${successCount} ไฟล์แล้ว`);
+  }
+
   async function handleDocumentUpload(
     sectionId: ClientRoomSectionId,
     documentId: string,
@@ -139,6 +216,24 @@ export function ClientRoomDocumentsEditor({
                 <CardTitle>{section.title}</CardTitle>
                 <CardDescription>{section.description}</CardDescription>
               </div>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
+                {uploadingTarget.startsWith("document:") ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <FileUp className="size-4" />
+                )}
+                อัปหลายไฟล์
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    void handleSectionUpload(section.id, event.target.files);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
               <Button variant="outline" onClick={() => addDocument(section.id)}>
                 <Plus />
                 เพิ่มเอกสาร

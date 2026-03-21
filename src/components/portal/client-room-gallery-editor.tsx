@@ -14,6 +14,10 @@ import {
   type ClientRoomGalleryRoom,
 } from "@/lib/client-rooms/types";
 
+function buildImageCaption(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, "").trim();
+}
+
 export function ClientRoomGalleryEditor({
   draft,
   onChange,
@@ -27,6 +31,13 @@ export function ClientRoomGalleryEditor({
   uploadingTarget: string;
   onStatus: (message: string) => void;
 }) {
+  function addGalleryImages(roomId: string, images: ClientRoomGalleryImage[]) {
+    updateGalleryRoom(roomId, (room) => ({
+      ...room,
+      images: [...room.images, ...images],
+    }));
+  }
+
   function updateGalleryRoom(
     roomId: string,
     updater: (room: ClientRoomGalleryRoom) => ClientRoomGalleryRoom,
@@ -66,6 +77,49 @@ export function ClientRoomGalleryEditor({
     } catch (error) {
       onStatus(error instanceof Error ? error.message : "อัปโหลดรูป gallery ไม่สำเร็จ");
     }
+  }
+
+  async function handleRoomUpload(roomId: string, files: FileList | null) {
+    const nextFiles = Array.from(files ?? []);
+    if (nextFiles.length === 0) {
+      return;
+    }
+
+    const images = nextFiles.map((file) => ({
+      ...createEmptyGalleryImage(),
+      caption: buildImageCaption(file.name),
+    }));
+
+    addGalleryImages(roomId, images);
+
+    let successCount = 0;
+    const failedFiles: string[] = [];
+
+    for (const [index, file] of nextFiles.entries()) {
+      const image = images[index];
+
+      try {
+        onStatus(`กำลังอัปโหลดรูป ${index + 1}/${nextFiles.length}: ${file.name}`);
+        const url = await onUpload("gallery", file);
+        updateGalleryImage(roomId, image.id, (current) => ({
+          ...current,
+          src: url,
+        }));
+        successCount += 1;
+      } catch (error) {
+        failedFiles.push(file.name);
+        onStatus(error instanceof Error ? error.message : `อัปโหลด ${file.name} ไม่สำเร็จ`);
+      }
+    }
+
+    if (failedFiles.length > 0) {
+      onStatus(
+        `อัปโหลดรูปสำเร็จ ${successCount}/${nextFiles.length} ไฟล์ ไฟล์ที่ยังต้อง retry: ${failedFiles.join(", ")}`,
+      );
+      return;
+    }
+
+    onStatus(`อัปโหลดรูป ${successCount} ไฟล์แล้ว`);
   }
 
   return (
@@ -125,6 +179,24 @@ export function ClientRoomGalleryEditor({
                 <Trash2 />
                 ลบห้อง
               </Button>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
+                {uploadingTarget.startsWith("gallery:") ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="size-4" />
+                )}
+                อัปหลายรูป
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    void handleRoomUpload(room.id, event.target.files);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
             </div>
 
             <div className="space-y-3">
