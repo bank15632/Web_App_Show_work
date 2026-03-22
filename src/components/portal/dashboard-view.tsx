@@ -80,9 +80,6 @@ function useScrollAnimation() {
     const container = ref.current;
     if (!container) return;
 
-    const elements = container.querySelectorAll(".fade-up");
-    if (elements.length === 0) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -95,8 +92,36 @@ function useScrollAnimation() {
       { threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
     );
 
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
+    const observeFadeUpElement = (element: Element) => {
+      if (!(element instanceof HTMLElement)) return;
+      if (!element.classList.contains("fade-up")) return;
+      observer.observe(element);
+    };
+
+    const observeTree = (root: ParentNode) => {
+      root.querySelectorAll(".fade-up").forEach(observeFadeUpElement);
+      if (root instanceof HTMLElement && root.classList.contains("fade-up")) {
+        observeFadeUpElement(root);
+      }
+    };
+
+    observeTree(container);
+
+    const mutationObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          observeTree(node);
+        });
+      });
+    });
+
+    mutationObserver.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      mutationObserver.disconnect();
+      observer.disconnect();
+    };
   }, []);
 
   return ref;
@@ -726,7 +751,10 @@ function ProjectCard({
   delay: string;
 }) {
   const status = getClientRoomStatus(project);
-  const sharePath = project.shareToken ? buildClientRoomSharePath(project.shareToken) : null;
+  const sharePath =
+    project.shareToken && project.publishedAt
+      ? buildClientRoomSharePath(project.shareToken)
+      : null;
 
   return (
     <div

@@ -369,6 +369,32 @@ export async function publishClientRoomProject(
   return project;
 }
 
+export async function unpublishClientRoomProject(
+  env: TrackerEnv,
+  projectId: string,
+) {
+  await ensureClientRoomsReady(env);
+  const existing = await getClientRoomProjectById(env, projectId);
+  if (!existing) {
+    throw new Error("Client room not found");
+  }
+
+  await runStatement(
+    env.DB,
+    `UPDATE client_room_projects
+     SET published_json = NULL, published_at = NULL
+     WHERE id = ?`,
+    projectId,
+  );
+
+  const project = await getClientRoomProjectById(env, projectId);
+  if (!project) {
+    throw new Error("Failed to reload unpublished client room");
+  }
+
+  return project;
+}
+
 export async function deleteClientRoomProject(
   env: TrackerEnv,
   projectId: string,

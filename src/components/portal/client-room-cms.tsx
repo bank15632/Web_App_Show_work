@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import {
+  ArrowLeft,
   Copy,
+  EyeOff,
   ExternalLink,
   ImagePlus,
   LoaderCircle,
@@ -43,6 +46,27 @@ function buildAbsoluteUrl(path: string | null) {
   return new URL(path, window.location.origin).toString();
 }
 
+function mapProjectSummary(project: ClientRoomProjectRecord): ClientRoomProjectSummary {
+  return {
+    id: project.id,
+    title: project.title,
+    clientName: project.clientName,
+    slug: project.slug,
+    projectType: project.draftData.projectType,
+    location: project.draftData.location,
+    year: project.draftData.year,
+    overview: project.draftData.overview,
+    documentCount: project.draftData.sections.reduce(
+      (count, section) => count + section.items.length,
+      0,
+    ),
+    shareToken: project.shareToken,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    publishedAt: project.publishedAt,
+  };
+}
+
 export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: string }) {
   const [projects, setProjects] = useState<ClientRoomProjectSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -52,6 +76,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
   const [isLoadingProject, setIsLoadingProject] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState("");
   const [uploadProgress, setUploadProgress] = useState<{
@@ -215,23 +240,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
       setProject(data.project);
       setProjects((current) =>
         current.map((item) =>
-          item.id === data.project?.id
-            ? {
-                ...item,
-                title: data.project.title,
-                clientName: data.project.clientName,
-                slug: data.project.slug,
-                projectType: data.project.draftData.projectType,
-                location: data.project.draftData.location,
-                year: data.project.draftData.year,
-                overview: data.project.draftData.overview,
-                documentCount: data.project.draftData.sections.reduce(
-                  (count, section) => count + section.items.length,
-                  0,
-                ),
-                updatedAt: data.project.updatedAt,
-              }
-            : item,
+          item.id === data.project?.id ? mapProjectSummary(data.project) : item,
         ),
       );
       setStatusMessage("บันทึก draft แล้ว");
@@ -270,25 +279,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
       setProject(data.project);
       setProjects((current) =>
         current.map((item) =>
-          item.id === data.project?.id
-            ? {
-                ...item,
-                title: data.project.title,
-                clientName: data.project.clientName,
-                slug: data.project.slug,
-                projectType: data.project.draftData.projectType,
-                location: data.project.draftData.location,
-                year: data.project.draftData.year,
-                overview: data.project.draftData.overview,
-                documentCount: data.project.draftData.sections.reduce(
-                  (count, section) => count + section.items.length,
-                  0,
-                ),
-                shareToken: data.project.shareToken,
-                updatedAt: data.project.updatedAt,
-                publishedAt: data.project.publishedAt,
-              }
-            : item,
+          item.id === data.project?.id ? mapProjectSummary(data.project) : item,
         ),
       );
       setStatusMessage("publish สำเร็จ ลิงก์ลูกค้าถูก freeze ตาม snapshot ล่าสุดแล้ว");
@@ -296,6 +287,48 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
       setStatusMessage(error instanceof Error ? error.message : "publish ไม่สำเร็จ");
     } finally {
       setIsPublishing(false);
+    }
+  }
+
+  async function unpublishProject() {
+    if (!project?.publishedAt) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Unpublish "${project.title}"? ลิงก์ลูกค้าจะเปิดไม่ได้จนกว่าจะ publish ใหม่อีกครั้ง`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsUnpublishing(true);
+    setStatusMessage("กำลังยกเลิกการเผยแพร่ลิงก์ลูกค้า...");
+
+    try {
+      const response = await fetch(`/api/client-rooms/projects/${project.id}/publish`, {
+        method: "DELETE",
+      });
+      const data = (await response.json()) as {
+        error?: string;
+        project?: ClientRoomProjectRecord;
+      };
+
+      if (!response.ok || !data.project) {
+        throw new Error(data.error || "unpublish ไม่สำเร็จ");
+      }
+
+      setProject(data.project);
+      setProjects((current) =>
+        current.map((item) =>
+          item.id === data.project?.id ? mapProjectSummary(data.project) : item,
+        ),
+      );
+      setStatusMessage("ยกเลิกการเผยแพร่แล้ว ลิงก์ลูกค้าถูกปิดชั่วคราว");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "unpublish ไม่สำเร็จ");
+    } finally {
+      setIsUnpublishing(false);
     }
   }
 
@@ -412,6 +445,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
   }
 
   const sharePath = project?.shareToken
+    && project.publishedAt
     ? buildClientRoomSharePath(project.shareToken)
     : null;
   const shareUrl = buildAbsoluteUrl(sharePath);
@@ -436,26 +470,41 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
               Draft, Publish, Share
             </p>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <Link
+              href="/"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-4" />
+              Dashboard
+            </Link>
             <Button
               variant="outline"
               onClick={() => void saveCurrentProjectDraft()}
-              disabled={!project || isSaving || isPublishing || isDeleting || isUploading}
+              disabled={!project || isSaving || isPublishing || isUnpublishing || isDeleting || isUploading}
             >
               {isSaving ? <LoaderCircle className="animate-spin" /> : <Save />}
               Save Draft
             </Button>
             <Button
               onClick={() => void publishProject()}
-              disabled={!project || isSaving || isPublishing || isDeleting || isUploading}
+              disabled={!project || isSaving || isPublishing || isUnpublishing || isDeleting || isUploading}
             >
               {isPublishing ? <LoaderCircle className="animate-spin" /> : <Rocket />}
               Publish
             </Button>
             <Button
+              variant="outline"
+              onClick={() => void unpublishProject()}
+              disabled={!project?.publishedAt || isSaving || isPublishing || isUnpublishing || isDeleting || isUploading}
+            >
+              {isUnpublishing ? <LoaderCircle className="animate-spin" /> : <EyeOff />}
+              Unpublish
+            </Button>
+            <Button
               variant="destructive"
               onClick={() => void deleteCurrentProject()}
-              disabled={!project || isSaving || isPublishing || isDeleting || isUploading}
+              disabled={!project || isSaving || isPublishing || isUnpublishing || isDeleting || isUploading}
             >
               {isDeleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
               Delete Project
@@ -478,9 +527,9 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                 value={newProjectTitle}
                 onChange={(event) => setNewProjectTitle(event.target.value)}
                 placeholder="ชื่อโปรเจกต์"
-                disabled={isUploading}
+                disabled={isUploading || isUnpublishing}
               />
-              <Button className="w-full" onClick={() => void createProject()} disabled={isUploading}>
+              <Button className="w-full" onClick={() => void createProject()} disabled={isUploading || isUnpublishing}>
                 <Plus />
                 สร้างโปรเจกต์ใหม่
               </Button>
@@ -510,7 +559,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                     setSelectedProjectId(item.id);
                     void loadProject(item.id);
                   }}
-                  disabled={isUploading}
+                  disabled={isUploading || isUnpublishing}
                   className={`w-full rounded-xl border p-3 text-left transition-colors ${
                     selectedProjectId === item.id
                       ? "border-foreground bg-secondary/60"

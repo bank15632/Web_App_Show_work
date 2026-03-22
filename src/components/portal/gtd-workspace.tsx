@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import {
   Copy,
   Inbox,
   ListChecks,
+  LoaderCircle,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -54,6 +55,18 @@ type KanbanBridgeDraft = {
   projectId: string;
   taskType: TrackerTaskType;
 };
+interface PendingAction {
+  buttonKey: string;
+  label: string;
+  type:
+    | "add-inbox"
+    | "item-action"
+    | "item-open-kanban"
+    | "kanban-send"
+    | "review-action"
+    | "copy-brief";
+  itemId?: string;
+}
 
 export function GtdWorkspace() {
   const [items, setItems] = useState<GtdItem[]>([]);
@@ -75,6 +88,10 @@ export function GtdWorkspace() {
     projectId: "",
     taskType: "design",
   });
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const actionLockRef = useRef(false);
+  const activeButtonKeyRef = useRef<string | null>(null);
+  const queuedActionKeysRef = useRef(new Set<string>());
 
   useEffect(() => {
     let ignore = false;
@@ -138,6 +155,14 @@ export function GtdWorkspace() {
       ? selectedItemId
       : filteredItems[0]?.id ?? null;
   const selectedItem = filteredItems.find((item) => item.id === resolvedSelectedItemId) ?? null;
+  const isWorkspaceActionPending = pendingAction !== null;
+  const selectedItemPendingAction =
+    selectedItem && pendingAction?.itemId === selectedItem.id ? pendingAction : null;
+  const isSelectedItemLocked = Boolean(selectedItemPendingAction);
+  const reviewPendingAction =
+    pendingAction?.type === "review-action" || pendingAction?.type === "copy-brief"
+      ? pendingAction
+      : null;
   const completedReviewSteps = reviewSteps.filter((step) => review.steps[step.id]).length;
   const reviewStatus = getWeeklyReviewStatus(review.lastCompletedAt, referenceTime);
 
@@ -158,6 +183,45 @@ export function GtdWorkspace() {
     setItems(workspace.items);
     setReview(workspace.review);
     setReferenceTime(Date.now());
+  }
+
+  function isPendingButton(buttonKey: string) {
+    return pendingAction?.buttonKey === buttonKey;
+  }
+
+  async function withPendingAction<T>(
+    action: PendingAction,
+    run: () => Promise<T>,
+  ) {
+    if (actionLockRef.current) {
+      if (
+        activeButtonKeyRef.current === action.buttonKey ||
+        queuedActionKeysRef.current.has(action.buttonKey)
+      ) {
+        return null;
+      }
+
+      queuedActionKeysRef.current.add(action.buttonKey);
+
+      while (actionLockRef.current) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 50);
+        });
+      }
+    }
+
+    actionLockRef.current = true;
+    activeButtonKeyRef.current = action.buttonKey;
+    setPendingAction(action);
+
+    try {
+      return await run();
+    } finally {
+      actionLockRef.current = false;
+      activeButtonKeyRef.current = null;
+      setPendingAction(null);
+      queuedActionKeysRef.current.delete(action.buttonKey);
+    }
   }
 
   async function loadTrackerProjects({ silent = false }: { silent?: boolean } = {}) {
@@ -195,66 +259,87 @@ export function GtdWorkspace() {
     const text = draftText.trim();
     if (!text) return;
 
-    try {
-      const data = await createGtdItemRequest({
-        text,
-        bucket: "inbox",
-        context: "",
-        priority: "medium",
-      });
-      applyWorkspace(data.workspace);
-      setDraftText("");
-      setSelectedItemId(data.item.id);
-      setActiveListMode("active");
-      setActiveBucket("inbox");
-      setStatusMessage("Added to inbox.");
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Failed to add inbox item.",
-      );
-    }
+    await withPendingAction(
+      {
+        type: "add-inbox",
+        label: "Adding to inbox...",
+        buttonKey: "add-inbox",
+      },
+      async () => {
+        try {
+          const data = await createGtdItemRequest({
+            text,
+            bucket: "inbox",
+            context: "",
+            priority: "medium",
+          });
+          applyWorkspace(data.workspace);
+          setDraftText("");
+          setSelectedItemId(data.item.id);
+          setActiveListMode("active");
+          setActiveBucket("inbox");
+          setStatusMessage("Added to inbox.");
+        } catch (error) {
+          setStatusMessage(
+            error instanceof Error ? error.message : "Failed to add inbox item.",
+          );
+        }
+      },
+    );
   }
 
   async function updateItem(
     itemId: string,
     patch: Partial<GtdItem>,
     successMessage?: string,
+    pendingLabel = "Saving changes...",
+    buttonKey = "item-detail",
   ) {
     const optimisticUpdatedAt = new Date().toISOString();
 
-    setReferenceTime(Date.now());
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              ...patch,
-              updatedAt: optimisticUpdatedAt,
-            }
-          : item,
-      ),
-    );
+    await withPendingAction(
+      {
+        type: "item-action",
+        itemId,
+        label: pendingLabel,
+        buttonKey,
+      },
+      async () => {
+        setReferenceTime(Date.now());
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  ...patch,
+                  updatedAt: optimisticUpdatedAt,
+                }
+              : item,
+          ),
+        );
 
-    try {
-      await updateGtdItemRequest(itemId, {
-        text: patch.text,
-        bucket: patch.bucket,
-        context: patch.context,
-        priority: patch.priority,
-        dueDate: patch.dueDate,
-        note: patch.note,
-        linkedProjectId: patch.linkedProjectId,
-        linkedTaskId: patch.linkedTaskId,
-        done: patch.done,
-        doneAt: patch.doneAt,
-      });
-      if (successMessage) setStatusMessage(successMessage);
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Failed to update GTD item.",
-      );
-      void loadWorkspace({ silent: true });
-    }
+        try {
+          await updateGtdItemRequest(itemId, {
+            text: patch.text,
+            bucket: patch.bucket,
+            context: patch.context,
+            priority: patch.priority,
+            dueDate: patch.dueDate,
+            note: patch.note,
+            linkedProjectId: patch.linkedProjectId,
+            linkedTaskId: patch.linkedTaskId,
+            done: patch.done,
+            doneAt: patch.doneAt,
+          });
+          if (successMessage) setStatusMessage(successMessage);
+        } catch (error) {
+          setStatusMessage(
+            error instanceof Error ? error.message : "Failed to update GTD item.",
+          );
+          void loadWorkspace({ silent: true });
+        }
+      },
+    );
   }
 
   function updateItemDraft(patch: Partial<GtdItem>) {
@@ -270,10 +355,16 @@ export function GtdWorkspace() {
     if (itemDraft.note !== selectedItem.note) patch.note = itemDraft.note;
     if (Object.keys(patch).length === 0) return;
 
-    await updateItem(selectedItem.id, patch);
+    await updateItem(
+      selectedItem.id,
+      patch,
+      undefined,
+      "Saving item details...",
+      "item-detail",
+    );
   }
 
-  function toggleDone(item: GtdItem) {
+  function toggleDone(item: GtdItem, buttonKey = "toggle-item") {
     if (item.done) {
       setActiveListMode("active");
       setActiveBucket(item.bucket);
@@ -285,6 +376,8 @@ export function GtdWorkspace() {
       item.id,
       { done: !item.done, doneAt: item.done ? null : new Date().toISOString() },
       item.done ? "Marked as active again." : "Marked as done and moved to Archived.",
+      item.done ? "Restoring item..." : "Marking item done...",
+      buttonKey,
     );
   }
 
@@ -294,41 +387,63 @@ export function GtdWorkspace() {
       selectedItem.id,
       { bucket, done: false, doneAt: null },
       `Moved to ${bucketLabels[bucket]}.`,
+      `Moving to ${bucketLabels[bucket]}...`,
+      `process:${bucket}`,
     );
     setActiveListMode("active");
     setActiveBucket(bucket);
   }
 
   async function deleteItem(itemId: string) {
-    setReferenceTime(Date.now());
-    setItems((prev) => prev.filter((item) => item.id !== itemId));
-    if (selectedItemId === itemId) setSelectedItemId(null);
-
-    try {
-      await deleteGtdItemRequest(itemId);
-      setStatusMessage("Item deleted.");
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Failed to delete item.",
-      );
-      void loadWorkspace({ silent: true });
-    }
+    await withPendingAction(
+      {
+        type: "item-action",
+        itemId,
+        label: "Deleting item...",
+        buttonKey: "delete-item",
+      },
+      async () => {
+        try {
+          const response = await deleteGtdItemRequest(itemId);
+          applyWorkspace(response.workspace);
+          if (selectedItemId === itemId) setSelectedItemId(null);
+          setStatusMessage("Item deleted.");
+        } catch (error) {
+          setStatusMessage(
+            error instanceof Error ? error.message : "Failed to delete item.",
+          );
+          void loadWorkspace({ silent: true });
+        }
+      },
+    );
   }
 
   async function openKanbanDialog() {
-    const projects =
-      trackerProjects.length > 0
-        ? trackerProjects
-        : await loadTrackerProjects();
+    if (!selectedItem) return;
 
-    if (projects.length > 0) {
-      setKanbanDraft((prev) => ({
-        ...prev,
-        projectId: prev.projectId || projects[0]?.id || "",
-      }));
-    }
+    await withPendingAction(
+      {
+        type: "item-open-kanban",
+        itemId: selectedItem.id,
+        label: "Loading Kanban projects...",
+        buttonKey: "open-kanban",
+      },
+      async () => {
+        const projects =
+          trackerProjects.length > 0
+            ? trackerProjects
+            : await loadTrackerProjects();
 
-    setIsKanbanDialogOpen(true);
+        if (projects.length > 0) {
+          setKanbanDraft((prev) => ({
+            ...prev,
+            projectId: prev.projectId || projects[0]?.id || "",
+          }));
+        }
+
+        setIsKanbanDialogOpen(true);
+      },
+    );
   }
 
   async function sendSelectedItemToKanban() {
@@ -340,43 +455,55 @@ export function GtdWorkspace() {
       return;
     }
 
-    setIsSendingToKanban(true);
-    try {
-      const taskResponse = await createTrackerTaskRequest(project.id, {
-        phase: project.phase,
-        taskType: kanbanDraft.taskType,
-        title: selectedItem.text,
-        description: selectedItem.note,
-        status: "todo",
-        priority: selectedItem.priority,
-        dueDate: selectedItem.dueDate,
-        sourceType: "gtd.bridge",
-        sourceRef: selectedItem.id,
-        nextAction: selectedItem.note,
-        humanVerified: true,
-      });
+    await withPendingAction(
+      {
+        type: "kanban-send",
+        itemId: selectedItem.id,
+        label: "Creating Kanban task...",
+        buttonKey: "create-kanban",
+      },
+      async () => {
+        setIsSendingToKanban(true);
+        try {
+          const taskResponse = await createTrackerTaskRequest(project.id, {
+            phase: project.phase,
+            taskType: kanbanDraft.taskType,
+            title: selectedItem.text,
+            description: selectedItem.note,
+            status: "todo",
+            priority: selectedItem.priority,
+            dueDate: selectedItem.dueDate,
+            sourceType: "gtd.bridge",
+            sourceRef: selectedItem.id,
+            nextAction: selectedItem.note,
+            humanVerified: true,
+          });
 
-      const gtdResponse = await updateGtdItemRequest(selectedItem.id, {
-        linkedProjectId: project.id,
-        linkedTaskId: taskResponse.task.id,
-      });
+          const gtdResponse = await updateGtdItemRequest(selectedItem.id, {
+            linkedProjectId: project.id,
+            linkedTaskId: taskResponse.task.id,
+          });
 
-      applyWorkspace(gtdResponse.workspace);
-      setSelectedItemId(selectedItem.id);
-      setIsKanbanDialogOpen(false);
-      setStatusMessage(`Sent to Kanban project "${project.name}".`);
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Failed to send item to Kanban.",
-      );
-    } finally {
-      setIsSendingToKanban(false);
-    }
+          applyWorkspace(gtdResponse.workspace);
+          setSelectedItemId(selectedItem.id);
+          setIsKanbanDialogOpen(false);
+          setStatusMessage(`Sent to Kanban project "${project.name}".`);
+        } catch (error) {
+          setStatusMessage(
+            error instanceof Error ? error.message : "Failed to send item to Kanban.",
+          );
+        } finally {
+          setIsSendingToKanban(false);
+        }
+      },
+    );
   }
 
   async function updateReviewState(
     patch: Partial<WeeklyReviewState> & { reset?: boolean; steps?: Record<string, boolean> },
     successMessage?: string,
+    pendingLabel = "Saving weekly review...",
+    buttonKey = "review-detail",
   ) {
     const nextReview = patch.reset
       ? createDefaultReviewState()
@@ -389,35 +516,53 @@ export function GtdWorkspace() {
           },
         };
 
-    setReview(nextReview);
-    setReferenceTime(Date.now());
+    await withPendingAction(
+      {
+        type: "review-action",
+        label: pendingLabel,
+        buttonKey,
+      },
+      async () => {
+        setReview(nextReview);
+        setReferenceTime(Date.now());
 
-    try {
-      await updateGtdReviewRequest({
-        steps: patch.steps,
-        focus: patch.focus,
-        notes: patch.notes,
-        lastCompletedAt: patch.lastCompletedAt,
-        reset: patch.reset,
-      });
-      if (successMessage) setStatusMessage(successMessage);
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Failed to update weekly review.",
-      );
-      void loadWorkspace({ silent: true });
-    }
+        try {
+          await updateGtdReviewRequest({
+            steps: patch.steps,
+            focus: patch.focus,
+            notes: patch.notes,
+            lastCompletedAt: patch.lastCompletedAt,
+            reset: patch.reset,
+          });
+          if (successMessage) setStatusMessage(successMessage);
+        } catch (error) {
+          setStatusMessage(
+            error instanceof Error ? error.message : "Failed to update weekly review.",
+          );
+          void loadWorkspace({ silent: true });
+        }
+      },
+    );
   }
 
   async function copyWeeklyReviewBrief() {
     const brief = buildWeeklyReviewBrief(items, review);
-    try {
-      await navigator.clipboard.writeText(brief);
-      setStatusMessage("Copied weekly review brief.");
-    } catch {
-      downloadTextFile("gtd-weekly-review-brief.md", brief);
-      setStatusMessage("Clipboard blocked, downloaded weekly review brief.");
-    }
+    await withPendingAction(
+      {
+        type: "copy-brief",
+        label: "Copying weekly review brief...",
+        buttonKey: "copy-brief",
+      },
+      async () => {
+        try {
+          await navigator.clipboard.writeText(brief);
+          setStatusMessage("Copied weekly review brief.");
+        } catch {
+          downloadTextFile("gtd-weekly-review-brief.md", brief);
+          setStatusMessage("Clipboard blocked, downloaded weekly review brief.");
+        }
+      },
+    );
   }
 
   return (
@@ -454,8 +599,35 @@ export function GtdWorkspace() {
             <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-pretty">GTD Workspace</h1>
             <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">Quick capture, buckets, clarify flow และ weekly review สำหรับคุมงานหลายโปรเจกต์ในที่เดียว</p>
             <div className="mt-8 flex flex-col gap-3 rounded-[1.6rem] border border-border bg-secondary/40 p-5 sm:flex-row">
-              <input value={draftText} onChange={(event) => setDraftText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addInboxItem(); }} placeholder="Quick capture: พิมพ์งานที่นึกออกแล้วกด Enter" className="h-12 flex-1 rounded-full border border-border bg-background px-5 text-sm outline-none transition-colors focus:border-foreground" />
-              <button type="button" onClick={addInboxItem} className="inline-flex h-12 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-foreground/90">Add to inbox</button>
+              <input
+                value={draftText}
+                onChange={(event) => setDraftText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  if (!isWorkspaceActionPending) void addInboxItem();
+                }}
+                disabled={isPendingButton("add-inbox")}
+                placeholder="Quick capture: พิมพ์งานที่นึกออกแล้วกด Enter"
+                className="h-12 flex-1 rounded-full border border-border bg-background px-5 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void addInboxItem();
+                }}
+                disabled={!draftText.trim() || isWorkspaceActionPending}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPendingButton("add-inbox") ? (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add to inbox"
+                )}
+              </button>
             </div>
             {isLoading ? (
               <div className="mt-4 rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
@@ -579,9 +751,11 @@ export function GtdWorkspace() {
                 key={item.id}
                 type="button"
                 onClick={() => setSelectedItemId(item.id)}
+                disabled={Boolean(pendingAction?.itemId)}
                 className={cn(
                   "w-full rounded-[1.6rem] border bg-background p-5 text-left transition-all",
                   item.id === resolvedSelectedItemId ? "border-foreground shadow-[0_18px_40px_rgba(0,0,0,0.06)]" : "border-border hover:border-foreground/40",
+                  pendingAction?.itemId && "cursor-not-allowed opacity-70",
                 )}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -605,7 +779,10 @@ export function GtdWorkspace() {
 
           <div className="space-y-6">
             <section className="rounded-[2rem] border border-border bg-background p-5">
-              <p className="caption-editorial">Item Detail</p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="caption-editorial">Item Detail</p>
+                {selectedItemPendingAction ? <LoadingPill label={selectedItemPendingAction.label} /> : null}
+              </div>
               {selectedItem ? (
                 <div className="mt-4 space-y-4">
                   <input
@@ -614,7 +791,8 @@ export function GtdWorkspace() {
                     onBlur={() => {
                       void saveItemDraft();
                     }}
-                    className="h-12 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                    disabled={isSelectedItemLocked}
+                    className="h-12 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <select
@@ -623,9 +801,16 @@ export function GtdWorkspace() {
                         const bucket = event.target.value as GtdBucket;
                         updateItemDraft({ bucket });
                         setActiveBucket(bucket);
-                        void updateItem(selectedItem.id, { bucket });
+                        void updateItem(
+                          selectedItem.id,
+                          { bucket },
+                          undefined,
+                          `Moving to ${bucketLabels[bucket]}...`,
+                          "item-detail",
+                        );
                       }}
-                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                      disabled={isSelectedItemLocked}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {bucketOrder.map((bucket) => <option key={bucket} value={bucket}>{bucketLabels[bucket]}</option>)}
                     </select>
@@ -634,9 +819,16 @@ export function GtdWorkspace() {
                       onChange={(event) => {
                         const context = event.target.value as GtdContext;
                         updateItemDraft({ context });
-                        void updateItem(selectedItem.id, { context });
+                        void updateItem(
+                          selectedItem.id,
+                          { context },
+                          undefined,
+                          "Updating context...",
+                          "item-detail",
+                        );
                       }}
-                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                      disabled={isSelectedItemLocked}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <option value="">No context</option>
                       {contextOptions.filter((option) => option.value !== "all").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -646,9 +838,16 @@ export function GtdWorkspace() {
                       onChange={(event) => {
                         const priority = event.target.value as GtdPriority;
                         updateItemDraft({ priority });
-                        void updateItem(selectedItem.id, { priority });
+                        void updateItem(
+                          selectedItem.id,
+                          { priority },
+                          undefined,
+                          "Updating priority...",
+                          "item-detail",
+                        );
                       }}
-                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                      disabled={isSelectedItemLocked}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <option value="high">High</option>
                       <option value="medium">Medium</option>
@@ -660,9 +859,16 @@ export function GtdWorkspace() {
                       onChange={(event) => {
                         const dueDate = event.target.value || null;
                         updateItemDraft({ dueDate });
-                        void updateItem(selectedItem.id, { dueDate });
+                        void updateItem(
+                          selectedItem.id,
+                          { dueDate },
+                          undefined,
+                          "Updating due date...",
+                          "item-detail",
+                        );
                       }}
-                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                      disabled={isSelectedItemLocked}
+                      className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </div>
                   <textarea
@@ -673,7 +879,8 @@ export function GtdWorkspace() {
                     }}
                     rows={5}
                     placeholder="Notes, delegated owner, next step, or meeting context..."
-                    className="w-full rounded-[1.4rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground"
+                    disabled={isSelectedItemLocked}
+                    className="w-full rounded-[1.4rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   />
 
                   {selectedItem.done ? (
@@ -697,12 +904,12 @@ export function GtdWorkspace() {
                     <div className="rounded-[1.4rem] bg-secondary/50 p-4">
                       <p className="caption-editorial text-[0.68rem]">Clarify Flow</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        <QuickProcessButton label="Next Action" onClick={() => processInboxItem("next")} />
-                        <QuickProcessButton label="Waiting For" onClick={() => processInboxItem("waiting")} />
-                        <QuickProcessButton label="Calendar" onClick={() => processInboxItem("calendar")} />
-                        <QuickProcessButton label="Someday" onClick={() => processInboxItem("someday")} />
-                        <QuickProcessButton label="Reference" onClick={() => processInboxItem("reference")} />
-                        <QuickProcessButton label="Done in 2 min" onClick={() => toggleDone(selectedItem)} />
+                        <QuickProcessButton label="Next Action" onClick={() => processInboxItem("next")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:next")} />
+                        <QuickProcessButton label="Waiting For" onClick={() => processInboxItem("waiting")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:waiting")} />
+                        <QuickProcessButton label="Calendar" onClick={() => processInboxItem("calendar")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:calendar")} />
+                        <QuickProcessButton label="Someday" onClick={() => processInboxItem("someday")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:someday")} />
+                        <QuickProcessButton label="Reference" onClick={() => processInboxItem("reference")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:reference")} />
+                        <QuickProcessButton label="Done in 2 min" onClick={() => toggleDone(selectedItem, "toggle-quick")} disabled={isSelectedItemLocked} isPending={isPendingButton("toggle-quick")} />
                       </div>
                     </div>
                   ) : null}
@@ -714,9 +921,17 @@ export function GtdWorkspace() {
                         onClick={() => {
                           void openKanbanDialog();
                         }}
-                        className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                        disabled={isWorkspaceActionPending}
+                        className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {selectedItem.linkedTaskId ? "Create another Kanban task" : "Send to Kanban"}
+                        {isPendingButton("open-kanban") ? (
+                          <>
+                            <LoaderCircle className="size-4 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          selectedItem.linkedTaskId ? "Create another Kanban task" : "Send to Kanban"
+                        )}
                       </button>
                     ) : null}
                     {selectedItem.linkedProjectId && selectedItem.linkedTaskId ? (
@@ -731,19 +946,37 @@ export function GtdWorkspace() {
                     <button
                       type="button"
                       onClick={() => toggleDone(selectedItem)}
+                      disabled={isWorkspaceActionPending}
                       className={cn(
-                        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                        "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                         selectedItem.done
                           ? "border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
                           : "bg-emerald-600 text-white hover:bg-emerald-500",
                       )}
                     >
-                      <Check className="size-4" />
-                      {selectedItem.done ? "Mark active" : "Mark done"}
+                      {isPendingButton("toggle-item") ? (
+                        <LoaderCircle className="size-4 animate-spin" />
+                      ) : (
+                        <Check className="size-4" />
+                      )}
+                      {isPendingButton("toggle-item")
+                        ? selectedItem.done
+                          ? "Restoring..."
+                          : "Saving..."
+                        : selectedItem.done
+                          ? "Mark active"
+                          : "Mark done"}
                     </button>
-                    <button type="button" onClick={() => deleteItem(selectedItem.id)} className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50">
-                      <Trash2 className="size-4" />
-                      Delete
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void deleteItem(selectedItem.id);
+                      }}
+                      disabled={isWorkspaceActionPending}
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isPendingButton("delete-item") ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                      {isPendingButton("delete-item") ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </div>
@@ -758,15 +991,25 @@ export function GtdWorkspace() {
                   <p className="caption-editorial">Weekly Review</p>
                   <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">{completedReviewSteps}/{reviewSteps.length}</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void updateReviewState({ reset: true }, "Weekly review reset.");
-                  }}
-                  className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-                >
-                  Reset
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  {reviewPendingAction ? <LoadingPill label={reviewPendingAction.label} /> : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void updateReviewState(
+                        { reset: true },
+                        "Weekly review reset.",
+                        "Resetting weekly review...",
+                        "review-reset",
+                      );
+                    }}
+                    disabled={isWorkspaceActionPending}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPendingButton("review-reset") ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                    {isPendingButton("review-reset") ? "Resetting..." : "Reset"}
+                  </button>
+                </div>
               </div>
               <div className="mt-5 space-y-3">
                 {reviewSteps.map((step) => (
@@ -776,16 +1019,17 @@ export function GtdWorkspace() {
                     onClick={() => {
                       void updateReviewState({
                         steps: { [step.id]: !review.steps[step.id] },
-                      });
+                      }, undefined, `Updating "${step.title}"...`, `review-step:${step.id}`);
                     }}
+                    disabled={isWorkspaceActionPending}
                     className={cn(
-                      "w-full rounded-[1.25rem] border p-4 text-left transition-colors",
+                      "w-full rounded-[1.25rem] border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-70",
                       review.steps[step.id] ? "border-emerald-200 bg-emerald-50" : "border-border bg-secondary/30 hover:border-foreground/40",
                     )}
                   >
                     <div className="flex items-start gap-3">
                       <span className={cn("mt-0.5 inline-flex size-6 items-center justify-center rounded-full border text-xs", review.steps[step.id] ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-border text-muted-foreground")}>
-                        {review.steps[step.id] ? <Check className="size-3.5" /> : null}
+                        {isPendingButton(`review-step:${step.id}`) ? <LoaderCircle className="size-3.5 animate-spin" /> : review.steps[step.id] ? <Check className="size-3.5" /> : null}
                       </span>
                       <div>
                         <p className="text-sm font-medium">{step.title}</p>
@@ -803,10 +1047,16 @@ export function GtdWorkspace() {
                     setReview((prev) => ({ ...prev, focus: event.target.value }))
                   }
                   onBlur={() => {
-                    void updateReviewState({ focus: review.focus });
+                    void updateReviewState(
+                      { focus: review.focus },
+                      undefined,
+                      "Saving weekly focus...",
+                      "review-focus",
+                    );
                   }}
                   placeholder="Weekly focus: เป้าหมายหลักของสัปดาห์นี้"
-                  className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+                  disabled={isWorkspaceActionPending}
+                  className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <textarea
                   value={review.notes}
@@ -814,11 +1064,17 @@ export function GtdWorkspace() {
                     setReview((prev) => ({ ...prev, notes: event.target.value }))
                   }
                   onBlur={() => {
-                    void updateReviewState({ notes: review.notes });
+                    void updateReviewState(
+                      { notes: review.notes },
+                      undefined,
+                      "Saving review notes...",
+                      "review-notes",
+                    );
                   }}
                   placeholder="Review notes, bottlenecks, or commitments..."
                   rows={4}
-                  className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground"
+                  disabled={isWorkspaceActionPending}
+                  className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
 
@@ -829,16 +1085,26 @@ export function GtdWorkspace() {
                     void updateReviewState(
                       { lastCompletedAt: new Date().toISOString() },
                       "Weekly review marked complete.",
+                      "Marking weekly review complete...",
+                      "review-complete",
                     );
                   }}
-                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                  disabled={isWorkspaceActionPending}
+                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <ClipboardCheck className="size-4" />
-                  Complete review
+                  {isPendingButton("review-complete") ? <LoaderCircle className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
+                  {isPendingButton("review-complete") ? "Saving..." : "Complete review"}
                 </button>
-                <button type="button" onClick={() => { void copyWeeklyReviewBrief(); }} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
-                  <Copy className="size-4" />
-                  Copy brief
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyWeeklyReviewBrief();
+                  }}
+                  disabled={isWorkspaceActionPending}
+                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isPendingButton("copy-brief") ? <LoaderCircle className="size-4 animate-spin" /> : <Copy className="size-4" />}
+                  {isPendingButton("copy-brief") ? "Copying..." : "Copy brief"}
                 </button>
               </div>
 
@@ -926,7 +1192,8 @@ export function GtdWorkspace() {
                   <button
                     type="button"
                     onClick={() => setIsKanbanDialogOpen(false)}
-                    className="rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                    disabled={isSendingToKanban}
+                    className="rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Cancel
                   </button>
@@ -936,8 +1203,9 @@ export function GtdWorkspace() {
                       void sendSelectedItemToKanban();
                     }}
                     disabled={isSendingToKanban}
-                    className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
+                    {isSendingToKanban ? <LoaderCircle className="size-4 animate-spin" /> : null}
                     {isSendingToKanban ? "Creating..." : "Create in Kanban"}
                   </button>
                 </div>
@@ -963,11 +1231,36 @@ function MetricCard({ icon, label, value, body }: { icon: ReactNode; label: stri
   );
 }
 
-function QuickProcessButton({ label, onClick }: { label: string; onClick: () => void }) {
+function QuickProcessButton({
+  label,
+  onClick,
+  disabled = false,
+  isPending = false,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  isPending?: boolean;
+}) {
   return (
-    <button type="button" onClick={onClick} className="rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
-      {label}
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {isPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
+      {isPending ? `${label}...` : label}
     </button>
+  );
+}
+
+function LoadingPill({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800">
+      <LoaderCircle className="size-3.5 animate-spin" />
+      {label}
+    </span>
   );
 }
 
