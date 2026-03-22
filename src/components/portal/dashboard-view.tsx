@@ -532,19 +532,19 @@ export function DashboardView() {
             <MetricSummaryCard
               icon={<FolderOpen className="size-4" />}
               label="Active Projects"
-              value={showClientRoomLoadingState ? "Loading" : activeProjects}
+              value={showClientRoomLoadingState ? <MetricValueSkeleton /> : activeProjects}
               body="จำนวน client rooms ที่ถูกสร้างใน CMS ปัจจุบัน"
             />
             <MetricSummaryCard
               icon={<FileText className="size-4" />}
               label="Documents"
-              value={showClientRoomLoadingState ? "Loading" : totalDocuments}
+              value={showClientRoomLoadingState ? <MetricValueSkeleton /> : totalDocuments}
               body="จำนวนเอกสาร draft ทั้งหมดที่ถูกใส่ไว้ใน CMS"
             />
             <MetricSummaryCard
               icon={<ClipboardList className="size-4" />}
               label="Need Publish"
-              value={showClientRoomLoadingState ? "Loading" : pendingPublishes}
+              value={showClientRoomLoadingState ? <MetricValueSkeleton /> : pendingPublishes}
               body="draft ที่ยังไม่เคย publish หรือมีข้อมูลใหม่กว่าลิงก์ลูกค้า"
             />
           </div>
@@ -579,16 +579,21 @@ export function DashboardView() {
                   >
                     {getClientRoomStatusLabel(status)}
                   </h3>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {showClientRoomLoadingState ? "Loading" : clientRoomGroups[status].length}
-                  </span>
+                  {showClientRoomLoadingState ? (
+                    <SkeletonBlock className="ml-auto h-3 w-8 rounded-full" />
+                  ) : (
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {clientRoomGroups[status].length}
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-3">
                   {showClientRoomLoadingState ? (
-                    <p className="py-6 text-center text-xs text-muted-foreground">
-                      Loading...
-                    </p>
+                    <>
+                      <ClientRoomStatusCardSkeleton />
+                      <ClientRoomStatusCardSkeleton />
+                    </>
                   ) : clientRoomGroups[status].length === 0 ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
                       ไม่มีงาน
@@ -663,9 +668,13 @@ export function DashboardView() {
               ล้าง filter
             </button>
           ) : null}
-          <span className="text-sm text-muted-foreground">
-            {showClientRoomLoadingState ? "กำลังโหลด..." : `${filteredProjects.length} โปรเจกต์`}
-          </span>
+          {showClientRoomLoadingState ? (
+            <SkeletonBlock className="h-4 w-24 rounded-full" />
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              {filteredProjects.length} โปรเจกต์
+            </span>
+          )}
         </section>
 
         <section>
@@ -677,7 +686,14 @@ export function DashboardView() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {filteredProjects.length === 0 ? (
+            {showClientRoomLoadingState ? (
+              <>
+                <ProjectCardSkeleton />
+                <ProjectCardSkeleton delay="delay-100" />
+              </>
+            ) : null}
+
+            {!showClientRoomLoadingState && filteredProjects.length === 0 ? (
               <div className="col-span-full rounded-lg border border-border p-12 text-center">
                 <p className="text-lg text-muted-foreground">
                   {clientRoomProjects.length === 0
@@ -738,7 +754,7 @@ function MetricSummaryCard({
 }: {
   icon: ReactNode;
   label: string;
-  value: number | string;
+  value: ReactNode;
   body: string;
 }) {
   return (
@@ -750,6 +766,58 @@ function MetricSummaryCard({
       <p className="font-display text-4xl font-medium">{value}</p>
       <p className="mt-2 text-sm text-muted-foreground">{body}</p>
     </article>
+  );
+}
+
+function SkeletonBlock({ className }: { className: string }) {
+  return <div aria-hidden className={cn("skeleton-shimmer", className)} />;
+}
+
+function MetricValueSkeleton() {
+  return <SkeletonBlock className="h-10 w-28 rounded-lg" />;
+}
+
+function ClientRoomStatusCardSkeleton() {
+  return (
+    <div className="rounded-lg border border-white/40 bg-background/80 p-4">
+      <div className="flex items-center gap-2">
+        <SkeletonBlock className="h-3 w-28 rounded-full" />
+        <SkeletonBlock className="h-3 w-16 rounded-full" />
+      </div>
+      <SkeletonBlock className="mt-4 h-6 w-3/4 rounded-lg" />
+      <SkeletonBlock className="mt-2 h-3 w-1/2 rounded-full" />
+      <SkeletonBlock className="mt-4 h-3 w-full rounded-full" />
+      <SkeletonBlock className="mt-2 h-3 w-5/6 rounded-full" />
+    </div>
+  );
+}
+
+function ProjectCardSkeleton({ delay = "" }: { delay?: string }) {
+  return (
+    <div
+      className={cn(
+        "fade-up rounded-lg border border-border bg-background p-6",
+        delay,
+      )}
+    >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <SkeletonBlock className="h-4 w-36 rounded-full" />
+        <SkeletonBlock className="h-6 w-24 rounded-full" />
+        <SkeletonBlock className="h-6 w-16 rounded-full" />
+      </div>
+      <SkeletonBlock className="h-8 w-2/3 rounded-lg" />
+      <SkeletonBlock className="mt-3 h-4 w-5/6 rounded-full" />
+      <SkeletonBlock className="mt-2 h-4 w-3/4 rounded-full" />
+      <SkeletonBlock className="mt-6 h-4 w-full rounded-full" />
+      <SkeletonBlock className="mt-2 h-4 w-4/5 rounded-full" />
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+        <SkeletonBlock className="h-4 w-32 rounded-full" />
+        <div className="flex flex-wrap items-center gap-2">
+          <SkeletonBlock className="h-10 w-28 rounded-full" />
+          <SkeletonBlock className="h-10 w-28 rounded-full" />
+        </div>
+      </div>
+    </div>
   );
 }
 
