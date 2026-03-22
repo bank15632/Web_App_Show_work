@@ -164,6 +164,7 @@ export function DashboardView() {
   const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [clientRoomProjects, setClientRoomProjects] = useState<ClientRoomProjectSummary[]>([]);
+  const [isClientRoomsLoading, setIsClientRoomsLoading] = useState(true);
   const [clientRoomStatus, setClientRoomStatus] = useState("กำลังดึงข้อมูล client rooms...");
   const [gtdItems, setGtdItems] = useState<GtdItem[]>([]);
   const [trackerWorkspace, setTrackerWorkspace] = useState<TrackerWorkspaceData | null>(null);
@@ -175,6 +176,8 @@ export function DashboardView() {
     let ignore = false;
 
     async function loadWorkspace() {
+      setIsClientRoomsLoading(true);
+
       const [gtdResult, trackerResult, clientRoomResult] = await Promise.allSettled([
         fetchGtdWorkspace(),
         getTrackerWorkspace(),
@@ -216,6 +219,7 @@ export function DashboardView() {
         );
       }
 
+      setIsClientRoomsLoading(false);
       setReferenceTime(Date.now());
     }
 
@@ -263,6 +267,8 @@ export function DashboardView() {
 
   const hasActiveFilters =
     typeFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
+  const showClientRoomLoadingState =
+    isClientRoomsLoading && clientRoomProjects.length === 0;
 
   const clearFilters = () => {
     setTypeFilter("all");
@@ -526,19 +532,19 @@ export function DashboardView() {
             <MetricSummaryCard
               icon={<FolderOpen className="size-4" />}
               label="Active Projects"
-              value={activeProjects}
+              value={showClientRoomLoadingState ? "Loading" : activeProjects}
               body="จำนวน client rooms ที่ถูกสร้างใน CMS ปัจจุบัน"
             />
             <MetricSummaryCard
               icon={<FileText className="size-4" />}
               label="Documents"
-              value={totalDocuments}
+              value={showClientRoomLoadingState ? "Loading" : totalDocuments}
               body="จำนวนเอกสาร draft ทั้งหมดที่ถูกใส่ไว้ใน CMS"
             />
             <MetricSummaryCard
               icon={<ClipboardList className="size-4" />}
               label="Need Publish"
-              value={pendingPublishes}
+              value={showClientRoomLoadingState ? "Loading" : pendingPublishes}
               body="draft ที่ยังไม่เคย publish หรือมีข้อมูลใหม่กว่าลิงก์ลูกค้า"
             />
           </div>
@@ -574,12 +580,16 @@ export function DashboardView() {
                     {getClientRoomStatusLabel(status)}
                   </h3>
                   <span className="ml-auto text-xs text-muted-foreground">
-                    {clientRoomGroups[status].length}
+                    {showClientRoomLoadingState ? "Loading" : clientRoomGroups[status].length}
                   </span>
                 </div>
 
                 <div className="space-y-3">
-                  {clientRoomGroups[status].length === 0 ? (
+                  {showClientRoomLoadingState ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      Loading...
+                    </p>
+                  ) : clientRoomGroups[status].length === 0 ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
                       ไม่มีงาน
                     </p>
@@ -654,7 +664,7 @@ export function DashboardView() {
             </button>
           ) : null}
           <span className="text-sm text-muted-foreground">
-            {filteredProjects.length} โปรเจกต์
+            {showClientRoomLoadingState ? "กำลังโหลด..." : `${filteredProjects.length} โปรเจกต์`}
           </span>
         </section>
 
@@ -728,7 +738,7 @@ function MetricSummaryCard({
 }: {
   icon: ReactNode;
   label: string;
-  value: number;
+  value: number | string;
   body: string;
 }) {
   return (
