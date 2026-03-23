@@ -43,9 +43,7 @@ export function ProjectDocumentBrowser({
   project: ClientProject;
 }) {
   const [activeCategoryId, setActiveCategoryId] = useState<string>("");
-  const [activeDocumentId, setActiveDocumentId] = useState<string>(
-    "",
-  );
+  const [activeDocumentId, setActiveDocumentId] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedRevision, setExpandedRevision] = useState<string | null>(null);
   const [expandedRoom, setExpandedRoom] = useState<string | null>(null);
@@ -55,7 +53,7 @@ export function ProjectDocumentBrowser({
 
   function handleCategoryChange(category: AvailableCategory) {
     setActiveCategoryId(category.id);
-    setActiveDocumentId(getDefaultDocumentId(category.section));
+    setActiveDocumentId(getDefaultDocumentId(getBrowserDocuments(category.section.items)));
     setDropdownOpen(false);
     setExpandedRevision(null);
     setExpandedRoom(null);
@@ -77,20 +75,23 @@ export function ProjectDocumentBrowser({
     setExpandedRoom((prev) => (prev === roomName ? null : roomName));
   }
 
-  function getRoomRevisionHistory(roomName: string) {
-    if (!activeCategory) return [];
-    return activeCategory.section.items
-      .filter((doc) => doc.rooms?.some((r) => r.name === roomName))
-      .map((doc) => ({
-        doc,
-        room: doc.rooms!.find((r) => r.name === roomName)!,
-        label: getRevisionLabel(activeCategory.section.items, doc),
-      }));
-  }
-
   if (!activeCategory) {
     return null;
   }
+
+  const imageDocuments = getImageDocuments(activeCategory.section.items);
+  const browserDocuments = getBrowserDocuments(activeCategory.section.items);
+
+  function getRoomRevisionHistory(roomName: string) {
+    return browserDocuments
+      .filter((doc) => doc.rooms?.some((room) => room.name === roomName))
+      .map((doc) => ({
+        doc,
+        room: doc.rooms!.find((room) => room.name === roomName)!,
+        label: getRevisionLabel(browserDocuments, doc),
+      }));
+  }
+
   const previewUrl = activeDocument
     ? getDocumentPreviewUrl(project, activeDocument)
     : null;
@@ -98,7 +99,6 @@ export function ProjectDocumentBrowser({
 
   return (
     <section id="document-browser" className="border-t border-border">
-      {/* Category tabs — clean underline style */}
       <div className="sticky top-[73px] z-20 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-5 md:px-8 xl:px-12">
           <div className="flex items-center gap-8 overflow-x-auto py-4">
@@ -119,33 +119,36 @@ export function ProjectDocumentBrowser({
         </div>
       </div>
 
-      {/* Document content */}
       <div className="mx-auto max-w-7xl px-5 py-12 md:px-8 md:py-14 xl:px-12">
+        {imageDocuments.length > 0 ? (
+          <ImageDocumentStack
+            project={project}
+            category={activeCategory}
+            documents={imageDocuments}
+          />
+        ) : null}
+
         {activeDocument ? (
-          <div className="space-y-6">
-            {/* Revision dropdown */}
+          <div className={imageDocuments.length > 0 ? "mt-12 space-y-6" : "space-y-6"}>
             <div className="relative">
               <button
-                onClick={() => setDropdownOpen((v) => !v)}
+                onClick={() => setDropdownOpen((value) => !value)}
                 className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:border-foreground"
               >
-                {getRevisionLabel(activeCategory.section.items, activeDocument)}
-                {activeDocument.checked && (
+                {getRevisionLabel(browserDocuments, activeDocument)}
+                {activeDocument.checked ? (
                   <Check className="size-3.5 text-emerald-600" />
-                )}
+                ) : null}
                 <ChevronDown
                   className={`size-4 text-muted-foreground transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
                 />
               </button>
 
-              {/* Dropdown panel */}
-              {dropdownOpen && (
+              {dropdownOpen ? (
                 <div className="absolute left-0 top-full z-30 mt-2 w-full max-w-md overflow-hidden rounded-xl border border-border bg-background shadow-lg">
-                  {activeCategory.section.items.map((doc, index) => (
+                  {browserDocuments.map((doc, index) => (
                     <div key={doc.id} className="border-b border-border last:border-b-0">
-                      {/* Revision row */}
                       <div className="flex items-center">
-                        {/* Checkbox area — click to select */}
                         <button
                           onClick={() => selectRevision(doc)}
                           className={`flex flex-1 items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/50 ${
@@ -159,18 +162,15 @@ export function ProjectDocumentBrowser({
                                 : "border-border bg-background"
                             }`}
                           >
-                            {doc.checked && <Check className="size-3" />}
+                            {doc.checked ? <Check className="size-3" /> : null}
                           </span>
-                          <span>
-                            {getRevisionLabel(activeCategory.section.items, doc, index)}
-                          </span>
+                          <span>{getRevisionLabel(browserDocuments, doc, index)}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatPortalDate(doc.updatedAt)}
                           </span>
                         </button>
 
-                        {/* Expand rooms */}
-                        {doc.rooms && doc.rooms.length > 0 && (
+                        {doc.rooms && doc.rooms.length > 0 ? (
                           <button
                             onClick={() => toggleRevisionExpand(doc.id)}
                             className="px-3 py-3 text-muted-foreground transition-colors hover:text-foreground"
@@ -180,25 +180,25 @@ export function ProjectDocumentBrowser({
                               className={`size-4 transition-transform ${expandedRevision === doc.id ? "rotate-180" : ""}`}
                             />
                           </button>
-                        )}
+                        ) : null}
                       </div>
 
-                      {/* Expanded rooms — each room is a sub-dropdown */}
-                      {expandedRevision === doc.id && doc.rooms && (
+                      {expandedRevision === doc.id && doc.rooms ? (
                         <div className="border-t border-border bg-secondary/30">
-                          {doc.rooms.map((room, ri) => {
-                            const isRoomExpanded = expandedRoom === `${doc.id}:${room.name}`;
+                          {doc.rooms.map((room, index) => {
+                            const roomKey = `${doc.id}:${room.name}`;
+                            const isRoomExpanded = expandedRoom === roomKey;
                             const roomHistory = isRoomExpanded
                               ? getRoomRevisionHistory(room.name)
                               : [];
 
                             return (
                               <div
-                                key={ri}
+                                key={index}
                                 className="border-b border-border/50 last:border-b-0"
                               >
                                 <button
-                                  onClick={() => toggleRoomExpand(`${doc.id}:${room.name}`)}
+                                  onClick={() => toggleRoomExpand(roomKey)}
                                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-secondary/50"
                                 >
                                   <ChevronDown
@@ -210,8 +210,7 @@ export function ProjectDocumentBrowser({
                                   </span>
                                 </button>
 
-                                {/* Room revision history */}
-                                {isRoomExpanded && roomHistory.length > 0 && (
+                                {isRoomExpanded && roomHistory.length > 0 ? (
                                   <div className="bg-secondary/20 px-4 pb-2">
                                     {roomHistory.map((entry) => (
                                       <button
@@ -230,9 +229,9 @@ export function ProjectDocumentBrowser({
                                               : "border-border bg-background"
                                           }`}
                                         >
-                                          {entry.doc.checked && (
+                                          {entry.doc.checked ? (
                                             <Check className="size-2.5" />
-                                          )}
+                                          ) : null}
                                         </span>
                                         <span>{entry.label}</span>
                                         <span className="text-muted-foreground">
@@ -244,26 +243,24 @@ export function ProjectDocumentBrowser({
                                       </button>
                                     ))}
                                   </div>
-                                )}
+                                ) : null}
                               </div>
                             );
                           })}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
 
-            {/* Title + meta */}
             <div>
               <h2 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
                 {activeDocument.title}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {activeDocument.version} · Updated{" "}
-                {formatPortalDate(activeDocument.updatedAt)}
+                {activeDocument.version} · Updated {formatPortalDate(activeDocument.updatedAt)}
               </p>
             </div>
 
@@ -271,12 +268,11 @@ export function ProjectDocumentBrowser({
               {activeDocument.summary}
             </p>
 
-            {/* Rooms in this revision */}
-            {activeDocument.rooms && activeDocument.rooms.length > 0 && (
+            {activeDocument.rooms && activeDocument.rooms.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {activeDocument.rooms.map((room, i) => (
+                {activeDocument.rooms.map((room, index) => (
                   <span
-                    key={i}
+                    key={index}
                     className="rounded-full border border-border bg-secondary/50 px-3 py-1 text-xs"
                   >
                     {room.name}
@@ -286,9 +282,8 @@ export function ProjectDocumentBrowser({
                   </span>
                 ))}
               </div>
-            )}
+            ) : null}
 
-            {/* Action buttons + source */}
             <div className="flex flex-wrap items-center gap-3">
               <a
                 href={previewUrl ?? "#"}
@@ -313,11 +308,11 @@ export function ProjectDocumentBrowser({
               ) : null}
 
               <span className="text-sm text-muted-foreground">
-                Source: {activeDocument.kind === "canva" ? "Canva board" : "PDF"}
+                Source: {getDocumentSourceLabel(activeDocument)}
               </span>
             </div>
           </div>
-        ) : (
+        ) : imageDocuments.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border bg-secondary/30 px-6 py-10 md:px-8">
             <p className="text-[0.72rem] uppercase tracking-[0.24em] text-muted-foreground">
               {activeCategory.label}
@@ -326,14 +321,85 @@ export function ProjectDocumentBrowser({
               ยังไม่มีเอกสารที่เปิดได้ในหมวดนี้
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
-              {activeCategory.section.description}
-              {" "}
-              เพิ่มไฟล์หรือลิงก์เอกสารจากหน้า CMS แล้วกด Publish อีกครั้ง
+              {activeCategory.section.description} เพิ่มไฟล์หรือลิงก์เอกสารจากหน้า
+              CMS แล้วกด Publish อีกครั้ง
             </p>
           </div>
-        )}
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function ImageDocumentStack({
+  project,
+  category,
+  documents,
+}: {
+  project: ClientProject;
+  category: AvailableCategory;
+  documents: ProjectDocument[];
+}) {
+  return (
+    <div className="space-y-8">
+      {documents.map((document, index) => {
+        const previewUrl = getDocumentPreviewUrl(project, document);
+        const hasDownload = hasUsableUrl(document.downloadUrl);
+
+        return (
+          <figure key={document.id} className="space-y-4">
+            <div className="overflow-hidden rounded-3xl bg-secondary">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewUrl}
+                alt={document.title || `${category.label} ${index + 1}`}
+                className="w-full object-cover"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-2">
+                <h2 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
+                  {document.title || `${category.label} ${index + 1}`}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {document.version} · Updated {formatPortalDate(document.updatedAt)}
+                </p>
+                {document.summary ? (
+                  <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">
+                    {document.summary}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                >
+                  <Eye className="size-4" />
+                  เปิดรูปเต็ม
+                </a>
+
+                {hasDownload ? (
+                  <a
+                    href={document.downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+                  >
+                    <Download className="size-4" />
+                    ดาวน์โหลดรูป
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </figure>
+        );
+      })}
+    </div>
   );
 }
 
@@ -379,11 +445,10 @@ export function resolveDocumentBrowserState(
     };
   }
 
+  const browserDocuments = getBrowserDocuments(activeCategory.section.items);
   const activeDocument =
-    activeCategory.section.items.find((item) => item.id === activeDocumentId) ??
-    activeCategory.section.items.find(
-      (item) => item.id === getDefaultDocumentId(activeCategory.section),
-    ) ??
+    browserDocuments.find((item) => item.id === activeDocumentId) ??
+    browserDocuments.find((item) => item.id === getDefaultDocumentId(browserDocuments)) ??
     null;
 
   return {
@@ -400,8 +465,32 @@ function getVisibleDocuments(documents: ProjectDocument[]) {
   );
 }
 
-function getDefaultDocumentId(section: ProjectSection) {
-  return section.items.find((item) => item.latest)?.id ?? section.items[0]?.id ?? "";
+function getImageDocuments(documents: ProjectDocument[]) {
+  return documents.filter((document) => isImageDocument(document));
+}
+
+function getBrowserDocuments(documents: ProjectDocument[]) {
+  return documents.filter((document) => !isImageDocument(document));
+}
+
+function isImageDocument(document: ProjectDocument) {
+  return document.kind === "image" || document.mimeType.startsWith("image/");
+}
+
+function getDocumentSourceLabel(document: ProjectDocument) {
+  if (isImageDocument(document)) {
+    return "Image";
+  }
+
+  if (document.kind === "canva") {
+    return "Canva board";
+  }
+
+  return "PDF";
+}
+
+function getDefaultDocumentId(documents: ProjectDocument[]) {
+  return documents.find((item) => item.latest)?.id ?? documents[0]?.id ?? "";
 }
 
 function getRevisionLabel(

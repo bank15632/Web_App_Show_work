@@ -47,6 +47,7 @@ describe("resolveDocumentBrowserState", () => {
           title: "Mood board",
           version: "Revise 01",
           kind: "pdf",
+          mimeType: "",
           updatedAt: "2026-03-23T00:00:00.000Z",
           summary: "Draft without uploaded file",
           latest: true,
@@ -62,6 +63,7 @@ describe("resolveDocumentBrowserState", () => {
           title: "Design Pack",
           version: "Revise 02",
           kind: "pdf",
+          mimeType: "application/pdf",
           updatedAt: "2026-03-23T00:00:00.000Z",
           summary: "Latest design set",
           latest: true,
@@ -91,6 +93,7 @@ describe("resolveDocumentBrowserState", () => {
           title: "Mood board",
           version: "Revise 01",
           kind: "pdf",
+          mimeType: "",
           updatedAt: "2026-03-23T00:00:00.000Z",
           summary: "Draft without uploaded file",
           latest: true,
@@ -106,6 +109,7 @@ describe("resolveDocumentBrowserState", () => {
           title: "Design Pack",
           version: "Revise 02",
           kind: "pdf",
+          mimeType: "application/pdf",
           updatedAt: "2026-03-23T00:00:00.000Z",
           summary: "Latest design set",
           latest: true,
@@ -122,5 +126,32 @@ describe("resolveDocumentBrowserState", () => {
     expect(state.categories.map((category) => category.id)).toEqual(["design"]);
     expect(state.activeCategory?.id).toBe("design");
     expect(state.activeDocument?.id).toBe("design-doc-1");
+  });
+
+  it("keeps image-only categories visible and skips revision picker state", () => {
+    const project = createProject([
+      createSection("design", [
+        {
+          id: "design-image-1",
+          title: "ComfyUI_00002_",
+          version: "Revise 01",
+          kind: "image",
+          mimeType: "image/png",
+          updatedAt: "2026-03-23T00:00:00.000Z",
+          summary: "",
+          latest: true,
+          checked: false,
+          rooms: [],
+          viewerUrl: "/api/client-rooms/assets/asset-1",
+          downloadUrl: "/api/client-rooms/assets/asset-1",
+        },
+      ]),
+    ]);
+
+    const state = resolveDocumentBrowserState(project);
+
+    expect(state.categories.map((category) => category.id)).toEqual(["design"]);
+    expect(state.activeCategory?.id).toBe("design");
+    expect(state.activeDocument).toBeNull();
   });
 });

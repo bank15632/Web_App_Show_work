@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, LayoutTemplate, Sparkles } from "lucide-react";
+import { FileImage, FileText, LayoutTemplate, Sparkles } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +76,11 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
         <CardHeader className="gap-4 border-b border-border/70">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="px-3 py-1">
-              {document.kind === "canva" ? "Canva Embed Slot" : "PDF Viewer Slot"}
+              {document.kind === "canva"
+                ? "Canva Embed Slot"
+                : document.kind === "image"
+                  ? "Image Viewer Slot"
+                  : "PDF Viewer Slot"}
             </Badge>
             <Badge variant="outline" className="px-3 py-1">
               {document.version}
@@ -98,6 +102,8 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
             <div className="flex size-12 items-center justify-center rounded-2xl bg-secondary">
               {document.kind === "canva" ? (
                 <LayoutTemplate className="size-5 text-foreground" />
+              ) : document.kind === "image" ? (
+                <FileImage className="size-5 text-foreground" />
               ) : (
                 <FileText className="size-5 text-foreground" />
               )}

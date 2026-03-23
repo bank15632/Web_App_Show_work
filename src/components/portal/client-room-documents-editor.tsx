@@ -146,7 +146,8 @@ export function ClientRoomDocumentsEditor({
     const documents: ClientRoomDocument[] = nextFiles.map((file, index) => ({
       ...createEmptyClientRoomDocument("pdf"),
       title: buildDocumentTitle(file.name),
-      kind: "pdf",
+      kind: file.type.startsWith("image/") ? "image" : "pdf",
+      mimeType: file.type,
       latest: shouldMarkLatest && index === 0,
     }));
 
@@ -163,7 +164,12 @@ export function ClientRoomDocumentsEditor({
         const url = await onUpload("document", file);
         updateDocument(sectionId, document.id, (current) => ({
           ...current,
-          kind: file.type === "application/pdf" ? "pdf" : current.kind,
+          kind: file.type.startsWith("image/")
+            ? "image"
+            : file.type === "application/pdf"
+              ? "pdf"
+              : current.kind,
+          mimeType: file.type,
           viewerUrl: url,
           downloadUrl: url,
         }));
@@ -197,7 +203,12 @@ export function ClientRoomDocumentsEditor({
       const url = await onUpload("document", file);
       updateDocument(sectionId, documentId, (document) => ({
         ...document,
-        kind: file.type === "application/pdf" ? "pdf" : document.kind,
+        kind: file.type.startsWith("image/")
+          ? "image"
+          : file.type === "application/pdf"
+            ? "pdf"
+            : document.kind,
+        mimeType: file.type,
         viewerUrl: url,
         downloadUrl: url,
       }));
@@ -308,6 +319,7 @@ export function ClientRoomDocumentsEditor({
                       className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       <option value="pdf">PDF</option>
+                      <option value="image">Image</option>
                       <option value="canva">Canva</option>
                     </select>
                   </Field>

@@ -8,6 +8,7 @@ import {
   createEmptyClientRoomDraft,
   type ClientRoomAssetKind,
   type ClientRoomAssetRecord,
+  type ClientRoomDocument,
   type ClientRoomDraftData,
   type ClientRoomProjectRecord,
   type ClientRoomProjectSummary,
@@ -158,6 +159,140 @@ function mapAssetRow(row: ClientRoomAssetRow): ClientRoomAssetRecord {
   };
 }
 
+function extractClientRoomAssetId(url: string) {
+  const match = url.match(/\/api\/client-rooms\/assets\/([^/?#]+)/);
+  return match?.[1] ?? null;
+}
+
+function collectClientRoomAssetIds(draft: ClientRoomDraftData) {
+  const assetIds = new Set<string>();
+
+  if (draft.heroImageUrl) {
+    const heroAssetId = extractClientRoomAssetId(draft.heroImageUrl);
+    if (heroAssetId) {
+      assetIds.add(heroAssetId);
+    }
+  }
+
+  for (const section of draft.sections) {
+    for (const item of section.items) {
+      const viewerAssetId = extractClientRoomAssetId(item.viewerUrl);
+      const downloadAssetId = extractClientRoomAssetId(item.downloadUrl);
+
+      if (viewerAssetId) {
+        assetIds.add(viewerAssetId);
+      }
+
+      if (downloadAssetId) {
+        assetIds.add(downloadAssetId);
+      }
+    }
+  }
+
+  for (const room of draft.gallery) {
+    for (const image of room.images) {
+      const imageAssetId = extractClientRoomAssetId(image.src);
+      if (imageAssetId) {
+        assetIds.add(imageAssetId);
+      }
+    }
+  }
+
+  return Array.from(assetIds);
+}
+
+async function listClientRoomAssetsByIds(
+  db: D1Database,
+  assetIds: string[],
+) {
+  if (assetIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = assetIds.map(() => "?").join(", ");
+
+  return queryAll<ClientRoomAssetRow>(
+    db,
+    `SELECT *
+     FROM client_room_assets
+     WHERE id IN (${placeholders})`,
+    ...assetIds,
+  );
+}
+
+function resolveDocumentKind(
+  currentKind: ClientRoomDocument["kind"],
+  mimeType: string,
+): ClientRoomDocument["kind"] {
+  if (currentKind === "canva") {
+    return "canva";
+  }
+
+  if (mimeType.startsWith("image/")) {
+    return "image";
+  }
+
+  if (mimeType === "application/pdf") {
+    return "pdf";
+  }
+
+  return currentKind;
+}
+
+function hydrateDraftDocumentAssets(
+  draft: ClientRoomDraftData,
+  assetRowsById: Map<string, ClientRoomAssetRow>,
+): ClientRoomDraftData {
+  return {
+    ...draft,
+    sections: draft.sections.map((section) => ({
+      ...section,
+      items: section.items.map((item) => {
+        const viewerAssetId = extractClientRoomAssetId(item.viewerUrl);
+        const downloadAssetId = extractClientRoomAssetId(item.downloadUrl);
+        const assetRow =
+          (viewerAssetId ? assetRowsById.get(viewerAssetId) : undefined) ??
+          (downloadAssetId ? assetRowsById.get(downloadAssetId) : undefined);
+        const mimeType = item.mimeType || assetRow?.mime_type || "";
+
+        return {
+          ...item,
+          mimeType,
+          kind: resolveDocumentKind(item.kind, mimeType),
+        };
+      }),
+    })),
+  };
+}
+
+async function hydrateClientRoomProjectAssets(
+  env: TrackerEnv,
+  project: ClientRoomProjectRecord,
+) {
+  const assetIds = new Set<string>(collectClientRoomAssetIds(project.draftData));
+
+  if (project.publishedData) {
+    for (const assetId of collectClientRoomAssetIds(project.publishedData)) {
+      assetIds.add(assetId);
+    }
+  }
+
+  if (assetIds.size === 0) {
+    return project;
+  }
+
+  const assetRows = await listClientRoomAssetsByIds(env.DB, Array.from(assetIds));
+  const assetRowsById = new Map(assetRows.map((row) => [row.id, row]));
+
+  return {
+    ...project,
+    draftData: hydrateDraftDocumentAssets(project.draftData, assetRowsById),
+    publishedData: project.publishedData
+      ? hydrateDraftDocumentAssets(project.publishedData, assetRowsById)
+      : null,
+  };
+}
+
 async function ensureUniqueProjectSlug(
   db: D1Database,
   requestedSlug: string,
@@ -246,7 +381,11 @@ export async function getClientRoomProjectById(
     projectId,
   );
 
-  return row ? mapProjectRow(row) : null;
+  if (!row) {
+    return null;
+  }
+
+  return hydrateClientRoomProjectAssets(env, mapProjectRow(row));
 }
 
 export async function createClientRoomProject(
@@ -447,7 +586,11 @@ export async function getPublishedClientRoomByShareToken(
     shareToken,
   );
 
-  return row ? mapProjectRow(row) : null;
+  if (!row) {
+    return null;
+  }
+
+  return hydrateClientRoomProjectAssets(env, mapProjectRow(row));
 }
 
 export async function createClientRoomAsset(

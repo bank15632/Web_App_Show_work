@@ -1,4 +1,4 @@
-import { FileText, LayoutTemplate, Sparkles } from "lucide-react";
+import { FileImage, FileText, LayoutTemplate, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { DocumentKind } from "@/lib/portal-data";
@@ -17,7 +17,8 @@ export function DocumentPreview({
   className?: string;
 }) {
   if (previewUrl.startsWith("/preview/")) {
-    const kindLabel = kind === "canva" ? "Canva board" : "PDF set";
+    const kindLabel =
+      kind === "canva" ? "Canva board" : kind === "image" ? "Image set" : "PDF set";
 
     return (
       <div
@@ -39,6 +40,8 @@ export function DocumentPreview({
               <div className="flex size-12 items-center justify-center rounded-full border border-border bg-background">
                 {kind === "canva" ? (
                   <LayoutTemplate className="size-5 text-foreground" />
+                ) : kind === "image" ? (
+                  <FileImage className="size-5 text-foreground" />
                 ) : (
                   <FileText className="size-5 text-foreground" />
                 )}

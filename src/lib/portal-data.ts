@@ -1,4 +1,4 @@
-export type DocumentKind = "canva" | "pdf";
+export type DocumentKind = "canva" | "pdf" | "image";
 export type ProjectStage = "concept" | "revision" | "construction" | "archived";
 export type ProjectType = "House" | "Condo" | "Commercial";
 export type RevisionStatus = "todo" | "doing" | "done";
@@ -13,6 +13,7 @@ export interface ProjectDocument {
   title: string;
   version: string;
   kind: DocumentKind;
+  mimeType: string;
   updatedAt: string;
   summary: string;
   latest?: boolean;

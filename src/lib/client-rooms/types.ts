@@ -1,4 +1,4 @@
-export type ClientRoomDocumentKind = "canva" | "pdf";
+export type ClientRoomDocumentKind = "canva" | "pdf" | "image";
 export type ClientRoomProjectType = "House" | "Condo" | "Commercial";
 export type ClientRoomSectionId =
   | "mood-tone"
@@ -18,6 +18,7 @@ export interface ClientRoomDocument {
   title: string;
   version: string;
   kind: ClientRoomDocumentKind;
+  mimeType: string;
   updatedAt: string;
   summary: string;
   latest: boolean;
@@ -151,6 +152,7 @@ export function createEmptyClientRoomDocument(
     title: "",
     version: "Revise 01",
     kind,
+    mimeType: "",
     updatedAt: new Date().toISOString().slice(0, 10),
     summary: "",
     latest: false,

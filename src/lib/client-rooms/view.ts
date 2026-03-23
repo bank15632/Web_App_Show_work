@@ -31,6 +31,7 @@ export function toPortalProject(project: ClientRoomProjectRecord): ClientProject
       items: section.items.map((item) => ({
         ...item,
         rooms: item.rooms ?? [],
+        mimeType: item.mimeType ?? "",
         viewerUrl: item.viewerUrl || undefined,
         downloadUrl: item.downloadUrl || undefined,
       })),

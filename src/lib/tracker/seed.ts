@@ -123,9 +123,16 @@ export function buildTrackerSeedBundle(): TrackerSeedBundle {
                   ? "submittal_log"
                   : "drawing_revision",
             title: `${section.title} — ${item.title}`,
-            fileName: `${slugify(item.title)}-${slugify(item.version)}.${item.kind === "pdf" ? "pdf" : "url"}`,
+            fileName: `${slugify(item.title)}-${slugify(item.version)}.${
+              item.kind === "pdf" ? "pdf" : item.kind === "image" ? "image" : "url"
+            }`,
             filePath: null,
-            mimeType: item.kind === "pdf" ? "application/pdf" : "text/uri-list",
+            mimeType:
+              item.kind === "pdf"
+                ? "application/pdf"
+                : item.kind === "image"
+                  ? item.mimeType || "image/*"
+                  : "text/uri-list",
             revision: item.version,
             extractedSummary: item.summary,
             sourceText: item.summary,
