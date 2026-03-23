@@ -39,9 +39,23 @@ function createProject(sections: ProjectSection[]): ClientProject {
 }
 
 describe("resolveDocumentBrowserState", () => {
-  it("falls back to the first category that has documents", () => {
+  it("shows only categories that have usable document links", () => {
     const project = createProject([
-      createSection("mood-tone", []),
+      createSection("mood-tone", [
+        {
+          id: "mood-doc-1",
+          title: "Mood board",
+          version: "Revise 01",
+          kind: "pdf",
+          updatedAt: "2026-03-23T00:00:00.000Z",
+          summary: "Draft without uploaded file",
+          latest: true,
+          checked: false,
+          rooms: [],
+          viewerUrl: "",
+          downloadUrl: "",
+        },
+      ]),
       createSection("design", [
         {
           id: "design-doc-1",
@@ -63,17 +77,29 @@ describe("resolveDocumentBrowserState", () => {
     const state = resolveDocumentBrowserState(project);
 
     expect(state.categories.map((category) => category.id)).toEqual([
-      "mood-tone",
       "design",
-      "construction",
     ]);
     expect(state.activeCategory?.id).toBe("design");
     expect(state.activeDocument?.id).toBe("design-doc-1");
   });
 
-  it("keeps an explicitly selected empty category active", () => {
+  it("falls back when the selected category has no usable document links", () => {
     const project = createProject([
-      createSection("mood-tone", []),
+      createSection("mood-tone", [
+        {
+          id: "mood-doc-1",
+          title: "Mood board",
+          version: "Revise 01",
+          kind: "pdf",
+          updatedAt: "2026-03-23T00:00:00.000Z",
+          summary: "Draft without uploaded file",
+          latest: true,
+          checked: false,
+          rooms: [],
+          viewerUrl: "",
+          downloadUrl: "",
+        },
+      ]),
       createSection("design", [
         {
           id: "design-doc-1",
@@ -93,7 +119,8 @@ describe("resolveDocumentBrowserState", () => {
 
     const state = resolveDocumentBrowserState(project, "mood-tone");
 
-    expect(state.activeCategory?.id).toBe("mood-tone");
-    expect(state.activeDocument).toBeNull();
+    expect(state.categories.map((category) => category.id)).toEqual(["design"]);
+    expect(state.activeCategory?.id).toBe("design");
+    expect(state.activeDocument?.id).toBe("design-doc-1");
   });
 });

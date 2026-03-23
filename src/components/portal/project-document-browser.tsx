@@ -323,12 +323,12 @@ export function ProjectDocumentBrowser({
               {activeCategory.label}
             </p>
             <h2 className="mt-3 font-display text-3xl tracking-tight md:text-4xl">
-              ยังไม่มีไฟล์ในหมวดนี้
+              ยังไม่มีเอกสารที่เปิดได้ในหมวดนี้
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">
               {activeCategory.section.description}
               {" "}
-              เพิ่มเอกสารจากหน้า CMS แล้วกด Publish อีกครั้ง เมนูของลูกค้าจะยังมองเห็นได้แม้หมวดนี้ยังว่างอยู่
+              เพิ่มไฟล์หรือลิงก์เอกสารจากหน้า CMS แล้วกด Publish อีกครั้ง
             </p>
           </div>
         )}
@@ -350,16 +350,24 @@ export function resolveDocumentBrowserState(
         return null;
       }
 
+      const visibleItems = getVisibleDocuments(section.items);
+
+      if (visibleItems.length === 0) {
+        return null;
+      }
+
       return {
         ...category,
-        section,
+        section: {
+          ...section,
+          items: visibleItems,
+        },
       };
     })
     .filter((item): item is AvailableCategory => item !== null);
 
   const activeCategory =
     categories.find((category) => category.id === activeCategoryId) ??
-    categories.find((category) => category.section.items.length > 0) ??
     categories[0] ??
     null;
 
@@ -383,6 +391,13 @@ export function resolveDocumentBrowserState(
     activeCategory,
     activeDocument,
   };
+}
+
+function getVisibleDocuments(documents: ProjectDocument[]) {
+  return documents.filter(
+    (document) =>
+      hasUsableUrl(document.viewerUrl) || hasUsableUrl(document.downloadUrl),
+  );
 }
 
 function getDefaultDocumentId(section: ProjectSection) {

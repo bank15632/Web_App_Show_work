@@ -1,68 +1,67 @@
-"use client";
-
-import { useState } from "react";
-import { ImageIcon } from "lucide-react";
-
 import type { GalleryRoom } from "@/lib/portal-data";
 
+type VisibleGalleryRoom = GalleryRoom;
+
 export function ProjectGallery({ rooms }: { rooms: GalleryRoom[] }) {
-  const [activeRoomId, setActiveRoomId] = useState(rooms[0]?.id ?? "");
+  const visibleRooms = getVisibleGalleryRooms(rooms);
 
-  if (rooms.length === 0) return null;
-
-  const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? rooms[0];
+  if (visibleRooms.length === 0) {
+    return null;
+  }
 
   return (
     <section className="border-t border-border">
-      {/* Sticky room tabs */}
-      <div className="sticky top-[73px] z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-8 overflow-x-auto px-5 py-4 md:px-8 xl:px-12">
-          {rooms.map((room) => (
-            <button
-              key={room.id}
-              onClick={() => setActiveRoomId(room.id)}
-              className={`shrink-0 border-b-2 pb-1 text-sm transition-colors ${
-                activeRoom.id === room.id
-                  ? "border-foreground font-medium text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {room.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Vertical image list — scroll down to see each image */}
       <div className="mx-auto max-w-7xl px-5 py-12 md:px-8 xl:px-12">
-        <div className="space-y-10">
-          {activeRoom.images.map((image) => (
-            <div key={image.id} className="space-y-3">
-              {image.src ? (
-                <div className="overflow-hidden rounded-2xl bg-secondary">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image.src}
-                    alt={image.caption}
-                    className="aspect-[16/10] w-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-2xl bg-secondary">
-                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                    <ImageIcon className="size-16 opacity-30" />
-                    <p className="text-sm font-medium">{image.caption}</p>
-                    <p className="text-xs opacity-60">
-                      รูปจะแสดงที่นี่เมื่อ upload แล้ว
-                    </p>
-                  </div>
-                </div>
-              )}
-              <p className="text-sm text-muted-foreground">{image.caption}</p>
+        <div className="mb-12">
+          <p className="text-[0.72rem] uppercase tracking-[0.24em] text-muted-foreground">
+            Gallery
+          </p>
+          <h2 className="mt-2 font-display text-3xl tracking-tight md:text-4xl">
+            Project Images
+          </h2>
+        </div>
+
+        <div className="space-y-12">
+          {visibleRooms.map((room) => (
+            <div key={room.id} className="space-y-6">
+              {room.name ? (
+                <h3 className="font-display text-2xl tracking-tight md:text-3xl">
+                  {room.name}
+                </h3>
+              ) : null}
+
+              <div className="space-y-10">
+                {room.images.map((image) => (
+                  <figure key={image.id} className="space-y-3">
+                    <div className="overflow-hidden rounded-2xl bg-secondary">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image.src}
+                        alt={image.caption || room.name}
+                        className="aspect-[16/10] w-full object-cover"
+                      />
+                    </div>
+                    {image.caption ? (
+                      <figcaption className="text-sm text-muted-foreground">
+                        {image.caption}
+                      </figcaption>
+                    ) : null}
+                  </figure>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       </div>
     </section>
   );
+}
+
+export function getVisibleGalleryRooms(rooms: GalleryRoom[]): VisibleGalleryRoom[] {
+  return rooms
+    .map((room) => ({
+      ...room,
+      images: room.images.filter((image) => image.src.trim().length > 0),
+    }))
+    .filter((room) => room.images.length > 0);
 }
