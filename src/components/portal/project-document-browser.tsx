@@ -353,7 +353,9 @@ function ImageDocumentStack({
               <img
                 src={previewUrl}
                 alt={document.title || `${category.label} ${index + 1}`}
-                className="w-full object-cover"
+                loading="lazy"
+                decoding="async"
+                className="block h-auto w-full"
               />
             </div>
 

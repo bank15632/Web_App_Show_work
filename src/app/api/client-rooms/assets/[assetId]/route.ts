@@ -21,11 +21,15 @@ export async function GET(_: Request, { params }: ClientRoomAssetRouteProps) {
     return new NextResponse("Asset not found", { status: 404 });
   }
 
-  return new NextResponse(await object.arrayBuffer(), {
-    headers: {
-      "content-type": asset.mimeType,
-      "cache-control": "public, max-age=31536000, immutable",
-      "content-disposition": `inline; filename="${asset.fileName}"`,
-    },
+  const headers = new Headers({
+    "content-type": asset.mimeType || "application/octet-stream",
+    "cache-control": "public, max-age=31536000, immutable",
+    "content-disposition": `inline; filename="${asset.fileName}"`,
   });
+
+  headers.set("etag", object.httpEtag);
+  headers.set("content-length", String(object.size));
+  headers.set("last-modified", object.uploaded.toUTCString());
+
+  return new NextResponse(object.body, { headers });
 }
