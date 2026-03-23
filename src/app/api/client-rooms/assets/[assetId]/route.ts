@@ -7,6 +7,30 @@ type ClientRoomAssetRouteProps = {
   params: Promise<{ assetId: string }>;
 };
 
+function createBodyStream(body: unknown) {
+  const reader = (
+    body as {
+      getReader: () => ReadableStreamDefaultReader<Uint8Array>;
+    }
+  ).getReader();
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        controller.close();
+        return;
+      }
+
+      controller.enqueue(value);
+    },
+    async cancel(reason) {
+      await reader.cancel(reason);
+    },
+  });
+}
+
 export async function GET(_: Request, { params }: ClientRoomAssetRouteProps) {
   const env = await getTrackerEnv();
   const { assetId } = await params;
@@ -31,5 +55,5 @@ export async function GET(_: Request, { params }: ClientRoomAssetRouteProps) {
   headers.set("content-length", String(object.size));
   headers.set("last-modified", object.uploaded.toUTCString());
 
-  return new NextResponse(object.body, { headers });
+  return new NextResponse(createBodyStream(object.body), { headers });
 }
