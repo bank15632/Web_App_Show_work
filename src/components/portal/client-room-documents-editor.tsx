@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -16,7 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { FileUp, GripVertical, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileUp, GripVertical, LoaderCircle, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -317,204 +317,21 @@ export function ClientRoomDocumentsEditor({
                 items={section.items.map((doc) => doc.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {section.items.map((document) => (
+                {section.items.map((document, index) => (
                   <SortableDocumentCard key={document.id} id={document.id}>
                     {(handleProps) => (
-                      <div className="space-y-4 rounded-2xl border border-border p-4">
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            className="mt-0.5 inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary active:cursor-grabbing"
-                            {...handleProps}
-                          >
-                            <GripVertical className="size-4" />
-                          </button>
-                          {hasUsableUrl(getImagePreviewUrl(document)) ? (
-                            <a
-                              href={getImagePreviewUrl(document)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block w-40 shrink-0 overflow-hidden rounded-lg border border-border"
-                              title="เปิดรูปเต็ม"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={getImagePreviewUrl(document)}
-                                alt={document.title || document.id}
-                                className="aspect-[4/3] w-full object-cover"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            </a>
-                          ) : null}
-                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium text-muted-foreground">{document.id}</p>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeDocument(section.id, document.id)}
-                            >
-                              <Trash2 />
-                              ลบ
-                            </Button>
-                          </div>
-                        </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Title">
-                    <Input
-                      value={document.title}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          title: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Version">
-                    <Input
-                      value={document.version}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          version: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Updated At">
-                    <Input
-                      type="date"
-                      value={document.updatedAt}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          updatedAt: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Kind">
-                    <select
-                      value={document.kind}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          kind: event.target.value as ClientRoomDocument["kind"],
-                        }))
-                      }
-                      className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      <option value="pdf">PDF</option>
-                      <option value="image">Image</option>
-                      <option value="canva">Canva</option>
-                    </select>
-                  </Field>
-                  <Field label="Viewer URL">
-                    <Input
-                      value={document.viewerUrl}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          viewerUrl: event.target.value,
-                        }))
-                      }
-                      placeholder="ลิงก์ Canva / PDF / embed"
-                    />
-                  </Field>
-                  <Field label="Download URL">
-                    <Input
-                      value={document.downloadUrl}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          downloadUrl: event.target.value,
-                        }))
-                      }
-                      placeholder="ลิงก์ดาวน์โหลด PDF"
-                    />
-                  </Field>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Summary</label>
-                    <textarea
-                      value={document.summary}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          summary: event.target.value,
-                        }))
-                      }
-                      className={textareaClassName()}
-                      placeholder="คำอธิบายเอกสาร"
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Rooms per line</label>
-                    <textarea
-                      value={serializeRooms(document.rooms)}
-                      onChange={(event) =>
-                        updateDocument(section.id, document.id, (current) => ({
-                          ...current,
-                          rooms: parseRooms(event.target.value),
-                        }))
-                      }
-                      className={textareaClassName()}
-                      placeholder="ห้องนั่งเล่น | ปรับโทนผนัง&#10;ห้องนอนใหญ่ | เพิ่ม warm lighting"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-4 md:col-span-2">
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={document.latest}
-                        onChange={(event) =>
-                          updateDocument(section.id, document.id, (current) => ({
-                            ...current,
-                            latest: event.target.checked,
-                          }))
-                        }
+                      <CollapsibleDocumentCard
+                        document={document}
+                        index={index}
+                        totalItems={section.items.length}
+                        sectionId={section.id}
+                        handleProps={handleProps}
+                        onRemove={() => removeDocument(section.id, document.id)}
+                        onMove={(newIndex) => moveDocument(section.id, index, newIndex)}
+                        uploadingTarget={uploadingTarget}
+                        onFieldChange={(updater) => updateDocument(section.id, document.id, updater)}
+                        onFileUpload={(file) => handleDocumentUpload(section.id, document.id, file)}
                       />
-                      Latest revision
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={document.checked}
-                        onChange={(event) =>
-                          updateDocument(section.id, document.id, (current) => ({
-                            ...current,
-                            checked: event.target.checked,
-                          }))
-                        }
-                      />
-                      Checked / approved
-                    </label>
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Upload document file</label>
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
-                      {uploadingTarget.startsWith("document:") ? (
-                        <LoaderCircle className="size-4 animate-spin" />
-                      ) : (
-                        <FileUp className="size-4" />
-                      )}
-                      Upload PDF or file
-                      <input
-                        type="file"
-                        accept=".pdf,image/*"
-                        className="hidden"
-                        onChange={(event) =>
-                          void handleDocumentUpload(
-                            section.id,
-                            document.id,
-                            event.target.files?.[0] ?? null,
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
-                      </div>
                     )}
                   </SortableDocumentCard>
                 ))}
@@ -524,6 +341,223 @@ export function ClientRoomDocumentsEditor({
         </Card>
       ))}
     </>
+  );
+}
+
+function CollapsibleDocumentCard({
+  document,
+  index,
+  totalItems,
+  sectionId,
+  handleProps,
+  onRemove,
+  onMove,
+  uploadingTarget,
+  onFieldChange,
+  onFileUpload,
+}: {
+  document: ClientRoomDocument;
+  index: number;
+  totalItems: number;
+  sectionId: ClientRoomSectionId;
+  handleProps: Record<string, unknown>;
+  onRemove: () => void;
+  onMove: (newIndex: number) => void;
+  uploadingTarget: string;
+  onFieldChange: (updater: (doc: ClientRoomDocument) => ClientRoomDocument) => void;
+  onFileUpload: (file: File | null) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [orderInput, setOrderInput] = useState("");
+
+  function handleOrderCommit(value: string) {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.max(0, Math.min(parsed - 1, totalItems - 1));
+    if (clamped !== index) {
+      onMove(clamped);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border p-3">
+      {/* Collapsed row: grip + order + thumbnail + title + expand/collapse + delete */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary active:cursor-grabbing"
+          {...handleProps}
+        >
+          <GripVertical className="size-4" />
+        </button>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={orderInput || String(index + 1)}
+          onFocus={() => setOrderInput(String(index + 1))}
+          onChange={(e) => setOrderInput(e.target.value)}
+          onBlur={(e) => {
+            handleOrderCommit(e.target.value);
+            setOrderInput("");
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleOrderCommit(orderInput);
+              setOrderInput("");
+              e.currentTarget.blur();
+            }
+          }}
+          className="h-8 w-10 shrink-0 rounded-lg border border-input bg-transparent text-center text-sm font-medium outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          title="ลำดับที่ — แก้ตัวเลขเพื่อย้ายตำแหน่ง"
+        />
+        {hasUsableUrl(getImagePreviewUrl(document)) ? (
+          <a
+            href={getImagePreviewUrl(document)}
+            target="_blank"
+            rel="noreferrer"
+            className="block w-20 shrink-0 overflow-hidden rounded-lg border border-border"
+            title="เปิดรูปเต็ม"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={getImagePreviewUrl(document)}
+              alt={document.title || document.id}
+              className="aspect-[4/3] w-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          </a>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {document.title || document.id}
+          </p>
+          {document.version ? (
+            <p className="truncate text-xs text-muted-foreground">{document.version}</p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
+          title={expanded ? "ย่อ" : "ขยายดูรายละเอียด"}
+        >
+          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </button>
+        <Button variant="destructive" size="sm" onClick={onRemove}>
+          <Trash2 />
+          ลบ
+        </Button>
+      </div>
+
+      {/* Expanded detail fields */}
+      {expanded ? (
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field label="Title">
+            <Input
+              value={document.title}
+              onChange={(e) => onFieldChange((c) => ({ ...c, title: e.target.value }))}
+            />
+          </Field>
+          <Field label="Version">
+            <Input
+              value={document.version}
+              onChange={(e) => onFieldChange((c) => ({ ...c, version: e.target.value }))}
+            />
+          </Field>
+          <Field label="Updated At">
+            <Input
+              type="date"
+              value={document.updatedAt}
+              onChange={(e) => onFieldChange((c) => ({ ...c, updatedAt: e.target.value }))}
+            />
+          </Field>
+          <Field label="Kind">
+            <select
+              value={document.kind}
+              onChange={(e) =>
+                onFieldChange((c) => ({
+                  ...c,
+                  kind: e.target.value as ClientRoomDocument["kind"],
+                }))
+              }
+              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="pdf">PDF</option>
+              <option value="image">Image</option>
+              <option value="canva">Canva</option>
+            </select>
+          </Field>
+          <Field label="Viewer URL">
+            <Input
+              value={document.viewerUrl}
+              onChange={(e) => onFieldChange((c) => ({ ...c, viewerUrl: e.target.value }))}
+              placeholder="ลิงก์ Canva / PDF / embed"
+            />
+          </Field>
+          <Field label="Download URL">
+            <Input
+              value={document.downloadUrl}
+              onChange={(e) => onFieldChange((c) => ({ ...c, downloadUrl: e.target.value }))}
+              placeholder="ลิงก์ดาวน์โหลด PDF"
+            />
+          </Field>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-medium">Summary</label>
+            <textarea
+              value={document.summary}
+              onChange={(e) => onFieldChange((c) => ({ ...c, summary: e.target.value }))}
+              className={textareaClassName()}
+              placeholder="คำอธิบายเอกสาร"
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-medium">Rooms per line</label>
+            <textarea
+              value={serializeRooms(document.rooms)}
+              onChange={(e) => onFieldChange((c) => ({ ...c, rooms: parseRooms(e.target.value) }))}
+              className={textareaClassName()}
+              placeholder="ห้องนั่งเล่น | ปรับโทนผนัง&#10;ห้องนอนใหญ่ | เพิ่ม warm lighting"
+            />
+          </div>
+          <div className="flex flex-wrap gap-4 md:col-span-2">
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={document.latest}
+                onChange={(e) => onFieldChange((c) => ({ ...c, latest: e.target.checked }))}
+              />
+              Latest revision
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={document.checked}
+                onChange={(e) => onFieldChange((c) => ({ ...c, checked: e.target.checked }))}
+              />
+              Checked / approved
+            </label>
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-medium">Upload document file</label>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
+              {uploadingTarget.startsWith("document:") ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <FileUp className="size-4" />
+              )}
+              Upload PDF or file
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                className="hidden"
+                onChange={(e) => onFileUpload(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
