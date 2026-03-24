@@ -6,4 +6,5 @@ export interface TrackerEnv {
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
   NEXT_INC_CACHE_R2_BUCKET?: R2Bucket;
+  OWNER_PIN?: string;
 }
