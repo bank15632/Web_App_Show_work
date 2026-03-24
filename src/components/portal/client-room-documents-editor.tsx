@@ -1,7 +1,22 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { FileUp, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { FileUp, GripVertical, LoaderCircle, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +88,8 @@ export function ClientRoomDocumentsEditor({
   uploadingTarget: string;
   onStatus: (message: string) => void;
 }) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
   function addDocuments(sectionId: ClientRoomSectionId, documents: ClientRoomDocument[]) {
     const hasNewLatest = documents.some((document) => document.latest);
 
@@ -83,13 +100,13 @@ export function ClientRoomDocumentsEditor({
           ? {
               ...section,
               items: [
-                ...documents,
                 ...(hasNewLatest
                   ? section.items.map((item) => ({
                       ...item,
                       latest: false,
                     }))
                   : section.items),
+                ...documents,
               ],
             }
           : section,
@@ -125,11 +142,11 @@ export function ClientRoomDocumentsEditor({
           ? {
               ...section,
               items: [
+                ...section.items,
                 {
                   ...createEmptyClientRoomDocument(),
                   latest: section.items.length === 0,
                 },
-                ...section.items,
               ],
             }
           : section,
@@ -146,6 +163,17 @@ export function ClientRoomDocumentsEditor({
               ...section,
               items: section.items.filter((item) => item.id !== documentId),
             }
+          : section,
+      ),
+    }));
+  }
+
+  function moveDocument(sectionId: ClientRoomSectionId, oldIndex: number, newIndex: number) {
+    onChange((currentDraft) => ({
+      ...currentDraft,
+      sections: currentDraft.sections.map((section) =>
+        section.id === sectionId
+          ? { ...section, items: arrayMove(section.items, oldIndex, newIndex) }
           : section,
       ),
     }));
@@ -272,44 +300,65 @@ export function ClientRoomDocumentsEditor({
               <p className="text-sm text-muted-foreground">ยังไม่มีเอกสารในหมวดนี้</p>
             ) : null}
 
-            {section.items.map((document) => (
-              <div key={document.id} className="space-y-4 rounded-2xl border border-border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">{document.id}</p>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeDocument(section.id, document.id)}
-                  >
-                    <Trash2 />
-                    ลบ
-                  </Button>
-                </div>
-                {hasUsableUrl(getImagePreviewUrl(document)) ? (
-                  <div className="space-y-3 rounded-2xl border border-border/70 bg-secondary/20 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-medium">ตัวอย่างรูปที่อัปโหลด</p>
-                      <a
-                        href={getImagePreviewUrl(document)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm font-medium text-foreground underline underline-offset-4"
-                      >
-                        เปิดรูปเต็ม
-                      </a>
-                    </div>
-                    <div className="overflow-hidden rounded-xl border border-border bg-background">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={getImagePreviewUrl(document)}
-                        alt={document.title || document.id}
-                        className="block h-auto max-h-[32rem] w-full"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
-                  </div>
-                ) : null}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event: DragEndEvent) => {
+                const { active, over } = event;
+                if (!over || active.id === over.id) return;
+                const oldIndex = section.items.findIndex((item) => item.id === active.id);
+                const newIndex = section.items.findIndex((item) => item.id === over.id);
+                if (oldIndex !== -1 && newIndex !== -1) {
+                  moveDocument(section.id, oldIndex, newIndex);
+                }
+              }}
+            >
+              <SortableContext
+                items={section.items.map((doc) => doc.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {section.items.map((document) => (
+                  <SortableDocumentCard key={document.id} id={document.id}>
+                    {(handleProps) => (
+                      <div className="space-y-4 rounded-2xl border border-border p-4">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            className="mt-0.5 inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary active:cursor-grabbing"
+                            {...handleProps}
+                          >
+                            <GripVertical className="size-4" />
+                          </button>
+                          {hasUsableUrl(getImagePreviewUrl(document)) ? (
+                            <a
+                              href={getImagePreviewUrl(document)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block w-40 shrink-0 overflow-hidden rounded-lg border border-border"
+                              title="เปิดรูปเต็ม"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={getImagePreviewUrl(document)}
+                                alt={document.title || document.id}
+                                className="aspect-[4/3] w-full object-cover"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            </a>
+                          ) : null}
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium text-muted-foreground">{document.id}</p>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeDocument(section.id, document.id)}
+                            >
+                              <Trash2 />
+                              ลบ
+                            </Button>
+                          </div>
+                        </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Title">
                     <Input
@@ -465,12 +514,41 @@ export function ClientRoomDocumentsEditor({
                     </label>
                   </div>
                 </div>
-              </div>
-            ))}
+                      </div>
+                    )}
+                  </SortableDocumentCard>
+                ))}
+              </SortableContext>
+            </DndContext>
           </CardContent>
         </Card>
       ))}
     </>
+  );
+}
+
+function SortableDocumentCard({
+  id,
+  children,
+}: {
+  id: string;
+  children: (handleProps: Record<string, unknown>) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      {children({ ...attributes, ...listeners })}
+    </div>
   );
 }
 
