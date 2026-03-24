@@ -8,6 +8,7 @@ function createSection(id: string, items: ProjectSection["items"]): ProjectSecti
     id,
     title: id,
     description: `${id} description`,
+    categories: [],
     items,
   };
 }

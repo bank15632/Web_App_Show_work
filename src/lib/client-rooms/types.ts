@@ -26,12 +26,19 @@ export interface ClientRoomDocument {
   rooms: ClientRoomRevisionRoom[];
   viewerUrl: string;
   downloadUrl: string;
+  categoryId: string;
+}
+
+export interface ClientRoomCategory {
+  id: string;
+  name: string;
 }
 
 export interface ClientRoomSection {
   id: ClientRoomSectionId;
   title: string;
   description: string;
+  categories: ClientRoomCategory[];
   items: ClientRoomDocument[];
 }
 
@@ -196,6 +203,7 @@ export function createEmptyClientRoomDocument(
     rooms: [],
     viewerUrl: "",
     downloadUrl: "",
+    categoryId: "",
   };
 }
 
@@ -230,6 +238,7 @@ export function createEmptyClientRoomDraft(
     heroImageUrl: "",
     sections: clientRoomSectionTemplates.map((section) => ({
       ...section,
+      categories: [],
       items: [],
     })),
     gallery: [],

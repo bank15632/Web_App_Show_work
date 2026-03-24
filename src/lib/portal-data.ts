@@ -21,12 +21,19 @@ export interface ProjectDocument {
   rooms?: RevisionRoom[];
   viewerUrl?: string;
   downloadUrl?: string;
+  categoryId?: string;
+}
+
+export interface ProjectCategory {
+  id: string;
+  name: string;
 }
 
 export interface ProjectSection {
   id: string;
   title: string;
   description: string;
+  categories: ProjectCategory[];
   items: ProjectDocument[];
 }
 
