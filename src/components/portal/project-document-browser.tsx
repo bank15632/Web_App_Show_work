@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, Download, Eye } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
 
 import {
   formatPortalDate,
@@ -342,66 +342,100 @@ function ImageDocumentStack({
 }) {
   return (
     <div className="space-y-8">
-      {documents.map((document, index) => {
-        const previewUrl = getDocumentPreviewUrl(project, document);
-        const hasDownload = hasUsableUrl(document.downloadUrl);
-
-        return (
-          <figure key={document.id} className="space-y-4">
-            <div className="overflow-hidden rounded-3xl bg-secondary">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt={document.title || `${category.label} ${index + 1}`}
-                loading="lazy"
-                decoding="async"
-                className="block h-auto w-full"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-2">
-                <h2 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
-                  {document.title || `${category.label} ${index + 1}`}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {document.version} · Updated {formatPortalDate(document.updatedAt)}
-                </p>
-                {document.summary ? (
-                  <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">
-                    {document.summary}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <a
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-foreground bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-                >
-                  <Eye className="size-4" />
-                  เปิดรูปเต็ม
-                </a>
-
-                {hasDownload ? (
-                  <a
-                    href={document.downloadUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-                  >
-                    <Download className="size-4" />
-                    ดาวน์โหลดรูป
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </figure>
-        );
-      })}
+      {documents.map((document, index) => (
+        <ImageDocumentCard
+          key={document.id}
+          project={project}
+          category={category}
+          document={document}
+          index={index}
+        />
+      ))}
     </div>
+  );
+}
+
+function ImageDocumentCard({
+  project,
+  category,
+  document,
+  index,
+}: {
+  project: ClientProject;
+  category: AvailableCategory;
+  document: ProjectDocument;
+  index: number;
+}) {
+  const [infoOpen, setInfoOpen] = useState(false);
+  const previewUrl = getDocumentPreviewUrl(project, document);
+  const hasDownload = hasUsableUrl(document.downloadUrl);
+
+  return (
+    <figure className="space-y-2">
+      <div className="group relative overflow-hidden rounded-3xl bg-secondary">
+        <a href={previewUrl} target="_blank" rel="noreferrer">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={document.title || `${category.label} ${index + 1}`}
+            loading="lazy"
+            decoding="async"
+            className="block h-auto w-full"
+          />
+        </a>
+
+        {hasDownload ? (
+          <a
+            href={document.downloadUrl}
+            download
+            className="absolute bottom-3 right-3 inline-flex size-10 items-center justify-center rounded-full bg-foreground/70 text-background backdrop-blur-sm transition-opacity hover:bg-foreground/90 md:opacity-0 md:group-hover:opacity-100"
+            title="ดาวน์โหลดรูป"
+          >
+            <Download className="size-5" />
+          </a>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setInfoOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {infoOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+        {document.title || `${category.label} ${index + 1}`}
+        {document.version ? (
+          <span className="text-xs text-muted-foreground">· {document.version}</span>
+        ) : null}
+      </button>
+
+      {infoOpen ? (
+        <div className="space-y-2 pl-5">
+          <p className="text-sm text-muted-foreground">
+            Updated {formatPortalDate(document.updatedAt)}
+          </p>
+          {document.summary ? (
+            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+              {document.summary}
+            </p>
+          ) : null}
+          {document.rooms && document.rooms.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {document.rooms.map((room, i) => (
+                <span
+                  key={i}
+                  className="rounded-full border border-border bg-secondary/50 px-3 py-1 text-xs"
+                >
+                  {room.name}
+                  {room.description ? (
+                    <span className="ml-1.5 text-muted-foreground">{room.description}</span>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </figure>
   );
 }
 
