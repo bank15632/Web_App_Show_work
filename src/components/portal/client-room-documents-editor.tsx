@@ -394,8 +394,11 @@ function CollapsibleDocumentCard({
           type="text"
           inputMode="numeric"
           value={orderInput || String(index + 1)}
-          onFocus={() => setOrderInput(String(index + 1))}
-          onChange={(e) => setOrderInput(e.target.value)}
+          onFocus={(e) => {
+            setOrderInput(String(index + 1));
+            requestAnimationFrame(() => e.target.select());
+          }}
+          onChange={(e) => setOrderInput(e.target.value.replace(/\D/g, ""))}
           onBlur={(e) => {
             handleOrderCommit(e.target.value);
             setOrderInput("");
