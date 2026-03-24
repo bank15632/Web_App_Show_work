@@ -44,6 +44,22 @@ function buildDocumentTitle(fileName: string) {
   return fileName.replace(/\.[^/.]+$/, "").trim() || fileName;
 }
 
+function hasUsableUrl(value: string) {
+  return value.trim().length > 0;
+}
+
+function isImageDocument(document: ClientRoomDocument) {
+  return document.kind === "image" || document.mimeType.startsWith("image/");
+}
+
+function getImagePreviewUrl(document: ClientRoomDocument) {
+  if (!isImageDocument(document)) {
+    return "";
+  }
+
+  return document.viewerUrl || document.downloadUrl;
+}
+
 export function ClientRoomDocumentsEditor({
   draft,
   onChange,
@@ -257,10 +273,7 @@ export function ClientRoomDocumentsEditor({
             ) : null}
 
             {section.items.map((document) => (
-              <div
-                key={document.id}
-                className="space-y-4 rounded-2xl border border-border p-4"
-              >
+              <div key={document.id} className="space-y-4 rounded-2xl border border-border p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-muted-foreground">{document.id}</p>
                   <Button
@@ -272,6 +285,31 @@ export function ClientRoomDocumentsEditor({
                     ลบ
                   </Button>
                 </div>
+                {hasUsableUrl(getImagePreviewUrl(document)) ? (
+                  <div className="space-y-3 rounded-2xl border border-border/70 bg-secondary/20 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium">ตัวอย่างรูปที่อัปโหลด</p>
+                      <a
+                        href={getImagePreviewUrl(document)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-foreground underline underline-offset-4"
+                      >
+                        เปิดรูปเต็ม
+                      </a>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-border bg-background">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getImagePreviewUrl(document)}
+                        alt={document.title || document.id}
+                        className="block h-auto max-h-[32rem] w-full"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  </div>
+                ) : null}
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Title">
                     <Input

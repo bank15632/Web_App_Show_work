@@ -83,6 +83,7 @@ export interface ClientRoomProjectSummary {
   location: string;
   year: string;
   overview: string;
+  thumbnailUrl: string;
   documentCount: number;
   shareToken: string | null;
   createdAt: string;
@@ -138,6 +139,41 @@ export function buildClientRoomAssetUrl(assetId: string) {
 
 export function buildClientRoomSharePath(shareToken: string) {
   return `/client-room/${shareToken}`;
+}
+
+function hasAssetUrl(value: string) {
+  return value.trim().length > 0;
+}
+
+function isImageDocument(document: ClientRoomDocument) {
+  return document.kind === "image" || document.mimeType.startsWith("image/");
+}
+
+export function getClientRoomThumbnailUrl(draft: ClientRoomDraftData) {
+  if (hasAssetUrl(draft.heroImageUrl)) {
+    return draft.heroImageUrl;
+  }
+
+  for (const section of draft.sections) {
+    const imageDocument = section.items.find(
+      (document) =>
+        isImageDocument(document) &&
+        (hasAssetUrl(document.viewerUrl) || hasAssetUrl(document.downloadUrl)),
+    );
+
+    if (imageDocument) {
+      return imageDocument.viewerUrl || imageDocument.downloadUrl;
+    }
+  }
+
+  for (const room of draft.gallery) {
+    const image = room.images.find((item) => hasAssetUrl(item.src));
+    if (image) {
+      return image.src;
+    }
+  }
+
+  return "";
 }
 
 export function createClientRoomId(prefix: string) {

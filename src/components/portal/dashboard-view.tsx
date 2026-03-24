@@ -800,6 +800,7 @@ function ProjectCardSkeleton({ delay = "" }: { delay?: string }) {
         delay,
       )}
     >
+      <SkeletonBlock className="mb-5 aspect-[16/9] w-full rounded-2xl" />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SkeletonBlock className="h-4 w-36 rounded-full" />
         <SkeletonBlock className="h-6 w-24 rounded-full" />
@@ -842,6 +843,23 @@ function ProjectCard({
       )}
     >
       <div className="p-6">
+        <div className="overflow-hidden rounded-2xl border border-border bg-secondary/30">
+          {project.thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={project.thumbnailUrl}
+              alt={project.title}
+              className="aspect-[16/9] w-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <div className="flex aspect-[16/9] items-center justify-center text-sm text-muted-foreground">
+              ยังไม่มีรูปโปรเจกต์
+            </div>
+          )}
+        </div>
+
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="caption-editorial text-xs">{project.slug}</span>
           <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
@@ -859,7 +877,7 @@ function ProjectCard({
           </span>
         </div>
 
-        <h3 className="font-display text-2xl font-medium tracking-tight">
+        <h3 className="mt-5 font-display text-2xl font-medium tracking-tight">
           {project.title}
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">

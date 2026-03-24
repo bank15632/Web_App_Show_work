@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { uploadClientRoomAssetMultipart } from "@/lib/client-rooms/upload";
 import {
   buildClientRoomSharePath,
+  getClientRoomThumbnailUrl,
   type ClientRoomDraftData,
   type ClientRoomProjectRecord,
   type ClientRoomProjectSummary,
@@ -56,6 +57,7 @@ function mapProjectSummary(project: ClientRoomProjectRecord): ClientRoomProjectS
     location: project.draftData.location,
     year: project.draftData.year,
     overview: project.draftData.overview,
+    thumbnailUrl: getClientRoomThumbnailUrl(project.draftData),
     documentCount: project.draftData.sections.reduce(
       (count, section) => count + section.items.length,
       0,

@@ -6,6 +6,7 @@ import { clientRoomMigrationSql } from "@/lib/client-rooms/sql";
 import {
   buildClientRoomAssetUrl,
   createEmptyClientRoomDraft,
+  getClientRoomThumbnailUrl,
   type ClientRoomAssetKind,
   type ClientRoomAssetRecord,
   type ClientRoomDocument,
@@ -361,6 +362,7 @@ export async function listClientRoomProjects(
       location: draft.location,
       year: draft.year,
       overview: draft.overview,
+      thumbnailUrl: getClientRoomThumbnailUrl(draft),
       documentCount: getDocumentCount(draft),
       shareToken: row.share_token,
       createdAt: row.created_at,
