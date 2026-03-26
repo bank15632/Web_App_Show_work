@@ -140,7 +140,7 @@ export function SystemGuidePage({ guide }: { guide: ManualSystemGuide }) {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7f3ed_100%)]">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-6 py-5 lg:px-10">
+        <div className="flex flex-wrap items-center gap-3 px-6 py-5 lg:px-10">
           <Link
             href="/aec-workflow"
             className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
@@ -168,7 +168,7 @@ export function SystemGuidePage({ guide }: { guide: ManualSystemGuide }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] space-y-10 px-6 py-12 lg:px-10">
+      <main className="space-y-10 px-6 py-12 lg:px-10">
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_22rem]">
           <div className="rounded-[2rem] border border-border bg-background p-8 shadow-[0_24px_80px_rgba(0,0,0,0.04)]">
             <p className="caption-editorial">System Guide</p>

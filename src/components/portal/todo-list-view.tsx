@@ -637,7 +637,7 @@ export function TodoListView() {
     <div className="min-h-screen bg-background">
       <div
         className={cn(
-          "mx-auto grid min-h-screen max-w-[1680px] transition-[grid-template-columns] duration-300",
+          "grid min-h-screen transition-[grid-template-columns] duration-300",
           layoutClassName,
         )}
       >
