@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Download, Eye, FileDown, LoaderCircle } from "lucide-react";
 
+import {
+  exportSectionImagesToPdf,
+  type PdfExportProgress,
+} from "@/lib/client-rooms/pdf-export";
 import {
   formatPortalDate,
   getDocumentPreviewUrl,
@@ -340,8 +344,49 @@ function ImageDocumentStack({
   category: AvailableCategory;
   documents: ProjectDocument[];
 }) {
+  const [pdfProgress, setPdfProgress] = useState<PdfExportProgress | null>(null);
+
+  async function handleDownloadPdf() {
+    setPdfProgress({ current: 0, total: documents.length });
+    try {
+      await exportSectionImagesToPdf(
+        documents,
+        category.label,
+        project.title,
+        setPdfProgress,
+      );
+    } finally {
+      setPdfProgress(null);
+    }
+  }
+
+  const isExporting = pdfProgress !== null;
+
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {documents.length} รูปในหมวด {category.label}
+        </p>
+        <button
+          onClick={handleDownloadPdf}
+          disabled={isExporting}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
+        >
+          {isExporting ? (
+            <>
+              <LoaderCircle className="size-4 animate-spin" />
+              กำลังสร้าง PDF ({pdfProgress.current}/{pdfProgress.total})
+            </>
+          ) : (
+            <>
+              <FileDown className="size-4" />
+              ดาวน์โหลดทั้งหมดเป็น PDF
+            </>
+          )}
+        </button>
+      </div>
+
       {documents.map((document, index) => (
         <ImageDocumentCard
           key={document.id}
