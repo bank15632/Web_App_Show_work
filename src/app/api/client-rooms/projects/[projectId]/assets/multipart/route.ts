@@ -5,6 +5,7 @@ import {
   createClientRoomObjectKey,
 } from "@/lib/client-rooms/service";
 import type { ClientRoomAssetKind } from "@/lib/client-rooms/types";
+import { ValidationError } from "@/lib/errors";
 import {
   createErrorResponse,
   createJsonResponse,
@@ -20,7 +21,7 @@ const multipartChunkSize = 10 * 1024 * 1024;
 
 function assertObjectKey(projectId: string, objectKey: string) {
   if (!objectKey.startsWith(`client-rooms/${projectId}/`)) {
-    throw new Error("Invalid upload key");
+    throw new ValidationError("Invalid upload key");
   }
 }
 
@@ -35,18 +36,18 @@ export async function POST(request: Request, { params }: MultipartRouteProps) {
     };
 
     if (!payload.fileName || !payload.mimeType || !payload.kind) {
-      throw new Error("Invalid multipart payload");
+      throw new ValidationError("Invalid multipart payload");
     }
 
     if (!allowedKinds.has(payload.kind)) {
-      throw new Error("Invalid asset kind");
+      throw new ValidationError("Invalid asset kind");
     }
 
     if (
       (payload.kind === "hero" || payload.kind === "gallery") &&
       !payload.mimeType.startsWith("image/")
     ) {
-      throw new Error("Hero and gallery uploads must be images");
+      throw new ValidationError("Hero and gallery uploads must be images");
     }
 
     await assertClientRoomExists(env, projectId);
@@ -82,7 +83,7 @@ export async function PUT(request: Request, { params }: MultipartRouteProps) {
     const partNumber = Number(url.searchParams.get("partNumber"));
 
     if (!uploadId || !key || !Number.isInteger(partNumber) || partNumber < 1) {
-      throw new Error("Invalid multipart part payload");
+      throw new ValidationError("Invalid multipart part payload");
     }
 
     await assertClientRoomExists(env, projectId);
@@ -90,7 +91,7 @@ export async function PUT(request: Request, { params }: MultipartRouteProps) {
 
     const chunk = await request.arrayBuffer();
     if (chunk.byteLength === 0) {
-      throw new Error("Missing upload body");
+      throw new ValidationError("Missing upload body");
     }
 
     const multipartUpload = env.ARTIFACTS_BUCKET.resumeMultipartUpload(key, uploadId);
@@ -111,7 +112,7 @@ export async function DELETE(request: Request, { params }: MultipartRouteProps) 
     const key = url.searchParams.get("key");
 
     if (!uploadId || !key) {
-      throw new Error("Invalid multipart abort payload");
+      throw new ValidationError("Invalid multipart abort payload");
     }
 
     await assertClientRoomExists(env, projectId);

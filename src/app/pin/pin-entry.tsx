@@ -7,7 +7,11 @@ import { LoaderCircle } from "lucide-react";
 export function PinEntry() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/";
+  const rawNext = searchParams.get("next");
+  const nextPath =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+      ? rawNext
+      : "/";
 
   const [digits, setDigits] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
@@ -93,7 +97,7 @@ export function PinEntry() {
           <p className="text-sm text-muted-foreground">กรอกรหัส 4 หลักเพื่อเข้าสู่ระบบ</p>
         </div>
 
-        <div className="flex justify-center gap-3" onPaste={handlePaste}>
+        <div className="flex justify-center gap-3" role="group" aria-label="PIN entry" onPaste={handlePaste}>
           {digits.map((digit, i) => (
             <input
               key={i}
@@ -101,6 +105,7 @@ export function PinEntry() {
               type="text"
               inputMode="numeric"
               maxLength={1}
+              aria-label={`PIN digit ${i + 1} of 4`}
               value={digit}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}

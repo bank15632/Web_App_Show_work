@@ -3,6 +3,7 @@ import {
   createClientRoomAssetRecord,
 } from "@/lib/client-rooms/service";
 import type { ClientRoomAssetKind } from "@/lib/client-rooms/types";
+import { ValidationError } from "@/lib/errors";
 import {
   createErrorResponse,
   createJsonResponse,
@@ -22,7 +23,7 @@ const allowedKinds = new Set<ClientRoomAssetKind>(["hero", "gallery", "document"
 
 function assertObjectKey(projectId: string, objectKey: string) {
   if (!objectKey.startsWith(`client-rooms/${projectId}/`)) {
-    throw new Error("Invalid upload key");
+    throw new ValidationError("Invalid upload key");
   }
 }
 
@@ -62,15 +63,15 @@ export async function POST(request: Request, { params }: CompleteMultipartRouteP
       !payload.parts ||
       payload.parts.length === 0
     ) {
-      throw new Error("Invalid multipart complete payload");
+      throw new ValidationError("Invalid multipart complete payload");
     }
 
     if (!allowedKinds.has(payload.kind)) {
-      throw new Error("Invalid asset kind");
+      throw new ValidationError("Invalid asset kind");
     }
 
     if (!payload.parts.every(isUploadedPart)) {
-      throw new Error("Invalid multipart parts");
+      throw new ValidationError("Invalid multipart parts");
     }
 
     await assertClientRoomExists(env, projectId);
