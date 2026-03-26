@@ -455,7 +455,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1500px] items-center gap-3 px-5 py-4 md:px-8">
+        <div className="flex items-center gap-3 px-5 py-4 md:px-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-bnj.svg"
@@ -515,7 +515,7 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1500px] gap-6 px-5 py-6 md:px-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <main className="grid gap-6 px-5 py-6 md:px-8 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-4">
           <Card>
             <CardHeader>
