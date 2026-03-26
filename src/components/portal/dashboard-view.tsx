@@ -355,7 +355,7 @@ export function DashboardView() {
   return (
     <div ref={containerRef} className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="mx-auto flex max-w-[1320px] items-center gap-4 px-6 py-5 lg:px-10">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-6 py-5 lg:px-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-bnj.svg"
@@ -410,7 +410,7 @@ export function DashboardView() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1320px] space-y-16 px-6 py-12 lg:px-10">
+      <main className="mx-auto max-w-[1600px] space-y-16 px-6 py-12 lg:px-10">
         <section className="fade-up space-y-6">
           <div className="max-w-4xl">
             <p className="caption-editorial mb-2">Dashboard</p>
