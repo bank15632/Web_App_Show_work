@@ -504,8 +504,8 @@ export function DashboardView() {
                     {framework.status}
                   </span>
                 </div>
-                <p className="mt-3 text-sm font-medium text-foreground">{framework.role}</p>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                <p className="mt-3 text-base font-medium text-foreground">{framework.role}</p>
+                <p className="mt-2 text-base leading-7 text-muted-foreground">
                   {framework.whenToUse}
                 </p>
                 <div className="mt-4">
@@ -620,10 +620,10 @@ export function DashboardView() {
                       <p className="mt-2 font-display text-base font-medium leading-tight">
                         {project.title}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-sm text-muted-foreground">
                         {project.clientName}
                       </p>
-                      <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+                      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
                         {getClientRoomStatusBody(project)}
                       </p>
                     </Link>
@@ -685,7 +685,7 @@ export function DashboardView() {
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {showClientRoomLoadingState ? (
               <>
                 <ProjectCardSkeleton />
@@ -741,7 +741,7 @@ function CommandCard({
         <span className="caption-editorial text-xs">{label}</span>
       </div>
       <h2 className="mt-3 font-display text-3xl font-medium tracking-tight">{title}</h2>
-      <p className="mt-3 text-sm leading-7 text-muted-foreground">{body}</p>
+      <p className="mt-3 text-base leading-7 text-muted-foreground">{body}</p>
     </article>
   );
 }
@@ -764,7 +764,7 @@ function MetricSummaryCard({
         <span className="caption-editorial text-xs">{label}</span>
       </div>
       <p className="font-display text-4xl font-medium">{value}</p>
-      <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+      <p className="mt-2 text-base text-muted-foreground">{body}</p>
     </article>
   );
 }
@@ -849,12 +849,12 @@ function ProjectCard({
             <img
               src={project.thumbnailUrl}
               alt={project.title}
-              className="aspect-[16/9] w-full object-cover"
+              className="aspect-video max-h-56 w-full object-cover"
               loading="lazy"
               decoding="async"
             />
           ) : (
-            <div className="flex aspect-[16/9] items-center justify-center text-sm text-muted-foreground">
+            <div className="flex aspect-video max-h-56 items-center justify-center text-sm text-muted-foreground">
               ยังไม่มีรูปโปรเจกต์
             </div>
           )}
@@ -880,17 +880,17 @@ function ProjectCard({
         <h3 className="mt-5 font-display text-2xl font-medium tracking-tight">
           {project.title}
         </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           {project.clientName} · {project.location || "ยังไม่ระบุที่ตั้ง"} · อัปเดต{" "}
           {formatPortalDate(project.updatedAt)}
         </p>
 
-        <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-4 line-clamp-2 text-base leading-relaxed text-muted-foreground">
           {project.overview}
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <span className="text-sm text-muted-foreground">
+          <span className="text-base text-muted-foreground">
             {project.documentCount} files · {project.publishedAt ? "published" : "draft only"}
           </span>
           <div className="flex flex-wrap items-center gap-2">
