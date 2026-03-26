@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { verifySessionToken } from "@/lib/auth/session";
+
 const COOKIE_NAME = "owner_pin";
 
 /** Routes that require the owner pincode */
@@ -21,7 +23,13 @@ function isPublicRoute(pathname: string) {
   return false;
 }
 
-export function middleware(request: NextRequest) {
+/** Validate redirect path to prevent open redirect attacks */
+function getSafeRedirectPath(raw: string): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicRoute(pathname)) {
@@ -32,8 +40,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const pin = request.cookies.get(COOKIE_NAME)?.value;
-  if (pin && pin.length > 0) {
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const ownerPin = process.env.OWNER_PIN ?? "";
+  const isValid = token && ownerPin ? await verifySessionToken(token, ownerPin) : false;
+
+  if (isValid) {
     return NextResponse.next();
   }
 
@@ -44,7 +55,7 @@ export function middleware(request: NextRequest) {
 
   // Page routes redirect to /pin
   const pinUrl = new URL("/pin", request.url);
-  pinUrl.searchParams.set("next", pathname);
+  pinUrl.searchParams.set("next", getSafeRedirectPath(pathname));
   return NextResponse.redirect(pinUrl);
 }
 

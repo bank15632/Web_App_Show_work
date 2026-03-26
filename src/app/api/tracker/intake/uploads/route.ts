@@ -1,3 +1,4 @@
+import { ValidationError } from "@/lib/errors";
 import { generateArtifactReviewProposals } from "@/lib/tracker/ai";
 import { createErrorResponse, createJsonResponse, getTrackerEnv } from "@/lib/tracker/runtime";
 import {
@@ -6,6 +7,9 @@ import {
   getProjectFromWorkspace,
   getWorkspaceData,
 } from "@/lib/tracker/service";
+import { sanitizeFileName } from "@/lib/utils";
+
+const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25 MB
 
 function toBase64(arrayBuffer: ArrayBuffer) {
   return Buffer.from(arrayBuffer).toString("base64");
@@ -21,19 +25,23 @@ export async function POST(request: Request) {
     const file = formData.get("file");
 
     if (!projectId || !title || (kind !== "site_photo" && kind !== "site_markup")) {
-      throw new Error("Invalid upload payload");
+      throw new ValidationError("Invalid upload payload");
     }
 
     if (!(file instanceof File)) {
-      throw new Error("Upload file is required");
+      throw new ValidationError("Upload file is required");
     }
 
     if (!file.type.startsWith("image/")) {
-      throw new Error("Only image uploads are supported in this endpoint");
+      throw new ValidationError("Only image uploads are supported in this endpoint");
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE) {
+      throw new ValidationError(`File too large: max ${MAX_UPLOAD_SIZE / 1024 / 1024}MB`);
     }
 
     const bytes = await file.arrayBuffer();
-    const objectKey = `tracker/${projectId}/${Date.now()}-${file.name}`;
+    const objectKey = `tracker/${projectId}/${Date.now()}-${sanitizeFileName(file.name)}`;
     await env.ARTIFACTS_BUCKET.put(objectKey, bytes, {
       httpMetadata: {
         contentType: file.type,

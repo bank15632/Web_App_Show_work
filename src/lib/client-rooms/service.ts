@@ -1,6 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { NotFoundError } from "@/lib/errors";
 import type { TrackerEnv } from "@/lib/tracker/env";
+import { sanitizeFileName } from "@/lib/utils";
 import { clientRoomCreateSchema, clientRoomDraftSchema, normalizeClientRoomDraft } from "@/lib/client-rooms/schemas";
 import { clientRoomMigrationSql } from "@/lib/client-rooms/sql";
 import {
@@ -58,10 +60,6 @@ function slugify(input: string) {
     .slice(0, 60);
 
   return base || `client-room-${crypto.randomUUID().slice(0, 8)}`;
-}
-
-function sanitizeFileName(fileName: string) {
-  return fileName.replace(/[^a-zA-Z0-9._-]+/g, "-");
 }
 
 function buildClientRoomObjectKey(projectId: string, fileName: string) {
@@ -425,7 +423,7 @@ export async function createClientRoomProject(
 
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
-    throw new Error("Failed to create client room");
+    throw new NotFoundError("Failed to create client room");
   }
 
   return project;
@@ -439,7 +437,7 @@ export async function saveClientRoomProject(
   await ensureClientRoomsReady(env);
   const existing = await getClientRoomProjectById(env, projectId);
   if (!existing) {
-    throw new Error("Client room not found");
+    throw new NotFoundError("Client room not found");
   }
 
   const draft = normalizeDraftData(draftInput);
@@ -469,7 +467,7 @@ export async function saveClientRoomProject(
 
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
-    throw new Error("Failed to reload client room");
+    throw new NotFoundError("Failed to reload client room");
   }
 
   return project;
@@ -482,7 +480,7 @@ export async function publishClientRoomProject(
   await ensureClientRoomsReady(env);
   const existing = await getClientRoomProjectById(env, projectId);
   if (!existing) {
-    throw new Error("Client room not found");
+    throw new NotFoundError("Client room not found");
   }
 
   const shareToken =
@@ -504,7 +502,7 @@ export async function publishClientRoomProject(
 
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
-    throw new Error("Failed to reload published client room");
+    throw new NotFoundError("Failed to reload published client room");
   }
 
   return project;
@@ -517,7 +515,7 @@ export async function unpublishClientRoomProject(
   await ensureClientRoomsReady(env);
   const existing = await getClientRoomProjectById(env, projectId);
   if (!existing) {
-    throw new Error("Client room not found");
+    throw new NotFoundError("Client room not found");
   }
 
   await runStatement(
@@ -530,7 +528,7 @@ export async function unpublishClientRoomProject(
 
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
-    throw new Error("Failed to reload unpublished client room");
+    throw new NotFoundError("Failed to reload unpublished client room");
   }
 
   return project;
@@ -627,7 +625,7 @@ export async function createClientRoomAsset(
 export async function assertClientRoomExists(env: TrackerEnv, projectId: string) {
   const existing = await getClientRoomProjectById(env, projectId);
   if (!existing) {
-    throw new Error("Client room not found");
+    throw new NotFoundError("Client room not found");
   }
 
   return existing;
@@ -674,7 +672,7 @@ export async function createClientRoomAssetRecord(
   );
 
   if (!row) {
-    throw new Error("Failed to create asset");
+    throw new NotFoundError("Failed to create asset");
   }
 
   return {
