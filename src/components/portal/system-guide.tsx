@@ -96,6 +96,32 @@ export function SystemGuidePanel({
         ))}
       </div>
 
+      {guide.referenceGroups?.length ? (
+        <div className="mt-6 space-y-4">
+          {guide.referenceGroups.map((group) => (
+            <article
+              key={group.title}
+              className="rounded-[1.5rem] border border-border bg-background p-5"
+            >
+              <p className="caption-editorial text-[0.68rem]">{group.title}</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {group.items.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-[1.25rem] border border-border bg-secondary/20 p-4"
+                  >
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                      {item.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
       <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="rounded-[1.5rem] border border-border bg-background p-5">
           <div className="flex items-center gap-2 text-muted-foreground">

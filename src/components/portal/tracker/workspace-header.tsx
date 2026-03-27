@@ -54,44 +54,54 @@ export function WorkspaceHeader({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-          <SelectPill
-            value={project.phase}
-            onChange={(value) => onPhaseChange(value as TrackerPhase)}
-            options={Object.entries(phaseLabels)}
-          />
-          <SelectPill
-            value={project.status}
-            onChange={(value) => onStatusChange(value as TrackerProjectStatus)}
-            options={projectStatuses.map((status) => [status, status.replace("_", " ")] as const)}
-          />
-          <button
-            type="button"
-            onClick={onOpenIntake}
-            disabled={isWorking}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[13px] font-medium transition-colors hover:border-foreground sm:text-sm"
-          >
-            <Upload className="size-4" />
-            Intake
-          </button>
-          <button
-            type="button"
-            onClick={onNewTask}
-            disabled={isWorking}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90 sm:text-sm"
-          >
-            <Plus className="size-4" />
-            Add Task
-          </button>
-          <button
-            type="button"
-            onClick={onDeleteProject}
-            disabled={isWorking}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-5 text-[13px] font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-          >
-            <Trash2 className="size-4" />
-            Delete Project
-          </button>
+        <div className="flex max-w-xl flex-col gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+            <SelectPill
+              value={project.phase}
+              onChange={(value) => onPhaseChange(value as TrackerPhase)}
+              options={Object.entries(phaseLabels)}
+            />
+            <SelectPill
+              value={project.status}
+              onChange={(value) => onStatusChange(value as TrackerProjectStatus)}
+              options={projectStatuses.map((status) => [status, status.replace("_", " ")] as const)}
+            />
+            <button
+              type="button"
+              onClick={onOpenIntake}
+              disabled={isWorking}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[13px] font-medium transition-colors hover:border-foreground sm:text-sm"
+            >
+              <Upload className="size-4" />
+              Intake
+            </button>
+            <button
+              type="button"
+              onClick={onNewTask}
+              disabled={isWorking}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90 sm:text-sm"
+            >
+              <Plus className="size-4" />
+              Add Task
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteProject}
+              disabled={isWorking}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-5 text-[13px] font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+            >
+              <Trash2 className="size-4" />
+              Delete Project
+            </button>
+          </div>
+          <div className="rounded-[1.25rem] border border-border bg-background/80 px-4 py-3 text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
+            <p className="font-medium text-foreground">Intake ใช้ตอนไหน</p>
+            <p className="mt-1">
+              ใช้ตอนมีข้อมูลใหม่ที่ยังไม่ควรสร้างเป็น task ตรงๆ เช่น minutes จากประชุม,
+              RFI log, revision text, site photo หรือ markup แล้วให้ระบบส่งเข้า review queue
+              ก่อนค่อยแตกเป็นงานจริง
+            </p>
+          </div>
         </div>
       </div>
 

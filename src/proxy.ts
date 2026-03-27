@@ -29,7 +29,7 @@ function getSafeRedirectPath(raw: string): string {
   return raw;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicRoute(pathname)) {
@@ -48,12 +48,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // API routes return 401
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Page routes redirect to /pin
   const pinUrl = new URL("/pin", request.url);
   pinUrl.searchParams.set("next", getSafeRedirectPath(pathname));
   return NextResponse.redirect(pinUrl);
@@ -61,11 +59,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static, _next/image (Next.js internals)
-     * - favicon.ico, logo-bnj.svg, sitemap.xml, robots.txt (static files)
-     */
     "/((?!_next/static|_next/image|favicon\\.ico|logo-bnj\\.svg|sitemap\\.xml|robots\\.txt).*)",
   ],
 };

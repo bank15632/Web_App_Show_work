@@ -20,7 +20,11 @@ import { TaskBoard } from "@/components/portal/tracker/task-board";
 import { WeeklyReportPanel } from "@/components/portal/tracker/weekly-report-panel";
 import { WorkspaceHeader } from "@/components/portal/tracker/workspace-header";
 import {
+  priorityDescriptions,
+  priorityLabels,
+  taskStatusDescriptions,
   taskStatusLabels,
+  taskTypeDescriptions,
   taskTypeLabels,
   trackerStorageKeys,
 } from "@/lib/tracker/constants";
@@ -65,6 +69,17 @@ type UploadDraft = {
   kind: "site_photo" | "site_markup";
   notes: string;
   file: File | null;
+};
+
+const intakeLogKindDescriptions: Record<LogDraft["kind"], string> = {
+  drawing_revision: "ใช้เมื่อมี revision notes, clouded comments หรือ drawing updates ที่ต้องสรุปผลกระทบ",
+  rfi_log: "ใช้กับคำถามจาก site หรือทีมก่อสร้างที่ต้องการคำตอบชัดก่อนเดินงานต่อ",
+  submittal_log: "ใช้กับ material approval, shop drawing หรือเอกสารส่งอนุมัติที่ต้องติดตามสถานะ",
+};
+
+const intakeUploadKindDescriptions: Record<UploadDraft["kind"], string> = {
+  site_photo: "ใช้กับรูปหน้างานจริงเพื่อเก็บหลักฐานและช่วยแตก issue หรือ follow-up ต่อ",
+  site_markup: "ใช้กับภาพที่วงหรือเขียนโน้ตไว้แล้ว เพื่อให้ระบบอ่าน context ของปัญหาได้ตรงขึ้น",
 };
 
 async function requestJson<T>(input: RequestInfo, init?: RequestInit) {
@@ -993,6 +1008,10 @@ export function TodoListView() {
               setDialog(null);
             }}
           >
+            <DialogHelperCard
+              title="ใช้เมื่อมี minutes หรือ action items จากประชุม"
+              body="วางบันทึกประชุม, discussion notes หรือ commitment ลงมาได้เลย แล้วระบบจะส่งข้อเสนอเข้า Review Queue ก่อนสร้าง task หรือ decision จริง"
+            />
             <input
               value={meetingDraft.title}
               onChange={(event) =>
@@ -1049,6 +1068,10 @@ export function TodoListView() {
               setDialog(null);
             }}
           >
+            <DialogHelperCard
+              title="ใช้เมื่อข้อมูลมาเป็น log หรือข้อความยาว"
+              body="เหมาะกับ RFI log, submittal log, revision summary หรือ text ที่ดึงมาจากเอกสาร เพื่อให้ระบบแยกประเด็นและเตรียมรายการรอตรวจ"
+            />
             <input
               value={logDraft.title}
               onChange={(event) =>
@@ -1071,6 +1094,9 @@ export function TodoListView() {
               <option value="rfi_log">RFI Log</option>
               <option value="submittal_log">Submittal Log</option>
             </select>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {intakeLogKindDescriptions[logDraft.kind]}
+            </p>
             <textarea
               value={logDraft.content}
               onChange={(event) =>
@@ -1124,6 +1150,10 @@ export function TodoListView() {
               setDialog(null);
             }}
           >
+            <DialogHelperCard
+              title="ใช้เมื่อมีรูปหน้างานหรือภาพ markup"
+              body="อัปโหลดรูป site, screenshot หรือภาพที่วงจุดปัญหาไว้ เพื่อให้ระบบเก็บเป็น artifact และช่วยแตก issue, blocker หรือ follow-up ต่อ"
+            />
             <input
               value={uploadDraft.title}
               onChange={(event) =>
@@ -1145,6 +1175,9 @@ export function TodoListView() {
               <option value="site_photo">Site Photo</option>
               <option value="site_markup">Site Markup</option>
             </select>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {intakeUploadKindDescriptions[uploadDraft.kind]}
+            </p>
             <input
               type="file"
               accept="image/*"
@@ -1169,6 +1202,21 @@ export function TodoListView() {
           </form>
         </DialogFrame>
       ) : null}
+    </div>
+  );
+}
+
+function DialogHelperCard({
+  title,
+  body,
+}: {
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">
+      <p className="font-medium text-foreground">{title}</p>
+      <p className="mt-1">{body}</p>
     </div>
   );
 }
@@ -1341,6 +1389,10 @@ function TaskFormFields({
 }) {
   return (
     <>
+      <DialogHelperCard
+        title="ใช้ฟอร์มนี้เมื่อ task ชัดแล้ว"
+        body="ถ้ารู้งาน, owner และอยากให้ขึ้นบอร์ดทันที ให้สร้างหรือแก้จากฟอร์มนี้ได้เลย ถ้ายังเป็นข้อมูลดิบจากประชุม, log หรือรูป ควรเริ่มจาก Intake ก่อน"
+      />
       <input
         value={draft.title}
         onChange={(event) => onChange({ ...draft, title: event.target.value })}
@@ -1357,63 +1409,97 @@ function TaskFormFields({
         className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
       />
       <div className="grid gap-4 md:grid-cols-2">
-        <select
-          value={draft.status}
-          onChange={(event) =>
-            onChange({
-              ...draft,
-              status: event.target.value as TrackerTaskMutationInput["status"],
-            })
-          }
-          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-        >
-          {Object.entries(taskStatusLabels).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={draft.taskType}
-          onChange={(event) =>
-            onChange({
-              ...draft,
-              taskType: event.target.value as TrackerTaskMutationInput["taskType"],
-            })
-          }
-          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-        >
-          {Object.entries(taskTypeLabels).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={draft.priority}
-          onChange={(event) =>
-            onChange({
-              ...draft,
-              priority: event.target.value as TrackerTaskMutationInput["priority"],
-            })
-          }
-          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-        >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
-        <input
-          type="date"
-          value={draft.dueDate ?? ""}
-          onChange={(event) =>
-            onChange({
-              ...draft,
-              dueDate: event.target.value || null,
-            })
-          }
-          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-        />
+        <label className="grid gap-2 text-sm text-foreground">
+          <span className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            Status
+          </span>
+          <select
+            value={draft.status}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                status: event.target.value as TrackerTaskMutationInput["status"],
+              })
+            }
+            className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+          >
+            {Object.entries(taskStatusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {taskStatusDescriptions[draft.status]}
+          </p>
+        </label>
+        <label className="grid gap-2 text-sm text-foreground">
+          <span className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            Task Type
+          </span>
+          <select
+            value={draft.taskType}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                taskType: event.target.value as TrackerTaskMutationInput["taskType"],
+              })
+            }
+            className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+          >
+            {Object.entries(taskTypeLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {taskTypeDescriptions[draft.taskType]}
+          </p>
+        </label>
+        <label className="grid gap-2 text-sm text-foreground">
+          <span className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            Priority
+          </span>
+          <select
+            value={draft.priority}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                priority: event.target.value as TrackerTaskMutationInput["priority"],
+              })
+            }
+            className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+          >
+            {Object.entries(priorityLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {priorityDescriptions[draft.priority]}
+          </p>
+        </label>
+        <label className="grid gap-2 text-sm text-foreground">
+          <span className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            Due Date
+          </span>
+          <input
+            type="date"
+            value={draft.dueDate ?? ""}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                dueDate: event.target.value || null,
+              })
+            }
+            className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+          />
+          <p className="text-xs leading-5 text-muted-foreground">
+            ใส่เมื่อมี deadline จริง, commitment ที่คนอื่นรอ หรือวันติดตามที่ต้องเห็นบนบอร์ด
+          </p>
+        </label>
       </div>
     </>
   );

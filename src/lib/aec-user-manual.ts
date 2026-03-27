@@ -44,6 +44,14 @@ export interface ManualSystemAction {
   href: string;
 }
 
+export interface ManualSystemReferenceGroup {
+  title: string;
+  items: Array<{
+    label: string;
+    body: string;
+  }>;
+}
+
 export interface ManualSystemGuide {
   slug: ManualSystemSlug;
   name: string;
@@ -62,6 +70,7 @@ export interface ManualSystemGuide {
   guardrail: string;
   statusNote: string;
   actions: ManualSystemAction[];
+  referenceGroups?: ManualSystemReferenceGroup[];
 }
 
 export const manualFrameworkCards: ManualFrameworkCard[] = [
@@ -304,6 +313,99 @@ export const manualSystemGuides: ManualSystemGuide[] = [
       { label: "Open Kanban board", href: "/todos" },
       { label: "Open GTD workspace", href: "/gtd" },
       { label: "Open AI guide", href: "/ai-assistant" },
+    ],
+    referenceGroups: [
+      {
+        title: "เมนูบนหน้า Kanban",
+        items: [
+          {
+            label: "Projects",
+            body: "แถบซ้ายใช้เลือกโปรเจกต์ที่กำลังดูอยู่ งาน, report และ review queue ตรงกลางจะเปลี่ยนตามโปรเจกต์นี้ทั้งหมด",
+          },
+          {
+            label: "Saved Views",
+            body: "ใช้กรองงานแบบเร็ว เช่น Today, This Week, Waiting On, Overdue, RFIs, Submittals และ Site Issues เพื่อหยิบดูเฉพาะกลุ่มงานที่ต้องตัดสินใจตอนนี้",
+          },
+          {
+            label: "Domain Tabs",
+            body: "Tasks คือบอร์ดหลัก, Decisions คือบันทึกคำตัดสินใจ, Revision Log คือประวัติ revision, Weekly Report คือรายงานประจำสัปดาห์, Review Queue คือรายการที่รอตรวจ",
+          },
+          {
+            label: "Intake",
+            body: "ใช้เอาข้อมูลใหม่ที่ยังไม่เป็น task เข้าระบบ เช่น minutes, RFI log, revision text, site photo หรือ markup แล้วให้ระบบสร้างรายการรอตรวจต่อ",
+          },
+          {
+            label: "Add Task",
+            body: "ใช้สร้าง task ด้วยมือเมื่อรู้อยู่แล้วว่างานคืออะไร ใครทำ และควรขึ้นบอร์ดทันทีโดยไม่ต้องผ่าน intake",
+          },
+          {
+            label: "Copy for AI chat",
+            body: "คัดลอกสรุปของโปรเจกต์ปัจจุบันเพื่อเอาไปถาม AI ภายนอกต่อ เช่น ขอให้ช่วยจัดลำดับงานหรือมอง blocker",
+          },
+        ],
+      },
+      {
+        title: "เมนู Intake ใช้ตอนไหน",
+        items: [
+          {
+            label: "Meeting note intake",
+            body: "ใช้หลังประชุม วาง minutes, discussion notes หรือ action items ลงไป ระบบจะสกัดประเด็นแล้วส่งเข้า review queue ก่อนสร้าง task หรือ decision จริง",
+          },
+          {
+            label: "RFI / revision intake",
+            body: "ใช้กับข้อความหรือข้อมูลที่มาจาก RFI log, submittal log หรือ drawing revision โดยเลือกชนิด log ให้ตรงก่อน paste ข้อมูลหรือ CSV rows",
+          },
+          {
+            label: "Site photo / markup intake",
+            body: "ใช้กับรูปหน้างาน, screenshot, หรือภาพที่มี markup เพื่อให้ระบบเก็บเป็น artifact และช่วยแตก issue หรือ follow-up ต่อจากภาพนั้น",
+          },
+          {
+            label: "After intake",
+            body: "ข้อมูลจาก intake จะยังไม่ขึ้นบอร์ดทันที แต่จะไปที่ Review Queue ก่อนเพื่อให้คนตรวจว่าข้อเสนอ task, decision หรือ summary ถูกต้องจริง",
+          },
+        ],
+      },
+      {
+        title: "Task Type หมายถึงอะไร",
+        items: [
+          {
+            label: "Design",
+            body: "งานออกแบบหรือแก้แบบ เช่น layout, detail, drawing pack หรือการพัฒนา solution ด้านสถาปัตย์/วิศวกรรม",
+          },
+          {
+            label: "Coordination",
+            body: "งานประสานหลายฝ่าย เช่น clash, ขอข้อมูลจาก consultant, sync กับ supplier หรือเคลียร์จุดเชื่อมต่อระหว่างทีม",
+          },
+          {
+            label: "Approval",
+            body: "งานที่เกี่ยวกับการขออนุมัติหรือเตรียมเอกสารเพื่ออนุมัติจาก client, consultant, owner หรือหน่วยงาน",
+          },
+          {
+            label: "RFI",
+            body: "คำถามที่ต้องการคำตอบชัดเพื่อให้ทำงานต่อได้ เหมาะกับประเด็นข้อมูลขาด, แบบไม่ชัด, หรือ field query จากหน้างาน",
+          },
+          {
+            label: "Submittal",
+            body: "งานส่งวัสดุ, shop drawing, sample หรือเอกสารที่ต้อง review/approve ก่อนผลิตหรือก่อสร้างต่อ",
+          },
+          {
+            label: "Site Issue",
+            body: "ปัญหาหน้างานที่ต้องติดตามแก้ เช่น งานผิดแบบ, defect, access problem, safety concern หรือ issue จากรูป site",
+          },
+          {
+            label: "Punch List",
+            body: "รายการเก็บงานหรือ defect ที่ต้องปิดให้ครบก่อนส่งมอบ ใช้กับ snag list และงาน correction ที่ตรวจพบแล้ว",
+          },
+          {
+            label: "Procurement",
+            body: "งานจัดซื้อหรือจัดหา เช่น ขอราคา, สั่งของ, เช็ก lead time, ตามของเข้า site หรือประสาน supplier",
+          },
+          {
+            label: "Meeting Follow-up",
+            body: "งานที่เกิดจากประชุมโดยตรง เช่น ส่ง recap, ตาม owner, ปิด commitment หรือแตก next step หลังจบประชุม",
+          },
+        ],
+      },
     ],
   },
   {

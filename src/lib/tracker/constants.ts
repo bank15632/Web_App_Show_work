@@ -101,6 +101,14 @@ export const taskStatusLabels = {
   done: "Done",
 } satisfies Record<(typeof trackerTaskStatuses)[number], string>;
 
+export const taskStatusDescriptions = {
+  todo: "งานพร้อมเริ่ม แต่ยังไม่ได้หยิบลงมือจริง",
+  doing: "งานที่กำลังทำอยู่ตอนนี้และควรมี owner ชัด",
+  waiting: "งานที่รอคำตอบ, ข้อมูล, approval หรือของจากคนอื่นก่อน",
+  blocked: "งานที่เดินต่อไม่ได้เพราะติด blocker สำคัญ",
+  done: "งานเสร็จและไม่ต้องติดตามต่อแล้วในบอร์ดนี้",
+} satisfies Record<(typeof trackerTaskStatuses)[number], string>;
+
 export const taskStatusTone = {
   todo: "border-stone-200 bg-stone-50 text-stone-700",
   doing: "border-sky-200 bg-sky-50 text-sky-700",
@@ -121,6 +129,18 @@ export const taskTypeLabels = {
   meeting_followup: "Meeting Follow-up",
 } satisfies Record<(typeof trackerTaskTypes)[number], string>;
 
+export const taskTypeDescriptions = {
+  design: "ใช้กับงานออกแบบหรือแก้แบบที่ทีมต้องลงมือทำต่อทันที",
+  coordination: "ใช้กับงานประสาน consultant, supplier หรือเคลียร์ข้อมูลข้ามทีม",
+  approval: "ใช้กับงานเตรียมเอกสารหรือรายการที่รอการอนุมัติจากผู้เกี่ยวข้อง",
+  rfi: "ใช้เมื่อมีคำถามที่ต้องได้คำตอบชัดก่อนเดินงานต่อ",
+  submittal: "ใช้กับ shop drawing, material approval หรือเอกสารส่งอนุมัติ",
+  site_issue: "ใช้กับปัญหาหน้างาน, defect หรือ issue ที่มาจาก site visit",
+  punch_list: "ใช้กับรายการเก็บงานหรือ defect ที่ต้องปิดก่อนส่งมอบ",
+  procurement: "ใช้กับงานจัดซื้อ, ขอราคา, เช็ก lead time หรือประสาน supplier",
+  meeting_followup: "ใช้กับ action item ที่แตกออกมาหลังประชุมและต้องมี owner ชัด",
+} satisfies Record<(typeof trackerTaskTypes)[number], string>;
+
 export const artifactKindLabels = {
   meeting_note: "Meeting Note",
   drawing_revision: "Drawing Revision",
@@ -135,6 +155,12 @@ export const priorityLabels = {
   low: "Low",
   medium: "Medium",
   high: "High",
+} satisfies Record<(typeof trackerPriorities)[number], string>;
+
+export const priorityDescriptions = {
+  low: "งานมีประโยชน์แต่ยังไม่เร่งและไม่กระทบ flow ตอนนี้มาก",
+  medium: "งานสำคัญตามปกติ ควรอยู่ในแผนของสัปดาห์นี้",
+  high: "งานเร่งหรือกระทบ deadline, คนอื่นรอ, หรือมีความเสี่ยงถ้าไม่เคลียร์เร็ว",
 } satisfies Record<(typeof trackerPriorities)[number], string>;
 
 export const priorityTone = {

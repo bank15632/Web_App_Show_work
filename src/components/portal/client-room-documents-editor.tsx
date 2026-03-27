@@ -324,7 +324,6 @@ export function ClientRoomDocumentsEditor({
                         document={document}
                         index={index}
                         totalItems={section.items.length}
-                        sectionId={section.id}
                         handleProps={handleProps}
                         onRemove={() => removeDocument(section.id, document.id)}
                         onMove={(newIndex) => moveDocument(section.id, index, newIndex)}
@@ -348,7 +347,6 @@ function CollapsibleDocumentCard({
   document,
   index,
   totalItems,
-  sectionId,
   handleProps,
   onRemove,
   onMove,
@@ -359,7 +357,6 @@ function CollapsibleDocumentCard({
   document: ClientRoomDocument;
   index: number;
   totalItems: number;
-  sectionId: ClientRoomSectionId;
   handleProps: Record<string, unknown>;
   onRemove: () => void;
   onMove: (newIndex: number) => void;

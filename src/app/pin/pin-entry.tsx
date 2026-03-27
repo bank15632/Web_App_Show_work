@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
@@ -86,11 +87,12 @@ export function PinEntry() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-xs space-y-8 text-center">
         <div className="space-y-2">
-          <img
+          <Image
             src="/logo-bnj.svg"
             alt="BNJ"
             width={80}
             height={40}
+            priority
             className="mx-auto h-10 w-auto"
           />
           <h1 className="text-lg font-medium">กรุณาใส่ PIN</h1>

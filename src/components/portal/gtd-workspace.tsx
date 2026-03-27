@@ -39,7 +39,11 @@ import {
   updateGtdItemRequest,
   updateGtdReviewRequest,
 } from "@/lib/gtd/client";
-import { phaseLabels, taskTypeLabels } from "@/lib/tracker/constants";
+import {
+  phaseLabels,
+  taskTypeDescriptions,
+  taskTypeLabels,
+} from "@/lib/tracker/constants";
 import {
   createTrackerTaskRequest,
   fetchTrackerWorkspace,
@@ -1125,6 +1129,13 @@ export function GtdWorkspace() {
             <p className="text-sm leading-7 text-muted-foreground">
               Create a tracker task from this GTD item and keep a link back to the Kanban board.
             </p>
+            <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">
+              <p className="font-medium text-foreground">ควรใช้เมื่อไหร่</p>
+              <p className="mt-1">
+                ใช้เมื่อ GTD item นี้ผ่านการ clarify แล้วและควรกลายเป็นงานที่ทีมเห็นร่วมกันบน
+                Kanban board ไม่ใช่แค่ reminder ส่วนตัว
+              </p>
+            </div>
 
             {isTrackerLoading ? (
               <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
@@ -1180,6 +1191,9 @@ export function GtdWorkspace() {
                       </option>
                     ))}
                   </select>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {taskTypeDescriptions[kanbanDraft.taskType]}
+                  </p>
                 </label>
 
                 <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">
