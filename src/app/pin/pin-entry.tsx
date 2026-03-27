@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
@@ -7,7 +8,11 @@ import { LoaderCircle } from "lucide-react";
 export function PinEntry() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/";
+  const rawNext = searchParams.get("next");
+  const nextPath =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+      ? rawNext
+      : "/";
 
   const [digits, setDigits] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
@@ -82,18 +87,19 @@ export function PinEntry() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-xs space-y-8 text-center">
         <div className="space-y-2">
-          <img
+          <Image
             src="/logo-bnj.svg"
             alt="BNJ"
             width={80}
             height={40}
+            priority
             className="mx-auto h-10 w-auto"
           />
           <h1 className="text-lg font-medium">กรุณาใส่ PIN</h1>
           <p className="text-sm text-muted-foreground">กรอกรหัส 4 หลักเพื่อเข้าสู่ระบบ</p>
         </div>
 
-        <div className="flex justify-center gap-3" onPaste={handlePaste}>
+        <div className="flex justify-center gap-3" role="group" aria-label="PIN entry" onPaste={handlePaste}>
           {digits.map((digit, i) => (
             <input
               key={i}
@@ -101,6 +107,7 @@ export function PinEntry() {
               type="text"
               inputMode="numeric"
               maxLength={1}
+              aria-label={`PIN digit ${i + 1} of 4`}
               value={digit}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}

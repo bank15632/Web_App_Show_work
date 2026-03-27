@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextResponse } from "next/server";
 
+import { AppError } from "@/lib/errors";
 import type { TrackerEnv } from "@/lib/tracker/env";
 
 export async function getTrackerEnv(): Promise<TrackerEnv> {
@@ -13,15 +14,12 @@ export function createJsonResponse(payload: unknown, init?: ResponseInit) {
 }
 
 export function createErrorResponse(error: unknown) {
-  const message =
-    error instanceof Error ? error.message : "Unexpected tracker error";
+  if (error instanceof AppError) {
+    return NextResponse.json({ error: error.message }, { status: error.statusCode });
+  }
 
-  return NextResponse.json(
-    {
-      error: message,
-    },
-    {
-      status: 500,
-    },
-  );
+  const message =
+    error instanceof Error ? error.message : "Unexpected error";
+
+  return NextResponse.json({ error: message }, { status: 500 });
 }

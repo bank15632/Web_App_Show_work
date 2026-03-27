@@ -39,7 +39,11 @@ import {
   updateGtdItemRequest,
   updateGtdReviewRequest,
 } from "@/lib/gtd/client";
-import { phaseLabels, taskTypeLabels } from "@/lib/tracker/constants";
+import {
+  phaseLabels,
+  taskTypeDescriptions,
+  taskTypeLabels,
+} from "@/lib/tracker/constants";
 import {
   createTrackerTaskRequest,
   fetchTrackerWorkspace,
@@ -568,7 +572,7 @@ export function GtdWorkspace() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7f3ed_100%)]">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="mx-auto flex max-w-[1480px] flex-wrap items-center gap-3 px-6 py-5 lg:px-10">
+        <div className="flex flex-wrap items-center gap-3 px-6 py-5 lg:px-10">
           <Link href="/aec-workflow" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
             <ArrowLeft className="size-4" />
             Back to AEC workflow
@@ -592,7 +596,7 @@ export function GtdWorkspace() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1480px] space-y-10 px-6 py-10 lg:px-10">
+      <main className="space-y-10 px-6 py-10 lg:px-10">
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_24rem]">
           <div className="rounded-[2rem] border border-border bg-background p-8 shadow-[0_24px_80px_rgba(0,0,0,0.04)]">
             <p className="caption-editorial">Phase 1 Module</p>
@@ -1125,6 +1129,13 @@ export function GtdWorkspace() {
             <p className="text-sm leading-7 text-muted-foreground">
               Create a tracker task from this GTD item and keep a link back to the Kanban board.
             </p>
+            <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">
+              <p className="font-medium text-foreground">ควรใช้เมื่อไหร่</p>
+              <p className="mt-1">
+                ใช้เมื่อ GTD item นี้ผ่านการ clarify แล้วและควรกลายเป็นงานที่ทีมเห็นร่วมกันบน
+                Kanban board ไม่ใช่แค่ reminder ส่วนตัว
+              </p>
+            </div>
 
             {isTrackerLoading ? (
               <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
@@ -1180,6 +1191,9 @@ export function GtdWorkspace() {
                       </option>
                     ))}
                   </select>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {taskTypeDescriptions[kanbanDraft.taskType]}
+                  </p>
                 </label>
 
                 <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">

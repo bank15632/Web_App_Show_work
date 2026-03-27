@@ -1,3 +1,4 @@
+import { ValidationError } from "@/lib/errors";
 import { createErrorResponse, createJsonResponse, getTrackerEnv } from "@/lib/tracker/runtime";
 import { createClientRoomAsset } from "@/lib/client-rooms/service";
 import type { ClientRoomAssetKind } from "@/lib/client-rooms/types";
@@ -7,6 +8,7 @@ type AssetRouteProps = {
 };
 
 const allowedKinds = new Set<ClientRoomAssetKind>(["hero", "gallery", "document"]);
+const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // 50 MB
 
 export async function POST(request: Request, { params }: AssetRouteProps) {
   try {
@@ -17,15 +19,19 @@ export async function POST(request: Request, { params }: AssetRouteProps) {
     const file = formData.get("file");
 
     if (!allowedKinds.has(kind)) {
-      throw new Error("Invalid asset kind");
+      throw new ValidationError("Invalid asset kind");
     }
 
     if (!(file instanceof File)) {
-      throw new Error("Upload file is required");
+      throw new ValidationError("Upload file is required");
     }
 
     if ((kind === "hero" || kind === "gallery") && !file.type.startsWith("image/")) {
-      throw new Error("Hero and gallery uploads must be images");
+      throw new ValidationError("Hero and gallery uploads must be images");
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE) {
+      throw new ValidationError(`File too large: max ${MAX_UPLOAD_SIZE / 1024 / 1024}MB`);
     }
 
     const result = await createClientRoomAsset(env, {

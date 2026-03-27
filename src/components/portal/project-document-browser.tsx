@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Download, Eye, FileDown, LoaderCircle } from "lucide-react";
 
+import {
+  exportSectionImagesToPdf,
+  type PdfExportProgress,
+} from "@/lib/client-rooms/pdf-export";
 import {
   formatPortalDate,
   getDocumentPreviewUrl,
@@ -373,23 +377,24 @@ function ImageDocumentStack({
   documents: ProjectDocument[];
   sectionCategories: ProjectCategory[];
 }) {
+  const [pdfProgress, setPdfProgress] = useState<PdfExportProgress | null>(null);
   const hasSubCategories = sectionCategories.length > 0;
 
-  if (!hasSubCategories) {
-    return (
-      <div className="space-y-8">
-        {documents.map((document, index) => (
-          <ImageDocumentCard
-            key={document.id}
-            project={project}
-            category={category}
-            document={document}
-            index={index}
-          />
-        ))}
-      </div>
-    );
+  async function handleDownloadPdf() {
+    setPdfProgress({ current: 0, total: documents.length });
+    try {
+      await exportSectionImagesToPdf(
+        documents,
+        category.label,
+        project.title,
+        setPdfProgress,
+      );
+    } finally {
+      setPdfProgress(null);
+    }
   }
+
+  const isExporting = pdfProgress !== null;
 
   // Group documents by category (preserve order from sectionCategories)
   const grouped: Array<{ cat: ProjectCategory; docs: ProjectDocument[] }> = [];
@@ -407,49 +412,88 @@ function ImageDocumentStack({
   const uncategorized = documents.filter((doc) => !usedDocIds.has(doc.id));
 
   return (
-    <div className="space-y-12">
-      {grouped.map(({ cat, docs }) => (
-        <div key={cat.id}>
-          <h3
-            id={`subcat-${cat.id}`}
-            className="mb-6 border-b border-border pb-3 text-lg font-semibold"
-          >
-            {cat.name}
-          </h3>
-          <div className="space-y-8">
-            {docs.map((document, index) => (
-              <ImageDocumentCard
-                key={document.id}
-                project={project}
-                category={category}
-                document={document}
-                index={index}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {documents.length} รูปในหมวด {category.label}
+        </p>
+        <button
+          onClick={handleDownloadPdf}
+          disabled={isExporting}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
+        >
+          {isExporting ? (
+            <>
+              <LoaderCircle className="size-4 animate-spin" />
+              กำลังสร้าง PDF ({pdfProgress.current}/{pdfProgress.total})
+            </>
+          ) : (
+            <>
+              <FileDown className="size-4" />
+              ดาวน์โหลดทั้งหมดเป็น PDF
+            </>
+          )}
+        </button>
+      </div>
 
-      {uncategorized.length > 0 ? (
-        <div>
-          {grouped.length > 0 ? (
-            <h3 className="mb-6 border-b border-border pb-3 text-lg font-semibold">
-              อื่นๆ
-            </h3>
-          ) : null}
-          <div className="space-y-8">
-            {uncategorized.map((document, index) => (
-              <ImageDocumentCard
-                key={document.id}
-                project={project}
-                category={category}
-                document={document}
-                index={index}
-              />
-            ))}
-          </div>
+      {!hasSubCategories ? (
+        <div className="space-y-8">
+          {documents.map((document, index) => (
+            <ImageDocumentCard
+              key={document.id}
+              project={project}
+              category={category}
+              document={document}
+              index={index}
+            />
+          ))}
         </div>
-      ) : null}
+      ) : (
+        <div className="space-y-12">
+          {grouped.map(({ cat, docs }) => (
+            <div key={cat.id}>
+              <h3
+                id={`subcat-${cat.id}`}
+                className="mb-6 border-b border-border pb-3 text-lg font-semibold"
+              >
+                {cat.name}
+              </h3>
+              <div className="space-y-8">
+                {docs.map((document, index) => (
+                  <ImageDocumentCard
+                    key={document.id}
+                    project={project}
+                    category={category}
+                    document={document}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {uncategorized.length > 0 ? (
+            <div>
+              {grouped.length > 0 ? (
+                <h3 className="mb-6 border-b border-border pb-3 text-lg font-semibold">
+                  อื่นๆ
+                </h3>
+              ) : null}
+              <div className="space-y-8">
+                {uncategorized.map((document, index) => (
+                  <ImageDocumentCard
+                    key={document.id}
+                    project={project}
+                    category={category}
+                    document={document}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
