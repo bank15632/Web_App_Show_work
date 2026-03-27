@@ -92,7 +92,11 @@ export function ProjectDocumentBrowser({
   const imageDocuments = getImageDocuments(activeCategory.section.items);
   const browserDocuments = getBrowserDocuments(activeCategory.section.items);
   const sectionCategories = activeCategory.section.categories ?? [];
-  const hasSubCategories = sectionCategories.length > 0;
+  const navigableSubCategories = getNavigableSubCategories(
+    sectionCategories,
+    imageDocuments,
+  );
+  const hasSubCategories = navigableSubCategories.length > 0;
 
   function getRoomRevisionHistory(roomName: string) {
     return browserDocuments
@@ -131,7 +135,7 @@ export function ProjectDocumentBrowser({
 
           {hasSubCategories ? (
             <div className="flex items-center gap-3 overflow-x-auto pb-3">
-              {sectionCategories.map((subCat) => (
+              {navigableSubCategories.map((subCat) => (
                 <button
                   key={subCat.id}
                   onClick={() => scrollToSubCategory(subCat.id)}
@@ -598,6 +602,19 @@ function getVisibleDocuments(documents: ProjectDocument[]) {
 
 function getImageDocuments(documents: ProjectDocument[]) {
   return documents.filter((document) => isImageDocument(document));
+}
+
+export function getNavigableSubCategories(
+  sectionCategories: ProjectCategory[],
+  documents: ProjectDocument[],
+) {
+  const categoryIdsWithImages = new Set(
+    documents
+      .map((document) => document.categoryId)
+      .filter((categoryId): categoryId is string => Boolean(categoryId)),
+  );
+
+  return sectionCategories.filter((category) => categoryIdsWithImages.has(category.id));
 }
 
 function getBrowserDocuments(documents: ProjectDocument[]) {
