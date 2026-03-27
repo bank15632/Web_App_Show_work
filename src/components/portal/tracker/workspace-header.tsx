@@ -28,33 +28,33 @@ export function WorkspaceHeader({
     : 0;
 
   return (
-    <section className="rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,#f6f1e8_0%,#ffffff_45%)] p-6">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-        <div>
+    <section className="rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,#f6f1e8_0%,#ffffff_45%)] p-5 sm:p-6">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
           <p className="caption-editorial">Workspace</p>
-          <h2 className="mt-2 font-display text-4xl font-medium tracking-tight sm:text-5xl">
+          <h2 className="mt-2 font-display text-3xl font-medium leading-tight tracking-tight text-balance sm:text-4xl lg:text-5xl">
             {project.name}
           </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
+          <p className="mt-3 max-w-3xl text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
             {project.overview || "AI review queue for architecture tasks, artifacts, and decisions."}
           </p>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="mt-5 flex flex-wrap items-center gap-2 sm:gap-3">
             <span
-              className="inline-flex rounded-full px-4 py-2 text-sm font-medium text-white"
+              className="inline-flex rounded-full px-3 py-1.5 text-[13px] font-medium text-white sm:px-4 sm:py-2 sm:text-sm"
               style={{ backgroundColor: phaseAccents[project.phase] }}
             >
               {phaseLabels[project.phase]}
             </span>
-            <span className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground">
+            <span className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted-foreground sm:px-4 sm:py-2 sm:text-sm">
               {project.clientName || "BNJ Studio"} · {project.location || "Bangkok"}
             </span>
-            <span className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground">
+            <span className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted-foreground sm:px-4 sm:py-2 sm:text-sm">
               {project.tasks.length} tasks · {doneCount} done · {progress}% complete
             </span>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
           <SelectPill
             value={project.phase}
             onChange={(value) => onPhaseChange(value as TrackerPhase)}
@@ -69,7 +69,7 @@ export function WorkspaceHeader({
             type="button"
             onClick={onOpenIntake}
             disabled={isWorking}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-sm font-medium transition-colors hover:border-foreground"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[13px] font-medium transition-colors hover:border-foreground sm:text-sm"
           >
             <Upload className="size-4" />
             Intake
@@ -78,7 +78,7 @@ export function WorkspaceHeader({
             type="button"
             onClick={onNewTask}
             disabled={isWorking}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90 sm:text-sm"
           >
             <Plus className="size-4" />
             Add Task
@@ -87,7 +87,7 @@ export function WorkspaceHeader({
             type="button"
             onClick={onDeleteProject}
             disabled={isWorking}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-5 text-[13px] font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
           >
             <Trash2 className="size-4" />
             Delete Project
@@ -118,11 +118,11 @@ function SelectPill({
   options: readonly (readonly [string, string])[] | [string, string][];
 }) {
   return (
-    <div className="relative">
+    <div className="relative w-full md:w-auto">
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium capitalize outline-none transition-colors hover:border-foreground focus:border-foreground"
+        className="h-11 w-full appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-[13px] font-medium capitalize outline-none transition-colors hover:border-foreground focus:border-foreground sm:text-sm"
       >
         {options.map(([optionValue, label]) => (
           <option key={optionValue} value={optionValue}>

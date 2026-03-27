@@ -656,8 +656,8 @@ export function TodoListView() {
           </div>
         ) : null}
 
-        <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-5 py-6 lg:px-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-4 py-5 sm:px-5 sm:py-6 lg:px-8">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <SidebarToggleButton
                 collapsed={isLeftRailCollapsed}
@@ -668,7 +668,7 @@ export function TodoListView() {
               />
               <Link
                 href="/todos/guide"
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
               >
                 <BookOpenText className="size-4" />
                 Kanban Guide
@@ -679,7 +679,7 @@ export function TodoListView() {
               onClick={() => {
                 void handleCopyAiBrief();
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
             >
               <Copy className="size-4" />
               Copy for AI chat
@@ -727,7 +727,7 @@ export function TodoListView() {
             onOpenIntake={() => setDialog("meeting")}
           />
 
-          <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <SavedViewBar
               activeView={savedView}
               counts={savedViewCounts}
@@ -1202,7 +1202,7 @@ function SidebarToggleButton({
       onClick={onClick}
       aria-pressed={collapsed}
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-full border bg-background px-4 text-sm font-medium transition-colors",
+        "inline-flex h-10 items-center gap-2 rounded-full border bg-background px-4 text-[13px] font-medium transition-colors sm:text-sm",
         collapsed
           ? "border-foreground text-foreground"
           : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",

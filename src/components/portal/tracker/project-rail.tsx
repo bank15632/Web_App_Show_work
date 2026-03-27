@@ -20,42 +20,42 @@ export function ProjectRail({
   onCreateProject: () => void;
 }) {
   return (
-    <aside className="flex h-full w-full max-w-[290px] flex-col border-r border-border bg-[linear-gradient(180deg,#ffffff_0%,#faf7f2_100%)]">
-      <div className="border-b border-border px-6 py-6">
-        <div className="flex items-center gap-4">
+    <aside className="flex h-full w-full max-w-none flex-col border-b border-border bg-[linear-gradient(180deg,#ffffff_0%,#faf7f2_100%)] lg:max-w-[290px] lg:border-b-0 lg:border-r">
+      <div className="border-b border-border px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex items-start gap-3 sm:gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={56}
             height={56}
-            className="h-10 w-auto"
+            className="h-9 w-auto shrink-0 sm:h-10"
           />
-          <div>
-            <p className="caption-editorial text-[0.7rem]">Tracker</p>
-            <h1 className="font-display text-2xl font-medium tracking-tight">
+          <div className="min-w-0">
+            <p className="caption-editorial text-[0.65rem] sm:text-[0.7rem]">Tracker</p>
+            <h1 className="mt-1 font-display text-xl font-medium leading-tight tracking-tight text-balance sm:text-2xl">
               AI Project Tracker
             </h1>
           </div>
         </div>
-        <div className="mt-5 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border px-4 py-2 text-[13px] leading-5 text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
           >
             <ListTodo className="size-4" />
             Dashboard
           </Link>
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm">
+          <div className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-[13px] leading-5 sm:text-sm">
             <Bot className="size-4" />
             {pendingReviewCount} pending review
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-5">
+      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5">
         <div className="mb-3 px-2">
-          <p className="caption-editorial text-[0.7rem]">Projects</p>
+          <p className="caption-editorial text-[0.65rem] sm:text-[0.7rem]">Projects</p>
         </div>
         <div className="space-y-2">
           {projects.map((project) => {
@@ -77,20 +77,24 @@ export function ProjectRail({
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="caption-editorial text-[0.68rem]">{project.code}</p>
-                    <p className="mt-1 font-medium text-foreground">{project.name}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="caption-editorial text-[0.62rem] sm:text-[0.68rem]">
+                      {project.code}
+                    </p>
+                    <p className="mt-1 text-sm font-medium leading-6 text-foreground text-pretty sm:text-base">
+                      {project.name}
+                    </p>
+                    <p className="mt-1 text-[13px] leading-5 text-muted-foreground sm:text-sm">
                       {project.clientName || "BNJ Studio"} · {phaseLabels[project.phase]}
                     </p>
                   </div>
                   <div
-                    className="flex size-11 items-center justify-center rounded-full text-xs font-medium text-white"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-medium text-white sm:size-11 sm:text-xs"
                     style={{
                       background: `conic-gradient(${phaseAccents[project.phase]} ${progress * 3.6}deg, #ece7df 0deg)`,
                     }}
                   >
-                    <span className="flex size-8 items-center justify-center rounded-full bg-white text-foreground">
+                    <span className="flex size-7 items-center justify-center rounded-full bg-white text-foreground sm:size-8">
                       {progress}%
                     </span>
                   </div>
@@ -105,7 +109,7 @@ export function ProjectRail({
         <button
           type="button"
           onClick={onCreateProject}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-dashed border-border px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
         >
           <FolderPlus className="size-4" />
           Create Project

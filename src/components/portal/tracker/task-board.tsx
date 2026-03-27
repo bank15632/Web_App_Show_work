@@ -162,18 +162,18 @@ export function TaskBoard({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="caption-editorial text-[0.7rem]">Execution</p>
-          <h3 className="mt-1 font-display text-3xl font-medium tracking-tight">
+          <h3 className="mt-1 font-display text-2xl font-medium tracking-tight sm:text-3xl">
             Task flow
           </h3>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={onCreateTask}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            className="rounded-full border border-border px-4 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
           >
             Quick add
           </button>
@@ -216,7 +216,7 @@ export function TaskBoard({
           }}
         >
           <div className="-mx-1 overflow-x-auto pb-2">
-            <div className="grid min-w-[89rem] grid-cols-[repeat(5,minmax(17rem,1fr))] gap-4 px-1">
+            <div className="grid min-w-[76rem] grid-cols-[repeat(5,minmax(14.5rem,1fr))] gap-4 px-1 sm:min-w-[89rem] sm:grid-cols-[repeat(5,minmax(17rem,1fr))]">
               {trackerTaskStatuses.map((status) => (
                 <TaskColumn
                   key={status}
@@ -258,11 +258,11 @@ function TaskColumn({
     >
       <div className="mb-4 flex items-center gap-2">
         <span
-          className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${taskStatusTone[status]}`}
+          className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-medium sm:text-xs ${taskStatusTone[status]}`}
         >
           {taskStatusLabels[status]}
         </span>
-        <span className="text-sm text-muted-foreground">{tasks.length}</span>
+        <span className="text-[13px] text-muted-foreground sm:text-sm">{tasks.length}</span>
       </div>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
         <div className="space-y-4">
@@ -329,41 +329,41 @@ function TaskCard({
 
   return (
     <article
-      className={`rounded-[1.4rem] border bg-stone-50/50 p-5 transition-all ${
+      className={`rounded-[1.4rem] border bg-stone-50/50 p-4 transition-all sm:p-5 ${
         dragging ? "border-foreground shadow-[0_16px_40px_rgba(0,0,0,0.12)]" : "border-border hover:border-foreground/30"
       }`}
     >
       <div className="flex items-start gap-4">
         <button
           type="button"
-          className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
+          className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground sm:size-9"
           {...dragHandleProps}
         >
           <GripVertical className="size-4" />
         </button>
         <div className="min-w-0 flex-1">
           <button type="button" onClick={onEdit} className="w-full text-left">
-            <h4 className="text-pretty text-base font-semibold leading-7 text-foreground">
+            <h4 className="text-pretty text-sm font-semibold leading-6 text-foreground sm:text-base sm:leading-7">
               {task.title}
             </h4>
           </button>
           {task.description ? (
-            <p className="mt-2 text-pretty text-sm leading-7 text-muted-foreground">
+            <p className="mt-2 text-pretty text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
               {task.description}
             </p>
           ) : null}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${priorityTone[task.priority]}`}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium sm:text-xs ${priorityTone[task.priority]}`}
             >
               {priorityLabels[task.priority]}
             </span>
-            <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground sm:text-xs">
               {taskTypeLabels[task.taskType]}
             </span>
             {task.dueDate ? (
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] sm:text-xs ${
                   isTaskOverdue(task)
                     ? "border-rose-200 bg-rose-50 text-rose-700"
                     : "border-border text-muted-foreground"
@@ -395,11 +395,11 @@ function TaskRow({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">{task.title}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{task.description}</p>
+          <p className="text-[13px] font-medium sm:text-sm">{task.title}</p>
+          <p className="mt-1 text-[13px] text-muted-foreground sm:text-sm">{task.description}</p>
         </div>
         <span
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${taskStatusTone[task.status]}`}
+          className={`rounded-full border px-3 py-1 text-[11px] font-medium sm:text-xs ${taskStatusTone[task.status]}`}
         >
           {taskStatusLabels[task.status]}
         </span>

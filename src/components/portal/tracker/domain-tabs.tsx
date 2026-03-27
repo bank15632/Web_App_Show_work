@@ -19,21 +19,23 @@ export function DomainTabs({
   onChange: (tab: TrackerDomainTab) => void;
 }) {
   return (
-    <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-border bg-background p-1">
-      {domainTabs.map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          onClick={() => onChange(tab)}
-          className={`rounded-full px-4 py-2 text-sm transition-colors ${
-            activeTab === tab
-              ? "bg-foreground text-background"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {labels[tab]}
-        </button>
-      ))}
+    <div className="-mx-1 overflow-x-auto pb-1">
+      <div className="inline-flex min-w-max items-center gap-2 rounded-full border border-border bg-background p-1 px-1">
+        {domainTabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onChange(tab)}
+            className={`shrink-0 rounded-full px-4 py-2 text-[13px] transition-colors sm:text-sm ${
+              activeTab === tab
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {labels[tab]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
