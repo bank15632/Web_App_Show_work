@@ -654,6 +654,7 @@ export function getNavigableSubCategories(
 ) {
   const categoryIdsWithImages = new Set(
     documents
+      .filter((document) => isImageDocument(document))
       .map((document) => document.categoryId)
       .filter((categoryId): categoryId is string => Boolean(categoryId)),
   );
