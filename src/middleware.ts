@@ -29,7 +29,8 @@ function getSafeRedirectPath(raw: string): string {
   return raw;
 }
 
-export async function proxy(request: NextRequest) {
+// Cloudflare's current OpenNext adapter still expects the Edge middleware convention.
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicRoute(pathname)) {
