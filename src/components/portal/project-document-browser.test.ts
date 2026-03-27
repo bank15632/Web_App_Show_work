@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveDocumentBrowserState } from "@/components/portal/project-document-browser";
-import type { ClientProject, ProjectSection } from "@/lib/portal-data";
+import {
+  getNavigableSubCategories,
+  resolveDocumentBrowserState,
+} from "@/components/portal/project-document-browser";
+import type { ClientProject, ProjectCategory, ProjectSection } from "@/lib/portal-data";
 
 function createSection(id: string, items: ProjectSection["items"]): ProjectSection {
   return {
     id,
     title: id,
     description: `${id} description`,
+    categories: [],
     items,
   };
 }
@@ -153,5 +157,66 @@ describe("resolveDocumentBrowserState", () => {
     expect(state.categories.map((category) => category.id)).toEqual(["design"]);
     expect(state.activeCategory?.id).toBe("design");
     expect(state.activeDocument).toBeNull();
+  });
+});
+
+describe("getNavigableSubCategories", () => {
+  it("returns only categories that have image documents to scroll to", () => {
+    const categories: ProjectCategory[] = [
+      { id: "living", name: "Living Room" },
+      { id: "bedroom", name: "Bedroom" },
+      { id: "kitchen", name: "Kitchen" },
+    ];
+
+    const documents: ProjectSection["items"] = [
+      {
+        id: "img-1",
+        title: "Living image",
+        version: "Revise 01",
+        kind: "image",
+        mimeType: "image/png",
+        updatedAt: "2026-03-23T00:00:00.000Z",
+        summary: "",
+        latest: true,
+        checked: false,
+        rooms: [],
+        viewerUrl: "/api/client-rooms/assets/img-1",
+        downloadUrl: "/api/client-rooms/assets/img-1",
+        categoryId: "living",
+      },
+      {
+        id: "pdf-1",
+        title: "Bedroom PDF",
+        version: "Revise 02",
+        kind: "pdf",
+        mimeType: "application/pdf",
+        updatedAt: "2026-03-23T00:00:00.000Z",
+        summary: "",
+        latest: false,
+        checked: false,
+        rooms: [],
+        viewerUrl: "https://example.com/bedroom",
+        downloadUrl: "https://example.com/bedroom.pdf",
+        categoryId: "bedroom",
+      },
+      {
+        id: "img-2",
+        title: "Uncategorized image",
+        version: "Revise 03",
+        kind: "image",
+        mimeType: "image/png",
+        updatedAt: "2026-03-23T00:00:00.000Z",
+        summary: "",
+        latest: false,
+        checked: false,
+        rooms: [],
+        viewerUrl: "/api/client-rooms/assets/img-2",
+        downloadUrl: "/api/client-rooms/assets/img-2",
+      },
+    ];
+
+    expect(getNavigableSubCategories(categories, documents)).toEqual([
+      { id: "living", name: "Living Room" },
+    ]);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Download, Eye, FileDown, LoaderCircle } from "lucide-react";
 
 import {
@@ -12,6 +12,7 @@ import {
   getDocumentPreviewUrl,
   hasUsableUrl,
   type ClientProject,
+  type ProjectCategory,
   type ProjectDocument,
   type ProjectSection,
 } from "@/lib/portal-data";
@@ -79,12 +80,27 @@ export function ProjectDocumentBrowser({
     setExpandedRoom((prev) => (prev === roomName ? null : roomName));
   }
 
+  const scrollToSubCategory = useCallback((subCatId: string) => {
+    const element = document.getElementById(`subcat-${subCatId}`);
+    if (element) {
+      const headerOffset = 140;
+      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: elementPosition - headerOffset, behavior: "smooth" });
+    }
+  }, []);
+
   if (!activeCategory) {
     return null;
   }
 
   const imageDocuments = getImageDocuments(activeCategory.section.items);
   const browserDocuments = getBrowserDocuments(activeCategory.section.items);
+  const sectionCategories = activeCategory.section.categories ?? [];
+  const navigableSubCategories = getNavigableSubCategories(
+    sectionCategories,
+    imageDocuments,
+  );
+  const hasSubCategories = navigableSubCategories.length > 0;
 
   function getRoomRevisionHistory(roomName: string) {
     return browserDocuments
@@ -120,6 +136,20 @@ export function ProjectDocumentBrowser({
               </button>
             ))}
           </div>
+
+          {hasSubCategories ? (
+            <div className="flex items-center gap-3 overflow-x-auto pb-3">
+              {navigableSubCategories.map((subCat) => (
+                <button
+                  key={subCat.id}
+                  onClick={() => scrollToSubCategory(subCat.id)}
+                  className="shrink-0 rounded-full border border-border bg-secondary/50 px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                >
+                  {subCat.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -129,6 +159,7 @@ export function ProjectDocumentBrowser({
             project={project}
             category={activeCategory}
             documents={imageDocuments}
+            sectionCategories={sectionCategories}
           />
         ) : null}
 
@@ -339,12 +370,15 @@ function ImageDocumentStack({
   project,
   category,
   documents,
+  sectionCategories,
 }: {
   project: ClientProject;
   category: AvailableCategory;
   documents: ProjectDocument[];
+  sectionCategories: ProjectCategory[];
 }) {
   const [pdfProgress, setPdfProgress] = useState<PdfExportProgress | null>(null);
+  const hasSubCategories = sectionCategories.length > 0;
 
   async function handleDownloadPdf() {
     setPdfProgress({ current: 0, total: documents.length });
@@ -361,6 +395,21 @@ function ImageDocumentStack({
   }
 
   const isExporting = pdfProgress !== null;
+
+  // Group documents by category (preserve order from sectionCategories)
+  const grouped: Array<{ cat: ProjectCategory; docs: ProjectDocument[] }> = [];
+  const usedDocIds = new Set<string>();
+
+  for (const cat of sectionCategories) {
+    const catDocs = documents.filter((doc) => doc.categoryId === cat.id);
+    if (catDocs.length > 0) {
+      grouped.push({ cat, docs: catDocs });
+      for (const doc of catDocs) usedDocIds.add(doc.id);
+    }
+  }
+
+  // Uncategorized documents
+  const uncategorized = documents.filter((doc) => !usedDocIds.has(doc.id));
 
   return (
     <div className="space-y-8">
@@ -387,15 +436,64 @@ function ImageDocumentStack({
         </button>
       </div>
 
-      {documents.map((document, index) => (
-        <ImageDocumentCard
-          key={document.id}
-          project={project}
-          category={category}
-          document={document}
-          index={index}
-        />
-      ))}
+      {!hasSubCategories ? (
+        <div className="space-y-8">
+          {documents.map((document, index) => (
+            <ImageDocumentCard
+              key={document.id}
+              project={project}
+              category={category}
+              document={document}
+              index={index}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-12">
+          {grouped.map(({ cat, docs }) => (
+            <div key={cat.id}>
+              <h3
+                id={`subcat-${cat.id}`}
+                className="mb-6 border-b border-border pb-3 text-lg font-semibold"
+              >
+                {cat.name}
+              </h3>
+              <div className="space-y-8">
+                {docs.map((document, index) => (
+                  <ImageDocumentCard
+                    key={document.id}
+                    project={project}
+                    category={category}
+                    document={document}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {uncategorized.length > 0 ? (
+            <div>
+              {grouped.length > 0 ? (
+                <h3 className="mb-6 border-b border-border pb-3 text-lg font-semibold">
+                  อื่นๆ
+                </h3>
+              ) : null}
+              <div className="space-y-8">
+                {uncategorized.map((document, index) => (
+                  <ImageDocumentCard
+                    key={document.id}
+                    project={project}
+                    category={category}
+                    document={document}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -548,6 +646,20 @@ function getVisibleDocuments(documents: ProjectDocument[]) {
 
 function getImageDocuments(documents: ProjectDocument[]) {
   return documents.filter((document) => isImageDocument(document));
+}
+
+export function getNavigableSubCategories(
+  sectionCategories: ProjectCategory[],
+  documents: ProjectDocument[],
+) {
+  const categoryIdsWithImages = new Set(
+    documents
+      .filter((document) => isImageDocument(document))
+      .map((document) => document.categoryId)
+      .filter((categoryId): categoryId is string => Boolean(categoryId)),
+  );
+
+  return sectionCategories.filter((category) => categoryIdsWithImages.has(category.id));
 }
 
 function getBrowserDocuments(documents: ProjectDocument[]) {

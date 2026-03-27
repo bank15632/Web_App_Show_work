@@ -16,15 +16,18 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, ChevronRight, FileUp, GripVertical, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileUp, GripVertical, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  createClientRoomId,
   createEmptyClientRoomDocument,
+  type ClientRoomCategory,
   type ClientRoomDocument,
   type ClientRoomDraftData,
+  type ClientRoomSection,
   type ClientRoomSectionId,
 } from "@/lib/client-rooms/types";
 
@@ -75,6 +78,10 @@ function getImagePreviewUrl(document: ClientRoomDocument) {
   return document.viewerUrl || document.downloadUrl;
 }
 
+function getCategoryName(section: ClientRoomSection, categoryId: string) {
+  return section.categories.find((c) => c.id === categoryId)?.name ?? "";
+}
+
 export function ClientRoomDocumentsEditor({
   draft,
   onChange,
@@ -89,6 +96,54 @@ export function ClientRoomDocumentsEditor({
   onStatus: (message: string) => void;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  function updateSection(
+    sectionId: ClientRoomSectionId,
+    updater: (section: ClientRoomSection) => ClientRoomSection,
+  ) {
+    onChange((currentDraft) => ({
+      ...currentDraft,
+      sections: currentDraft.sections.map((section) =>
+        section.id === sectionId ? updater(section) : section,
+      ),
+    }));
+  }
+
+  function addCategory(sectionId: ClientRoomSectionId, name: string) {
+    updateSection(sectionId, (section) => ({
+      ...section,
+      categories: [
+        ...section.categories,
+        { id: createClientRoomId("cat"), name },
+      ],
+    }));
+  }
+
+  function renameCategory(sectionId: ClientRoomSectionId, categoryId: string, name: string) {
+    updateSection(sectionId, (section) => ({
+      ...section,
+      categories: section.categories.map((c) =>
+        c.id === categoryId ? { ...c, name } : c,
+      ),
+    }));
+  }
+
+  function removeCategory(sectionId: ClientRoomSectionId, categoryId: string) {
+    updateSection(sectionId, (section) => ({
+      ...section,
+      categories: section.categories.filter((c) => c.id !== categoryId),
+      items: section.items.map((item) =>
+        item.categoryId === categoryId ? { ...item, categoryId: "" } : item,
+      ),
+    }));
+  }
+
+  function moveCategory(sectionId: ClientRoomSectionId, oldIndex: number, newIndex: number) {
+    updateSection(sectionId, (section) => ({
+      ...section,
+      categories: arrayMove(section.categories, oldIndex, newIndex),
+    }));
+  }
 
   function addDocuments(sectionId: ClientRoomSectionId, documents: ClientRoomDocument[]) {
     const hasNewLatest = documents.some((document) => document.latest);
@@ -296,6 +351,15 @@ export function ClientRoomDocumentsEditor({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <CategoryManager
+              categories={section.categories}
+              sensors={sensors}
+              onAdd={(name) => addCategory(section.id, name)}
+              onRename={(catId, name) => renameCategory(section.id, catId, name)}
+              onRemove={(catId) => removeCategory(section.id, catId)}
+              onMove={(oldIndex, newIndex) => moveCategory(section.id, oldIndex, newIndex)}
+            />
+
             {section.items.length === 0 ? (
               <p className="text-sm text-muted-foreground">ยังไม่มีเอกสารในหมวดนี้</p>
             ) : null}
@@ -324,6 +388,7 @@ export function ClientRoomDocumentsEditor({
                         document={document}
                         index={index}
                         totalItems={section.items.length}
+                        section={section}
                         handleProps={handleProps}
                         onRemove={() => removeDocument(section.id, document.id)}
                         onMove={(newIndex) => moveDocument(section.id, index, newIndex)}
@@ -343,10 +408,178 @@ export function ClientRoomDocumentsEditor({
   );
 }
 
+/* ---------- Category Manager ---------- */
+
+function CategoryManager({
+  categories,
+  sensors,
+  onAdd,
+  onRename,
+  onRemove,
+  onMove,
+}: {
+  categories: ClientRoomCategory[];
+  sensors: ReturnType<typeof useSensors>;
+  onAdd: (name: string) => void;
+  onRename: (id: string, name: string) => void;
+  onRemove: (id: string) => void;
+  onMove: (oldIndex: number, newIndex: number) => void;
+}) {
+  const [newName, setNewName] = useState("");
+
+  function handleAdd() {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setNewName("");
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-dashed border-border bg-secondary/30 p-3">
+      <p className="text-xs font-medium text-muted-foreground">หมวดหมู่ (Categories)</p>
+
+      {categories.length > 0 ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event: DragEndEvent) => {
+            const { active, over } = event;
+            if (!over || active.id === over.id) return;
+            const oldIndex = categories.findIndex((c) => c.id === active.id);
+            const newIndex = categories.findIndex((c) => c.id === over.id);
+            if (oldIndex !== -1 && newIndex !== -1) {
+              onMove(oldIndex, newIndex);
+            }
+          }}
+        >
+          <SortableContext
+            items={categories.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-wrap gap-2">
+              {categories.map((category) => (
+                <SortableCategoryChip
+                  key={category.id}
+                  category={category}
+                  onRename={(name) => onRename(category.id, name)}
+                  onRemove={() => onRemove(category.id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : null}
+
+      <div className="flex items-center gap-2">
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder="ชื่อหมวดหมู่ใหม่ เช่น Living room"
+          className="h-8 max-w-xs text-sm"
+        />
+        <Button variant="outline" size="sm" onClick={handleAdd} disabled={!newName.trim()}>
+          <Plus className="size-3" />
+          เพิ่ม
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SortableCategoryChip({
+  category,
+  onRename,
+  onRemove,
+}: {
+  category: ClientRoomCategory;
+  onRename: (name: string) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+  });
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(category.name);
+
+  function commitRename() {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== category.name) {
+      onRename(trimmed);
+    }
+    setEditing(false);
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-sm"
+    >
+      <button
+        type="button"
+        className="cursor-grab text-muted-foreground active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-3" />
+      </button>
+
+      {editing ? (
+        <input
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          autoFocus
+          className="w-24 bg-transparent text-sm outline-none"
+        />
+      ) : (
+        <span className="select-none">{category.name}</span>
+      )}
+
+      <button
+        type="button"
+        onClick={() => {
+          setEditValue(category.name);
+          setEditing(true);
+        }}
+        className="text-muted-foreground hover:text-foreground"
+        title="แก้ไขชื่อ"
+      >
+        <Pencil className="size-3" />
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="text-muted-foreground hover:text-red-500"
+        title="ลบหมวดหมู่"
+      >
+        <X className="size-3" />
+      </button>
+    </div>
+  );
+}
+
+/* ---------- Document Card ---------- */
+
 function CollapsibleDocumentCard({
   document,
   index,
   totalItems,
+  section,
   handleProps,
   onRemove,
   onMove,
@@ -357,6 +590,7 @@ function CollapsibleDocumentCard({
   document: ClientRoomDocument;
   index: number;
   totalItems: number;
+  section: ClientRoomSection;
   handleProps: Record<string, unknown>;
   onRemove: () => void;
   onMove: (newIndex: number) => void;
@@ -366,6 +600,10 @@ function CollapsibleDocumentCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [orderInput, setOrderInput] = useState("");
+
+  const categoryLabel = document.categoryId
+    ? getCategoryName(section, document.categoryId)
+    : "";
 
   function handleOrderCommit(value: string) {
     const parsed = Number.parseInt(value, 10);
@@ -378,7 +616,7 @@ function CollapsibleDocumentCard({
 
   return (
     <div className="rounded-2xl border border-border p-3">
-      {/* Collapsed row: grip + order + thumbnail + title + expand/collapse + delete */}
+      {/* Collapsed row: grip + order + thumbnail + title + category badge + expand/collapse + delete */}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -432,9 +670,16 @@ function CollapsibleDocumentCard({
           <p className="truncate text-sm font-medium">
             {document.title || document.id}
           </p>
-          {document.version ? (
-            <p className="truncate text-xs text-muted-foreground">{document.version}</p>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {document.version ? (
+              <p className="truncate text-xs text-muted-foreground">{document.version}</p>
+            ) : null}
+            {categoryLabel ? (
+              <span className="inline-block rounded-full bg-secondary px-2 py-0.5 text-[0.65rem] font-medium text-muted-foreground">
+                {categoryLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
         <button
           type="button"
@@ -488,6 +733,24 @@ function CollapsibleDocumentCard({
               <option value="canva">Canva</option>
             </select>
           </Field>
+          {section.categories.length > 0 ? (
+            <Field label="หมวดหมู่">
+              <select
+                value={document.categoryId}
+                onChange={(e) =>
+                  onFieldChange((c) => ({ ...c, categoryId: e.target.value }))
+                }
+                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <option value="">— ไม่ระบุหมวดหมู่ —</option>
+                {section.categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
           <Field label="Viewer URL">
             <Input
               value={document.viewerUrl}

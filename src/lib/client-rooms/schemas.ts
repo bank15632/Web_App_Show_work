@@ -26,12 +26,19 @@ const documentSchema = z.object({
   rooms: z.array(revisionRoomSchema).default([]),
   viewerUrl: z.string().trim().max(2000).default(""),
   downloadUrl: z.string().trim().max(2000).default(""),
+  categoryId: z.string().trim().max(80).default(""),
+});
+
+const categorySchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().max(120).default(""),
 });
 
 const sectionSchema = z.object({
   id: z.enum(sectionIdValues),
   title: z.string().trim().max(120).default(""),
   description: z.string().trim().max(400).default(""),
+  categories: z.array(categorySchema).default([]),
   items: z.array(documentSchema).default([]),
 });
 
@@ -78,6 +85,7 @@ export function normalizeClientRoomDraft(
         id: section.id,
         title: existing?.title || section.title,
         description: existing?.description || section.description,
+        categories: existing?.categories ?? [],
         items: existing?.items ?? [],
       };
     }),
