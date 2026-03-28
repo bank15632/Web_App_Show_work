@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterDocumentsByRevision,
   getNavigableSubCategories,
+  getRevisionOptions,
   resolveDocumentBrowserState,
 } from "@/components/portal/project-document-browser";
 import type { ClientProject, ProjectCategory, ProjectSection } from "@/lib/portal-data";
@@ -218,5 +220,62 @@ describe("getNavigableSubCategories", () => {
     expect(getNavigableSubCategories(categories, documents)).toEqual([
       { id: "living", name: "Living Room" },
     ]);
+  });
+});
+
+describe("revision helpers", () => {
+  const documents: ProjectSection["items"] = [
+    {
+      id: "rev-1-image",
+      title: "Rev 01 image",
+      version: "Revise 01",
+      kind: "image",
+      mimeType: "image/png",
+      updatedAt: "2026-03-23T00:00:00.000Z",
+      summary: "",
+      latest: false,
+      checked: false,
+      rooms: [],
+      viewerUrl: "/api/client-rooms/assets/rev-1-image",
+      downloadUrl: "/api/client-rooms/assets/rev-1-image",
+    },
+    {
+      id: "rev-2-pdf",
+      title: "Rev 02 PDF",
+      version: "Revise 02",
+      kind: "pdf",
+      mimeType: "application/pdf",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      summary: "",
+      latest: true,
+      checked: true,
+      rooms: [],
+      viewerUrl: "https://example.com/rev-2",
+      downloadUrl: "https://example.com/rev-2.pdf",
+    },
+    {
+      id: "rev-2-image",
+      title: "Rev 02 image",
+      version: "Revise 02",
+      kind: "image",
+      mimeType: "image/png",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      summary: "",
+      latest: false,
+      checked: false,
+      rooms: [],
+      viewerUrl: "/api/client-rooms/assets/rev-2-image",
+      downloadUrl: "/api/client-rooms/assets/rev-2-image",
+    },
+  ];
+
+  it("builds unique revision options in document order", () => {
+    expect(getRevisionOptions(documents)).toEqual(["Revise 01", "Revise 02"]);
+  });
+
+  it("filters mixed documents down to one selected revision", () => {
+    expect(
+      filterDocumentsByRevision(documents, documents, "Revise 02").map((document) => document.id),
+    ).toEqual(["rev-2-pdf", "rev-2-image"]);
   });
 });

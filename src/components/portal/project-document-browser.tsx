@@ -48,6 +48,7 @@ export function ProjectDocumentBrowser({
   project: ClientProject;
 }) {
   const [activeCategoryId, setActiveCategoryId] = useState<string>("");
+  const [selectedRevisionLabel, setSelectedRevisionLabel] = useState<string>("");
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>("");
   const [activeDocumentId, setActiveDocumentId] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -59,6 +60,7 @@ export function ProjectDocumentBrowser({
 
   function handleCategoryChange(category: AvailableCategory) {
     setActiveCategoryId(category.id);
+    setSelectedRevisionLabel("");
     setSelectedSubCategoryId("");
     setActiveDocumentId(getDefaultDocumentId(getBrowserDocuments(category.section.items)));
     setDropdownOpen(false);
@@ -92,14 +94,26 @@ export function ProjectDocumentBrowser({
   }, []);
 
   const sectionItems = activeCategory?.section.items ?? [];
-  const imageDocuments = getImageDocuments(sectionItems);
+  const allImageDocuments = getImageDocuments(sectionItems);
   const browserDocuments = getBrowserDocuments(sectionItems);
+  const revisionOptions = getRevisionOptions(sectionItems);
+  const activeRevisionLabel = activeDocument
+    ? getDocumentRevisionLabel(sectionItems, activeDocument)
+    : revisionOptions.find((label) => label === selectedRevisionLabel) ??
+      revisionOptions[0] ??
+      "";
+  const imageDocuments = filterDocumentsByRevision(
+    allImageDocuments,
+    sectionItems,
+    activeRevisionLabel,
+  );
   const sectionCategories = activeCategory?.section.categories ?? [];
   const navigableSubCategories = getNavigableSubCategories(
     sectionCategories,
     imageDocuments,
   );
   const hasSubCategories = navigableSubCategories.length > 0;
+  const showRevisionPicker = Boolean(activeDocument) || revisionOptions.length > 1;
   const activeSubCategoryId = navigableSubCategories.some(
     (subCat) => subCat.id === selectedSubCategoryId,
   )
@@ -161,6 +175,150 @@ export function ProjectDocumentBrowser({
       </div>
 
       <div className="mx-auto max-w-7xl px-5 py-12 md:px-8 md:py-14 xl:px-12">
+        {showRevisionPicker ? (
+          <div className="relative mb-8">
+            <button
+              onClick={() => setDropdownOpen((value) => !value)}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:border-foreground"
+            >
+              {activeRevisionLabel}
+              {activeDocument?.checked ? (
+                <Check className="size-3.5 text-emerald-600" />
+              ) : null}
+              <ChevronDown
+                className={`size-4 text-muted-foreground transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {dropdownOpen ? (
+              <div className="absolute left-0 top-full z-30 mt-2 w-full max-w-md overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                {activeDocument
+                  ? browserDocuments.map((doc, index) => (
+                      <div key={doc.id} className="border-b border-border last:border-b-0">
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => selectRevision(doc)}
+                            className={`flex flex-1 items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/50 ${
+                              doc.id === activeDocument.id ? "bg-secondary/80 font-medium" : ""
+                            }`}
+                          >
+                            <span
+                              className={`flex size-5 shrink-0 items-center justify-center rounded border ${
+                                doc.checked
+                                  ? "border-emerald-500 bg-emerald-500 text-white"
+                                  : "border-border bg-background"
+                              }`}
+                            >
+                              {doc.checked ? <Check className="size-3" /> : null}
+                            </span>
+                            <span>{getRevisionLabel(browserDocuments, doc, index)}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatPortalDate(doc.updatedAt)}
+                            </span>
+                          </button>
+
+                          {doc.rooms && doc.rooms.length > 0 ? (
+                            <button
+                              onClick={() => toggleRevisionExpand(doc.id)}
+                              className="px-3 py-3 text-muted-foreground transition-colors hover:text-foreground"
+                              aria-label="Show rooms"
+                            >
+                              <ChevronDown
+                                className={`size-4 transition-transform ${expandedRevision === doc.id ? "rotate-180" : ""}`}
+                              />
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {expandedRevision === doc.id && doc.rooms ? (
+                          <div className="border-t border-border bg-secondary/30">
+                            {doc.rooms.map((room, index) => {
+                              const roomKey = `${doc.id}:${room.name}`;
+                              const isRoomExpanded = expandedRoom === roomKey;
+                              const roomHistory = isRoomExpanded
+                                ? getRoomRevisionHistory(room.name)
+                                : [];
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="border-b border-border/50 last:border-b-0"
+                                >
+                                  <button
+                                    onClick={() => toggleRoomExpand(roomKey)}
+                                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-secondary/50"
+                                  >
+                                    <ChevronDown
+                                      className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${isRoomExpanded ? "rotate-180" : ""}`}
+                                    />
+                                    <span className="font-medium">{room.name}</span>
+                                    <span className="text-muted-foreground">
+                                      {room.description}
+                                    </span>
+                                  </button>
+
+                                  {isRoomExpanded && roomHistory.length > 0 ? (
+                                    <div className="bg-secondary/20 px-4 pb-2">
+                                      {roomHistory.map((entry) => (
+                                        <button
+                                          key={entry.doc.id}
+                                          onClick={() => selectRevision(entry.doc)}
+                                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-secondary/60 ${
+                                            entry.doc.id === activeDocumentId
+                                              ? "bg-secondary/80 font-medium"
+                                              : ""
+                                          }`}
+                                        >
+                                          <span
+                                            className={`flex size-4 shrink-0 items-center justify-center rounded border ${
+                                              entry.doc.checked
+                                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                                : "border-border bg-background"
+                                            }`}
+                                          >
+                                            {entry.doc.checked ? (
+                                              <Check className="size-2.5" />
+                                            ) : null}
+                                          </span>
+                                          <span>{entry.label}</span>
+                                          <span className="text-muted-foreground">
+                                            {entry.room.description}
+                                          </span>
+                                          <span className="ml-auto text-muted-foreground">
+                                            {formatPortalDate(entry.doc.updatedAt)}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  : revisionOptions.map((label) => (
+                      <button
+                        key={label}
+                        onClick={() => {
+                          setSelectedRevisionLabel(label);
+                          setDropdownOpen(false);
+                          setExpandedRevision(null);
+                          setExpandedRoom(null);
+                        }}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/50 ${
+                          label === activeRevisionLabel ? "bg-secondary/80 font-medium" : ""
+                        }`}
+                      >
+                        <span>{label}</span>
+                      </button>
+                    ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {imageDocuments.length > 0 ? (
           <ImageDocumentStack
             project={project}
@@ -172,131 +330,6 @@ export function ProjectDocumentBrowser({
 
         {activeDocument ? (
           <div className={imageDocuments.length > 0 ? "mt-12 space-y-6" : "space-y-6"}>
-            <div className="relative">
-              <button
-                onClick={() => setDropdownOpen((value) => !value)}
-                className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:border-foreground"
-              >
-                {getRevisionLabel(browserDocuments, activeDocument)}
-                {activeDocument.checked ? (
-                  <Check className="size-3.5 text-emerald-600" />
-                ) : null}
-                <ChevronDown
-                  className={`size-4 text-muted-foreground transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {dropdownOpen ? (
-                <div className="absolute left-0 top-full z-30 mt-2 w-full max-w-md overflow-hidden rounded-xl border border-border bg-background shadow-lg">
-                  {browserDocuments.map((doc, index) => (
-                    <div key={doc.id} className="border-b border-border last:border-b-0">
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => selectRevision(doc)}
-                          className={`flex flex-1 items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/50 ${
-                            doc.id === activeDocument.id ? "bg-secondary/80 font-medium" : ""
-                          }`}
-                        >
-                          <span
-                            className={`flex size-5 shrink-0 items-center justify-center rounded border ${
-                              doc.checked
-                                ? "border-emerald-500 bg-emerald-500 text-white"
-                                : "border-border bg-background"
-                            }`}
-                          >
-                            {doc.checked ? <Check className="size-3" /> : null}
-                          </span>
-                          <span>{getRevisionLabel(browserDocuments, doc, index)}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatPortalDate(doc.updatedAt)}
-                          </span>
-                        </button>
-
-                        {doc.rooms && doc.rooms.length > 0 ? (
-                          <button
-                            onClick={() => toggleRevisionExpand(doc.id)}
-                            className="px-3 py-3 text-muted-foreground transition-colors hover:text-foreground"
-                            aria-label="Show rooms"
-                          >
-                            <ChevronDown
-                              className={`size-4 transition-transform ${expandedRevision === doc.id ? "rotate-180" : ""}`}
-                            />
-                          </button>
-                        ) : null}
-                      </div>
-
-                      {expandedRevision === doc.id && doc.rooms ? (
-                        <div className="border-t border-border bg-secondary/30">
-                          {doc.rooms.map((room, index) => {
-                            const roomKey = `${doc.id}:${room.name}`;
-                            const isRoomExpanded = expandedRoom === roomKey;
-                            const roomHistory = isRoomExpanded
-                              ? getRoomRevisionHistory(room.name)
-                              : [];
-
-                            return (
-                              <div
-                                key={index}
-                                className="border-b border-border/50 last:border-b-0"
-                              >
-                                <button
-                                  onClick={() => toggleRoomExpand(roomKey)}
-                                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-secondary/50"
-                                >
-                                  <ChevronDown
-                                    className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${isRoomExpanded ? "rotate-180" : ""}`}
-                                  />
-                                  <span className="font-medium">{room.name}</span>
-                                  <span className="text-muted-foreground">
-                                    {room.description}
-                                  </span>
-                                </button>
-
-                                {isRoomExpanded && roomHistory.length > 0 ? (
-                                  <div className="bg-secondary/20 px-4 pb-2">
-                                    {roomHistory.map((entry) => (
-                                      <button
-                                        key={entry.doc.id}
-                                        onClick={() => selectRevision(entry.doc)}
-                                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-secondary/60 ${
-                                          entry.doc.id === activeDocumentId
-                                            ? "bg-secondary/80 font-medium"
-                                            : ""
-                                        }`}
-                                      >
-                                        <span
-                                          className={`flex size-4 shrink-0 items-center justify-center rounded border ${
-                                            entry.doc.checked
-                                              ? "border-emerald-500 bg-emerald-500 text-white"
-                                              : "border-border bg-background"
-                                          }`}
-                                        >
-                                          {entry.doc.checked ? (
-                                            <Check className="size-2.5" />
-                                          ) : null}
-                                        </span>
-                                        <span>{entry.label}</span>
-                                        <span className="text-muted-foreground">
-                                          {entry.room.description}
-                                        </span>
-                                        <span className="ml-auto text-muted-foreground">
-                                          {formatPortalDate(entry.doc.updatedAt)}
-                                        </span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
             <div>
               <h2 className="font-display text-3xl font-medium tracking-tight md:text-4xl">
                 {activeDocument.title}
@@ -677,6 +710,34 @@ export function getNavigableSubCategories(
   return sectionCategories.filter((category) => categoryIdsWithImages.has(category.id));
 }
 
+export function getRevisionOptions(documents: ProjectDocument[]) {
+  const seenLabels = new Set<string>();
+
+  return documents.flatMap((document) => {
+    const label = getDocumentRevisionLabel(documents, document);
+    if (seenLabels.has(label)) {
+      return [];
+    }
+
+    seenLabels.add(label);
+    return [label];
+  });
+}
+
+export function filterDocumentsByRevision(
+  documents: ProjectDocument[],
+  allDocuments: ProjectDocument[],
+  revisionLabel: string,
+) {
+  if (!revisionLabel) {
+    return documents;
+  }
+
+  return documents.filter(
+    (document) => getDocumentRevisionLabel(allDocuments, document) === revisionLabel,
+  );
+}
+
 function getBrowserDocuments(documents: ProjectDocument[]) {
   return documents.filter((document) => !isImageDocument(document));
 }
@@ -699,6 +760,15 @@ function getDocumentSourceLabel(document: ProjectDocument) {
 
 function getDefaultDocumentId(documents: ProjectDocument[]) {
   return documents.find((item) => item.latest)?.id ?? documents[0]?.id ?? "";
+}
+
+function getDocumentRevisionLabel(
+  documents: ProjectDocument[],
+  document: ProjectDocument,
+) {
+  const index = documents.findIndex((item) => item.id === document.id);
+
+  return getRevisionLabel(documents, document, index >= 0 ? index : undefined);
 }
 
 function getRevisionLabel(
