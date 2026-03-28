@@ -26,6 +26,8 @@ import {
   getDefaultRevisionLabel,
   getNextRevisionLabel,
   getRevisionSummaries,
+  moveRevisionGroup,
+  setLatestRevision,
 } from "@/lib/client-rooms/revisions";
 import {
   createClientRoomId,
@@ -251,6 +253,28 @@ export function ClientRoomDocumentsEditor({
     onStatus(`สร้าง ${nextRevisionLabel} แล้ว`);
   }
 
+  function setLatestRevisionForSection(
+    sectionId: ClientRoomSectionId,
+    revisionLabel: string,
+  ) {
+    updateSection(sectionId, (section) => ({
+      ...section,
+      items: setLatestRevision(section.items, revisionLabel),
+    }));
+    onStatus(`ตั้ง ${revisionLabel} เป็น Latest แล้ว`);
+  }
+
+  function moveRevisionForSection(
+    sectionId: ClientRoomSectionId,
+    revisionLabel: string,
+    direction: -1 | 1,
+  ) {
+    updateSection(sectionId, (section) => ({
+      ...section,
+      items: moveRevisionGroup(section.items, revisionLabel, direction),
+    }));
+  }
+
   function removeDocument(sectionId: ClientRoomSectionId, documentId: string) {
     onChange((currentDraft) => ({
       ...currentDraft,
@@ -419,6 +443,10 @@ export function ClientRoomDocumentsEditor({
               [section.id]: label,
             }))
           }
+          onSetLatestRevision={(label) => setLatestRevisionForSection(section.id, label)}
+          onMoveRevision={(label, direction) =>
+            moveRevisionForSection(section.id, label, direction)
+          }
           onAddRevision={() => addRevision(section.id)}
           onUploadFiles={(files) => void handleSectionUpload(section.id, files)}
           onAddDocument={() =>
@@ -450,6 +478,8 @@ function DocumentSectionEditor({
   onRemoveCategory,
   onMoveCategory,
   onSelectRevision,
+  onSetLatestRevision,
+  onMoveRevision,
   onAddRevision,
   onUploadFiles,
   onAddDocument,
@@ -467,6 +497,8 @@ function DocumentSectionEditor({
   onRemoveCategory: (categoryId: string) => void;
   onMoveCategory: (oldIndex: number, newIndex: number) => void;
   onSelectRevision: (label: string) => void;
+  onSetLatestRevision: (label: string) => void;
+  onMoveRevision: (label: string, direction: -1 | 1) => void;
   onAddRevision: () => void;
   onUploadFiles: (files: FileList | null) => void;
   onAddDocument: () => void;
@@ -540,26 +572,56 @@ function DocumentSectionEditor({
           <div className="flex flex-wrap items-center gap-2">
             {revisionSummaries.length > 0 ? (
               revisionSummaries.map((summary) => (
-                <button
+                <div
                   key={summary.label}
-                  type="button"
-                  onClick={() => onSelectRevision(summary.label)}
                   className={`rounded-full border px-4 py-2 text-sm transition-colors ${
                     summary.label === activeRevisionLabel
                       ? "border-foreground bg-background font-medium text-foreground"
                       : "border-border bg-background/70 text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {summary.label}
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {summary.count} ไฟล์
-                  </span>
-                  {summary.isLatest ? (
-                    <span className="ml-2 rounded-full bg-foreground px-2 py-0.5 text-[0.65rem] text-background">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onSelectRevision(summary.label)}
+                      className="text-left"
+                    >
+                      <span>{summary.label}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {summary.count} ไฟล์
+                      </span>
+                    </button>
+                    <label className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <input
+                        type="radio"
+                        name={`${section.id}-latest-revision`}
+                        checked={summary.isLatest}
+                        onChange={() => onSetLatestRevision(summary.label)}
+                      />
                       Latest
-                    </span>
-                  ) : null}
-                </button>
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onMoveRevision(summary.label, -1)}
+                        disabled={summary.index === 0}
+                        className="inline-flex size-6 items-center justify-center rounded border border-border text-xs disabled:opacity-40"
+                        aria-label={`Move ${summary.label} earlier`}
+                      >
+                        {"<"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveRevision(summary.label, 1)}
+                        disabled={summary.index === revisionSummaries.length - 1}
+                        className="inline-flex size-6 items-center justify-center rounded border border-border text-xs disabled:opacity-40"
+                        aria-label={`Move ${summary.label} later`}
+                      >
+                        {">"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ))
             ) : (
               <span className="text-sm text-muted-foreground">ยังไม่มีเอกสารในหมวดนี้</span>
@@ -999,19 +1061,14 @@ function CollapsibleDocumentCard({
             <label className="inline-flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={document.latest}
-                onChange={(e) => onFieldChange((c) => ({ ...c, latest: e.target.checked }))}
-              />
-              Latest revision
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
                 checked={document.checked}
                 onChange={(e) => onFieldChange((c) => ({ ...c, checked: e.target.checked }))}
               />
               Checked / approved
             </label>
+            <span className="text-sm text-muted-foreground">
+              เลือก Latest ที่ระดับ Revise ด้านบน
+            </span>
           </div>
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium">Upload document file</label>

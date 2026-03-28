@@ -77,9 +77,47 @@ export function getNextRevisionLabel<T extends RevisionLikeDocument>(documents: 
 export function getRevisionSummaries<T extends RevisionLikeDocument>(documents: T[]) {
   const latestLabel = getDefaultRevisionLabel(documents);
 
-  return getRevisionOptions(documents).map((label) => ({
+  return getRevisionOptions(documents).map((label, index) => ({
+    index,
     label,
     count: filterDocumentsByRevision(documents, documents, label).length,
     isLatest: label === latestLabel,
   }));
+}
+
+export function setLatestRevision<T extends RevisionLikeDocument>(
+  documents: T[],
+  revisionLabel: string,
+) {
+  return documents.map((document) => ({
+    ...document,
+    latest: getRevisionLabelForDocument(documents, document) === revisionLabel,
+  }));
+}
+
+export function moveRevisionGroup<T extends RevisionLikeDocument>(
+  documents: T[],
+  revisionLabel: string,
+  direction: -1 | 1,
+) {
+  const revisionLabels = getRevisionOptions(documents);
+  const currentIndex = revisionLabels.indexOf(revisionLabel);
+  const nextIndex = currentIndex + direction;
+
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= revisionLabels.length) {
+    return documents;
+  }
+
+  const reorderedLabels = [...revisionLabels];
+  const [movedLabel] = reorderedLabels.splice(currentIndex, 1);
+
+  if (!movedLabel) {
+    return documents;
+  }
+
+  reorderedLabels.splice(nextIndex, 0, movedLabel);
+
+  return reorderedLabels.flatMap((label) =>
+    filterDocumentsByRevision(documents, documents, label),
+  );
 }

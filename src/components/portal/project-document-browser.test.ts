@@ -5,6 +5,8 @@ import {
   filterDocumentsByRevision,
   getDefaultRevisionLabel,
   getRevisionOptions,
+  moveRevisionGroup,
+  setLatestRevision,
 } from "@/lib/client-rooms/revisions";
 import type { ClientProject, ProjectCategory, ProjectSection } from "@/lib/portal-data";
 
@@ -334,5 +336,24 @@ describe("revision helpers", () => {
 
   it("prefers the latest-marked revision as default", () => {
     expect(getDefaultRevisionLabel(documents)).toBe("Revise 02");
+  });
+
+  it("can move a revision group later in the order", () => {
+    expect(
+      moveRevisionGroup(documents, "Revise 01", 1).map((document) => document.id),
+    ).toEqual(["rev-2-pdf", "rev-2-image", "rev-1-image"]);
+  });
+
+  it("can set all documents in one revision as latest", () => {
+    expect(
+      setLatestRevision(documents, "Revise 01").map((document) => ({
+        id: document.id,
+        latest: document.latest,
+      })),
+    ).toEqual([
+      { id: "rev-1-image", latest: true },
+      { id: "rev-2-pdf", latest: false },
+      { id: "rev-2-image", latest: false },
+    ]);
   });
 });
