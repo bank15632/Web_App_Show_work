@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_Thai } from "next/font/google";
+import { Prompt } from "next/font/google";
 
 import "./globals.css";
 
-const ibmPlexSansThai = IBM_Plex_Sans_Thai({
+const prompt = Prompt({
   subsets: ["latin", "thai"],
   weight: ["300", "400", "500", "600", "700"],
   display: "swap",
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body
-        className={`${ibmPlexSansThai.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
+        className={`${prompt.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
       >
         {children}
       </body>
