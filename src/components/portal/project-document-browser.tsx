@@ -8,6 +8,12 @@ import {
   type PdfExportProgress,
 } from "@/lib/client-rooms/pdf-export";
 import {
+  filterDocumentsByRevision,
+  getDefaultRevisionLabel,
+  getRevisionLabelForDocument,
+  getRevisionOptions,
+} from "@/lib/client-rooms/revisions";
+import {
   formatPortalDate,
   getDocumentPreviewUrl,
   hasUsableUrl,
@@ -70,6 +76,7 @@ export function ProjectDocumentBrowser({
 
   function selectRevision(doc: ProjectDocument) {
     setActiveDocumentId(doc.id);
+    setSelectedRevisionLabel(getRevisionLabelForDocument(sectionItems, doc));
     setDropdownOpen(false);
     setExpandedRevision(null);
     setExpandedRoom(null);
@@ -97,10 +104,11 @@ export function ProjectDocumentBrowser({
   const allImageDocuments = getImageDocuments(sectionItems);
   const browserDocuments = getBrowserDocuments(sectionItems);
   const revisionOptions = getRevisionOptions(sectionItems);
+  const defaultRevisionLabel = getDefaultRevisionLabel(sectionItems);
   const activeRevisionLabel = activeDocument
-    ? getDocumentRevisionLabel(sectionItems, activeDocument)
+    ? getRevisionLabelForDocument(sectionItems, activeDocument)
     : revisionOptions.find((label) => label === selectedRevisionLabel) ??
-      revisionOptions[0] ??
+      defaultRevisionLabel ??
       "";
   const imageDocuments = filterDocumentsByRevision(
     allImageDocuments,
@@ -672,10 +680,15 @@ export function resolveDocumentBrowserState(
     };
   }
 
+  const defaultRevisionLabel = getDefaultRevisionLabel(activeCategory.section.items);
   const browserDocuments = getBrowserDocuments(activeCategory.section.items);
+  const defaultDocumentId =
+    browserDocuments.find(
+      (item) => getRevisionLabelForDocument(activeCategory.section.items, item) === defaultRevisionLabel,
+    )?.id ?? getDefaultDocumentId(browserDocuments);
   const activeDocument =
     browserDocuments.find((item) => item.id === activeDocumentId) ??
-    browserDocuments.find((item) => item.id === getDefaultDocumentId(browserDocuments)) ??
+    browserDocuments.find((item) => item.id === defaultDocumentId) ??
     null;
 
   return {
@@ -710,34 +723,6 @@ export function getNavigableSubCategories(
   return sectionCategories.filter((category) => categoryIdsWithImages.has(category.id));
 }
 
-export function getRevisionOptions(documents: ProjectDocument[]) {
-  const seenLabels = new Set<string>();
-
-  return documents.flatMap((document) => {
-    const label = getDocumentRevisionLabel(documents, document);
-    if (seenLabels.has(label)) {
-      return [];
-    }
-
-    seenLabels.add(label);
-    return [label];
-  });
-}
-
-export function filterDocumentsByRevision(
-  documents: ProjectDocument[],
-  allDocuments: ProjectDocument[],
-  revisionLabel: string,
-) {
-  if (!revisionLabel) {
-    return documents;
-  }
-
-  return documents.filter(
-    (document) => getDocumentRevisionLabel(allDocuments, document) === revisionLabel,
-  );
-}
-
 function getBrowserDocuments(documents: ProjectDocument[]) {
   return documents.filter((document) => !isImageDocument(document));
 }
@@ -762,31 +747,10 @@ function getDefaultDocumentId(documents: ProjectDocument[]) {
   return documents.find((item) => item.latest)?.id ?? documents[0]?.id ?? "";
 }
 
-function getDocumentRevisionLabel(
-  documents: ProjectDocument[],
-  document: ProjectDocument,
-) {
-  const index = documents.findIndex((item) => item.id === document.id);
-
-  return getRevisionLabel(documents, document, index >= 0 ? index : undefined);
-}
-
 function getRevisionLabel(
   documents: ProjectDocument[],
   document: ProjectDocument,
   index?: number,
 ) {
-  const match = document.version.match(/(\d+)/);
-
-  if (match) {
-    return `Revise ${match[1].padStart(2, "0")}`;
-  }
-
-  const safeIndex =
-    typeof index === "number"
-      ? index
-      : documents.findIndex((item) => item.id === document.id);
-  const fallbackNumber = String(documents.length - safeIndex).padStart(2, "0");
-
-  return `Revise ${fallbackNumber}`;
+  return getRevisionLabelForDocument(documents, document, index);
 }

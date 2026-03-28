@@ -22,6 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  filterDocumentsByRevision,
+  getDefaultRevisionLabel,
+  getNextRevisionLabel,
+  getRevisionSummaries,
+} from "@/lib/client-rooms/revisions";
+import {
   createClientRoomId,
   createEmptyClientRoomDocument,
   type ClientRoomCategory,
@@ -96,6 +102,9 @@ export function ClientRoomDocumentsEditor({
   onStatus: (message: string) => void;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [selectedRevisionBySectionId, setSelectedRevisionBySectionId] = useState<
+    Record<string, string>
+  >({});
 
   function updateSection(
     sectionId: ClientRoomSectionId,
@@ -177,19 +186,29 @@ export function ClientRoomDocumentsEditor({
     onChange((currentDraft) => ({
       ...currentDraft,
       sections: currentDraft.sections.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              items: section.items.map((item) =>
+        section.id !== sectionId
+          ? section
+          : (() => {
+              const nextItems = section.items.map((item) =>
                 item.id === documentId ? updater(item) : item,
-              ),
-            }
-          : section,
+              );
+              const updatedDocument = nextItems.find((item) => item.id === documentId);
+
+              return {
+                ...section,
+                items:
+                  updatedDocument?.latest
+                    ? nextItems.map((item) =>
+                        item.id === documentId ? item : { ...item, latest: false },
+                      )
+                    : nextItems,
+              };
+            })(),
       ),
     }));
   }
 
-  function addDocument(sectionId: ClientRoomSectionId) {
+  function addDocument(sectionId: ClientRoomSectionId, version?: string) {
     onChange((currentDraft) => ({
       ...currentDraft,
       sections: currentDraft.sections.map((section) =>
@@ -200,6 +219,10 @@ export function ClientRoomDocumentsEditor({
                 ...section.items,
                 {
                   ...createEmptyClientRoomDocument(),
+                  version:
+                    version ||
+                    getDefaultRevisionLabel(section.items) ||
+                    getNextRevisionLabel(section.items),
                   latest: section.items.length === 0,
                 },
               ],
@@ -207,6 +230,25 @@ export function ClientRoomDocumentsEditor({
           : section,
       ),
     }));
+  }
+
+  function addRevision(sectionId: ClientRoomSectionId) {
+    const section = draft.sections.find((item) => item.id === sectionId);
+    const nextRevisionLabel = getNextRevisionLabel(section?.items ?? []);
+
+    setSelectedRevisionBySectionId((current) => ({
+      ...current,
+      [sectionId]: nextRevisionLabel,
+    }));
+
+    addDocuments(sectionId, [
+      {
+        ...createEmptyClientRoomDocument(),
+        version: nextRevisionLabel,
+        latest: true,
+      },
+    ]);
+    onStatus(`สร้าง ${nextRevisionLabel} แล้ว`);
   }
 
   function removeDocument(sectionId: ClientRoomSectionId, documentId: string) {
@@ -223,14 +265,40 @@ export function ClientRoomDocumentsEditor({
     }));
   }
 
-  function moveDocument(sectionId: ClientRoomSectionId, oldIndex: number, newIndex: number) {
+  function moveVisibleDocuments(
+    sectionId: ClientRoomSectionId,
+    visibleDocuments: ClientRoomDocument[],
+    oldIndex: number,
+    newIndex: number,
+  ) {
     onChange((currentDraft) => ({
       ...currentDraft,
-      sections: currentDraft.sections.map((section) =>
-        section.id === sectionId
-          ? { ...section, items: arrayMove(section.items, oldIndex, newIndex) }
-          : section,
-      ),
+      sections: currentDraft.sections.map((section) => {
+        if (section.id !== sectionId) {
+          return section;
+        }
+
+        const visibleIds = visibleDocuments.map((document) => document.id);
+        const reorderedVisibleIds = arrayMove(visibleIds, oldIndex, newIndex);
+        const reorderedVisibleItems = reorderedVisibleIds
+          .map((documentId) => section.items.find((item) => item.id === documentId))
+          .filter((item): item is ClientRoomDocument => Boolean(item));
+
+        let reorderedIndex = 0;
+
+        return {
+          ...section,
+          items: section.items.map((item) => {
+            if (!visibleIds.includes(item.id)) {
+              return item;
+            }
+
+            const nextItem = reorderedVisibleItems[reorderedIndex];
+            reorderedIndex += 1;
+            return nextItem ?? item;
+          }),
+        };
+      }),
     }));
   }
 
@@ -241,10 +309,12 @@ export function ClientRoomDocumentsEditor({
     }
 
     const section = draft.sections.find((item) => item.id === sectionId);
+    const activeRevisionLabel = getActiveRevisionLabel(sectionId, section?.items ?? []);
     const shouldMarkLatest = !section || section.items.length === 0;
     const documents: ClientRoomDocument[] = nextFiles.map((file, index) => ({
       ...createEmptyClientRoomDocument("pdf"),
       title: buildDocumentTitle(file.name),
+      version: activeRevisionLabel,
       kind: file.type.startsWith("image/") ? "image" : "pdf",
       mimeType: file.type,
       latest: shouldMarkLatest && index === 0,
@@ -316,95 +386,237 @@ export function ClientRoomDocumentsEditor({
     }
   }
 
+  function getActiveRevisionLabel(
+    sectionId: ClientRoomSectionId,
+    documents: ClientRoomDocument[],
+  ) {
+    const selectedRevisionLabel = selectedRevisionBySectionId[sectionId];
+    const revisionSummaries = getRevisionSummaries(documents);
+
+    if (revisionSummaries.some((summary) => summary.label === selectedRevisionLabel)) {
+      return selectedRevisionLabel;
+    }
+
+    return getDefaultRevisionLabel(documents) || getNextRevisionLabel(documents);
+  }
+
   return (
     <>
       {draft.sections.map((section) => (
-        <Card key={section.id}>
-          <CardHeader>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <CardTitle>{section.title}</CardTitle>
-                <CardDescription>{section.description}</CardDescription>
-              </div>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
-                {uploadingTarget.startsWith("document:") ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <FileUp className="size-4" />
-                )}
-                อัปหลายไฟล์
-                <input
-                  type="file"
-                  accept=".pdf,image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    void handleSectionUpload(section.id, event.target.files);
-                    event.target.value = "";
-                  }}
-                />
-              </label>
-              <Button variant="outline" onClick={() => addDocument(section.id)}>
-                <Plus />
-                เพิ่มเอกสาร
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <CategoryManager
-              categories={section.categories}
-              sensors={sensors}
-              onAdd={(name) => addCategory(section.id, name)}
-              onRename={(catId, name) => renameCategory(section.id, catId, name)}
-              onRemove={(catId) => removeCategory(section.id, catId)}
-              onMove={(oldIndex, newIndex) => moveCategory(section.id, oldIndex, newIndex)}
-            />
-
-            {section.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">ยังไม่มีเอกสารในหมวดนี้</p>
-            ) : null}
-
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event: DragEndEvent) => {
-                const { active, over } = event;
-                if (!over || active.id === over.id) return;
-                const oldIndex = section.items.findIndex((item) => item.id === active.id);
-                const newIndex = section.items.findIndex((item) => item.id === over.id);
-                if (oldIndex !== -1 && newIndex !== -1) {
-                  moveDocument(section.id, oldIndex, newIndex);
-                }
-              }}
-            >
-              <SortableContext
-                items={section.items.map((doc) => doc.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                {section.items.map((document, index) => (
-                  <SortableDocumentCard key={document.id} id={document.id}>
-                    {(handleProps) => (
-                      <CollapsibleDocumentCard
-                        document={document}
-                        index={index}
-                        totalItems={section.items.length}
-                        section={section}
-                        handleProps={handleProps}
-                        onRemove={() => removeDocument(section.id, document.id)}
-                        onMove={(newIndex) => moveDocument(section.id, index, newIndex)}
-                        uploadingTarget={uploadingTarget}
-                        onFieldChange={(updater) => updateDocument(section.id, document.id, updater)}
-                        onFileUpload={(file) => handleDocumentUpload(section.id, document.id, file)}
-                      />
-                    )}
-                  </SortableDocumentCard>
-                ))}
-              </SortableContext>
-            </DndContext>
-          </CardContent>
-        </Card>
+        <DocumentSectionEditor
+          key={section.id}
+          section={section}
+          sensors={sensors}
+          uploadingTarget={uploadingTarget}
+          activeRevisionLabel={getActiveRevisionLabel(section.id, section.items)}
+          onAddCategory={(name) => addCategory(section.id, name)}
+          onRenameCategory={(catId, name) => renameCategory(section.id, catId, name)}
+          onRemoveCategory={(catId) => removeCategory(section.id, catId)}
+          onMoveCategory={(oldIndex, newIndex) => moveCategory(section.id, oldIndex, newIndex)}
+          onSelectRevision={(label) =>
+            setSelectedRevisionBySectionId((current) => ({
+              ...current,
+              [section.id]: label,
+            }))
+          }
+          onAddRevision={() => addRevision(section.id)}
+          onUploadFiles={(files) => void handleSectionUpload(section.id, files)}
+          onAddDocument={() =>
+            addDocument(section.id, getActiveRevisionLabel(section.id, section.items))
+          }
+          onMoveDocuments={(visibleDocuments, oldIndex, newIndex) =>
+            moveVisibleDocuments(section.id, visibleDocuments, oldIndex, newIndex)
+          }
+          onRemoveDocument={(documentId) => removeDocument(section.id, documentId)}
+          onUpdateDocument={(documentId, updater) =>
+            updateDocument(section.id, documentId, updater)
+          }
+          onUploadDocument={(documentId, file) =>
+            void handleDocumentUpload(section.id, documentId, file)
+          }
+        />
       ))}
     </>
+  );
+}
+
+function DocumentSectionEditor({
+  section,
+  sensors,
+  uploadingTarget,
+  activeRevisionLabel,
+  onAddCategory,
+  onRenameCategory,
+  onRemoveCategory,
+  onMoveCategory,
+  onSelectRevision,
+  onAddRevision,
+  onUploadFiles,
+  onAddDocument,
+  onMoveDocuments,
+  onRemoveDocument,
+  onUpdateDocument,
+  onUploadDocument,
+}: {
+  section: ClientRoomSection;
+  sensors: ReturnType<typeof useSensors>;
+  uploadingTarget: string;
+  activeRevisionLabel: string;
+  onAddCategory: (name: string) => void;
+  onRenameCategory: (categoryId: string, name: string) => void;
+  onRemoveCategory: (categoryId: string) => void;
+  onMoveCategory: (oldIndex: number, newIndex: number) => void;
+  onSelectRevision: (label: string) => void;
+  onAddRevision: () => void;
+  onUploadFiles: (files: FileList | null) => void;
+  onAddDocument: () => void;
+  onMoveDocuments: (
+    visibleDocuments: ClientRoomDocument[],
+    oldIndex: number,
+    newIndex: number,
+  ) => void;
+  onRemoveDocument: (documentId: string) => void;
+  onUpdateDocument: (
+    documentId: string,
+    updater: (document: ClientRoomDocument) => ClientRoomDocument,
+  ) => void;
+  onUploadDocument: (documentId: string, file: File | null) => void;
+}) {
+  const revisionSummaries = getRevisionSummaries(section.items);
+  const latestRevisionLabel = getDefaultRevisionLabel(section.items);
+  const visibleDocuments = filterDocumentsByRevision(
+    section.items,
+    section.items,
+    activeRevisionLabel,
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <CardTitle>{section.title}</CardTitle>
+            <CardDescription>{section.description}</CardDescription>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary">
+            {uploadingTarget.startsWith("document:") ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <FileUp className="size-4" />
+            )}
+            อัปหลายไฟล์
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                onUploadFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+          </label>
+          <Button variant="outline" onClick={onAddRevision}>
+            <Plus />
+            เพิ่ม Revise ใหม่
+          </Button>
+          <Button variant="outline" onClick={onAddDocument}>
+            <Plus />
+            เพิ่มเอกสาร
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <CategoryManager
+          categories={section.categories}
+          sensors={sensors}
+          onAdd={onAddCategory}
+          onRename={onRenameCategory}
+          onRemove={onRemoveCategory}
+          onMove={onMoveCategory}
+        />
+
+        <div className="space-y-3 rounded-2xl border border-border bg-secondary/20 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {revisionSummaries.length > 0 ? (
+              revisionSummaries.map((summary) => (
+                <button
+                  key={summary.label}
+                  type="button"
+                  onClick={() => onSelectRevision(summary.label)}
+                  className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                    summary.label === activeRevisionLabel
+                      ? "border-foreground bg-background font-medium text-foreground"
+                      : "border-border bg-background/70 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {summary.label}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {summary.count} ไฟล์
+                  </span>
+                  {summary.isLatest ? (
+                    <span className="ml-2 rounded-full bg-foreground px-2 py-0.5 text-[0.65rem] text-background">
+                      Latest
+                    </span>
+                  ) : null}
+                </button>
+              ))
+            ) : (
+              <span className="text-sm text-muted-foreground">ยังไม่มีเอกสารในหมวดนี้</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {activeRevisionLabel
+              ? `กำลังแก้ไข ${activeRevisionLabel}${latestRevisionLabel === activeRevisionLabel ? " (Latest)" : ""}`
+              : `พร้อมเริ่ม ${getNextRevisionLabel(section.items)}`}
+          </p>
+        </div>
+
+        {visibleDocuments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            ยังไม่มีเอกสารใน {activeRevisionLabel || getNextRevisionLabel(section.items)}
+          </p>
+        ) : null}
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event: DragEndEvent) => {
+            const { active, over } = event;
+            if (!over || active.id === over.id) return;
+            const oldIndex = visibleDocuments.findIndex((item) => item.id === active.id);
+            const newIndex = visibleDocuments.findIndex((item) => item.id === over.id);
+            if (oldIndex !== -1 && newIndex !== -1) {
+              onMoveDocuments(visibleDocuments, oldIndex, newIndex);
+            }
+          }}
+        >
+          <SortableContext
+            items={visibleDocuments.map((doc) => doc.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {visibleDocuments.map((document, index) => (
+              <SortableDocumentCard key={document.id} id={document.id}>
+                {(handleProps) => (
+                  <CollapsibleDocumentCard
+                    document={document}
+                    index={index}
+                    totalItems={visibleDocuments.length}
+                    section={section}
+                    handleProps={handleProps}
+                    onRemove={() => onRemoveDocument(document.id)}
+                    onMove={(newIndex) => onMoveDocuments(visibleDocuments, index, newIndex)}
+                    uploadingTarget={uploadingTarget}
+                    onFieldChange={(updater) => onUpdateDocument(document.id, updater)}
+                    onFileUpload={(file) => onUploadDocument(document.id, file)}
+                  />
+                )}
+              </SortableDocumentCard>
+            ))}
+          </SortableContext>
+        </DndContext>
+      </CardContent>
+    </Card>
   );
 }
 
