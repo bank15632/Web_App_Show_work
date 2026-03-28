@@ -48,6 +48,7 @@ export function ProjectDocumentBrowser({
   project: ClientProject;
 }) {
   const [activeCategoryId, setActiveCategoryId] = useState<string>("");
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>("");
   const [activeDocumentId, setActiveDocumentId] = useState<string>("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedRevision, setExpandedRevision] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export function ProjectDocumentBrowser({
 
   function handleCategoryChange(category: AvailableCategory) {
     setActiveCategoryId(category.id);
+    setSelectedSubCategoryId("");
     setActiveDocumentId(getDefaultDocumentId(getBrowserDocuments(category.section.items)));
     setDropdownOpen(false);
     setExpandedRevision(null);
@@ -89,18 +91,24 @@ export function ProjectDocumentBrowser({
     }
   }, []);
 
-  if (!activeCategory) {
-    return null;
-  }
-
-  const imageDocuments = getImageDocuments(activeCategory.section.items);
-  const browserDocuments = getBrowserDocuments(activeCategory.section.items);
-  const sectionCategories = activeCategory.section.categories ?? [];
+  const sectionItems = activeCategory?.section.items ?? [];
+  const imageDocuments = getImageDocuments(sectionItems);
+  const browserDocuments = getBrowserDocuments(sectionItems);
+  const sectionCategories = activeCategory?.section.categories ?? [];
   const navigableSubCategories = getNavigableSubCategories(
     sectionCategories,
     imageDocuments,
   );
   const hasSubCategories = navigableSubCategories.length > 0;
+  const activeSubCategoryId = navigableSubCategories.some(
+    (subCat) => subCat.id === selectedSubCategoryId,
+  )
+    ? selectedSubCategoryId
+    : navigableSubCategories[0]?.id ?? "";
+
+  if (!activeCategory) {
+    return null;
+  }
 
   function getRoomRevisionHistory(roomName: string) {
     return browserDocuments
@@ -126,11 +134,7 @@ export function ProjectDocumentBrowser({
               <button
                 key={category.id}
                 onClick={() => handleCategoryChange(category)}
-                className={`shrink-0 border-b-2 pb-1 text-sm transition-colors ${
-                  activeCategory.id === category.id
-                    ? "border-foreground font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
+                className={getTabButtonClassName(activeCategory.id === category.id)}
               >
                 {category.label}
               </button>
@@ -138,12 +142,15 @@ export function ProjectDocumentBrowser({
           </div>
 
           {hasSubCategories ? (
-            <div className="flex items-center gap-3 overflow-x-auto pb-3">
+            <div className="flex items-center gap-8 overflow-x-auto pb-3">
               {navigableSubCategories.map((subCat) => (
                 <button
                   key={subCat.id}
-                  onClick={() => scrollToSubCategory(subCat.id)}
-                  className="shrink-0 rounded-full border border-border bg-secondary/50 px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+                  onClick={() => {
+                    setSelectedSubCategoryId(subCat.id);
+                    scrollToSubCategory(subCat.id);
+                  }}
+                  className={getTabButtonClassName(activeSubCategoryId === subCat.id)}
                 >
                   {subCat.name}
                 </button>
@@ -364,6 +371,14 @@ export function ProjectDocumentBrowser({
       </div>
     </section>
   );
+}
+
+function getTabButtonClassName(isActive: boolean) {
+  return `shrink-0 border-b-2 pb-1 text-sm transition-colors ${
+    isActive
+      ? "border-foreground font-medium text-foreground"
+      : "border-transparent text-muted-foreground hover:text-foreground"
+  }`;
 }
 
 function ImageDocumentStack({
