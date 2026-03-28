@@ -342,7 +342,9 @@ export function TodoListView() {
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
-  const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(false);
+  const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches,
+  );
   const [hasHandledLaunchTarget, setHasHandledLaunchTarget] = useState(false);
 
   useEffect(() => {
@@ -671,7 +673,7 @@ export function TodoListView() {
           </div>
         ) : null}
 
-        <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-4 py-5 sm:px-5 sm:py-6 lg:px-8">
+        <main className="flex min-w-0 flex-col bg-[linear-gradient(180deg,#fff_0%,#fbf9f6_100%)] px-3 py-4 sm:px-5 sm:py-6 lg:px-8">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <SidebarToggleButton

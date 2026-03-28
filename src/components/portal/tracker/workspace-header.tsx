@@ -28,11 +28,11 @@ export function WorkspaceHeader({
     : 0;
 
   return (
-    <section className="rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,#f6f1e8_0%,#ffffff_45%)] p-5 sm:p-6">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+    <section className="rounded-[1.5rem] border border-border bg-[radial-gradient(circle_at_top_left,#f6f1e8_0%,#ffffff_45%)] p-4 sm:rounded-[2rem] sm:p-5 md:p-6">
+      <div className="flex flex-col gap-4 sm:gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <p className="caption-editorial">Workspace</p>
-          <h2 className="mt-2 font-display text-3xl font-medium leading-tight tracking-tight text-balance sm:text-4xl lg:text-5xl">
+          <h2 className="mt-2 font-display text-2xl font-medium leading-tight tracking-tight text-balance sm:text-3xl md:text-4xl lg:text-5xl">
             {project.name}
           </h2>
           <p className="mt-3 max-w-3xl text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
@@ -55,7 +55,7 @@ export function WorkspaceHeader({
         </div>
 
         <div className="flex max-w-xl flex-col gap-3">
-          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-center">
             <SelectPill
               value={project.phase}
               onChange={(value) => onPhaseChange(value as TrackerPhase)}

@@ -355,62 +355,67 @@ export function DashboardView() {
   return (
     <div ref={containerRef} className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="flex items-center gap-4 px-6 py-5 lg:px-10">
+        <div className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5 lg:px-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={120}
             height={60}
-            className="h-10 w-auto shrink-0"
+            className="h-8 w-auto shrink-0 sm:h-10"
           />
           <div className="min-w-0">
-            <p className="font-display text-lg font-semibold tracking-tight">
+            <p className="font-display text-base font-semibold tracking-tight sm:text-lg">
               AEC Workflow Platform
             </p>
             <p className="caption-editorial text-xs">Dashboard</p>
           </div>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+          <div className="ml-auto flex items-center justify-end gap-2 overflow-x-auto sm:gap-3">
             <Link
               href="/aec-workflow"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              aria-label="User Manual"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <BookOpenText className="size-4" />
-              User Manual
+              <span className="hidden sm:inline">User Manual</span>
             </Link>
             <Link
               href="/gtd"
-              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              aria-label="GTD Workspace"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <ListChecks className="size-4" />
-              GTD Workspace
+              <span className="hidden sm:inline">GTD Workspace</span>
             </Link>
             <Link
               href="/todos"
-              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              aria-label="Kanban Board"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <ListTodo className="size-4" />
-              Kanban Board
+              <span className="hidden sm:inline">Kanban Board</span>
             </Link>
             <Link
               href="/settings"
-              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              aria-label="Settings & Export"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <Settings2 className="size-4" />
-              Settings & Export
+              <span className="hidden md:inline">Settings & Export</span>
             </Link>
             <Link
               href="/client-rooms"
-              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              aria-label="Client Rooms CMS"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <FolderOpen className="size-4" />
-              Client Rooms CMS
+              <span className="hidden md:inline">Client Rooms CMS</span>
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="space-y-16 px-6 py-12 lg:px-10">
+      <main className="space-y-10 px-4 py-8 sm:space-y-12 sm:px-6 sm:py-10 lg:space-y-16 lg:px-10 lg:py-12">
         <section className="fade-up space-y-6">
           <div className="max-w-4xl">
             <p className="caption-editorial mb-2">Dashboard</p>
@@ -442,7 +447,7 @@ export function DashboardView() {
             </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <CommandCard
               icon={<ListChecks className="size-4" />}
               label="GTD Stats"
@@ -482,7 +487,7 @@ export function DashboardView() {
             </h2>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
             {manualFrameworkCards.map((framework) => (
               <article
                 key={framework.name}
@@ -528,7 +533,7 @@ export function DashboardView() {
         </section>
 
         <section className="fade-up space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
             <MetricSummaryCard
               icon={<FolderOpen className="size-4" />}
               label="Active Projects"
@@ -558,7 +563,7 @@ export function DashboardView() {
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
             {(["draft", "dirty", "live"] as ClientRoomStatus[]).map((status, index) => (
               <div
                 key={status}
