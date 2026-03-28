@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { Prompt } from "next/font/google";
+import { IBM_Plex_Sans_Thai } from "next/font/google";
 
 import "./globals.css";
 
-const prompt = Prompt({
+const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   subsets: ["latin", "thai"],
   weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
   display: "swap",
-  variable: "--font-prompt",
+  variable: "--font-body-ui",
 });
 
 export const metadata: Metadata = {
@@ -32,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body
-        className={`${prompt.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
+        className={`${ibmPlexSansThai.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
       >
         {children}
       </body>
