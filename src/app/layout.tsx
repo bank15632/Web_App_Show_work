@@ -29,9 +29,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
+    <html lang="th" className={prompt.variable}>
       <body
-        className={`${prompt.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
+        className="min-h-screen bg-background font-sans text-foreground antialiased"
       >
         {children}
       </body>
