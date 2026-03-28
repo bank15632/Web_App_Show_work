@@ -75,7 +75,11 @@ export function TaskBoard({
   onCreateTask: () => void;
   onReorder: (items: Array<{ taskId: string; status: TrackerTaskRecord["status"]; sortOrder: number }>) => Promise<void>;
 }) {
-  const [viewMode, setViewMode] = useState<ViewMode>("board");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+      ? "list"
+      : "board",
+  );
   const [board, setBoard] = useState<BoardState>(() => buildBoardState(tasks));
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor));
@@ -216,7 +220,7 @@ export function TaskBoard({
           }}
         >
           <div className="-mx-1 overflow-x-auto pb-2">
-            <div className="grid min-w-[76rem] grid-cols-[repeat(5,minmax(14.5rem,1fr))] gap-4 px-1 sm:min-w-[89rem] sm:grid-cols-[repeat(5,minmax(17rem,1fr))]">
+            <div className="grid min-w-[60rem] grid-cols-[repeat(5,minmax(11.5rem,1fr))] gap-3 px-1 md:min-w-[76rem] md:grid-cols-[repeat(5,minmax(14.5rem,1fr))] md:gap-4 lg:min-w-[89rem] lg:grid-cols-[repeat(5,minmax(17rem,1fr))]">
               {trackerTaskStatuses.map((status) => (
                 <TaskColumn
                   key={status}

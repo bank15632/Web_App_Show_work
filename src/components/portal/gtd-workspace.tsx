@@ -572,36 +572,36 @@ export function GtdWorkspace() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7f3ed_100%)]">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="flex flex-wrap items-center gap-3 px-6 py-5 lg:px-10">
-          <Link href="/aec-workflow" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+        <div className="flex items-center gap-2 overflow-x-auto px-4 py-4 sm:flex-wrap sm:gap-3 sm:px-6 sm:py-5 lg:px-10">
+          <Link href="/aec-workflow" aria-label="Back to AEC workflow" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <ArrowLeft className="size-4" />
-            Back to AEC workflow
+            <span className="hidden sm:inline">Back to AEC workflow</span>
           </Link>
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+          <Link href="/" aria-label="Dashboard" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <ListChecks className="size-4" />
-            Dashboard
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
-          <Link href="/todos" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+          <Link href="/todos" aria-label="Open tracker" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <ArrowLeft className="size-4 rotate-180" />
-            Open tracker
+            <span className="hidden sm:inline">Open tracker</span>
           </Link>
-          <Link href="/settings" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+          <Link href="/settings" aria-label="Settings & Export" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <Settings2 className="size-4" />
-            Settings & Export
+            <span className="hidden sm:inline">Settings & Export</span>
           </Link>
-          <Link href="/gtd/guide" className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground">
+          <Link href="/gtd/guide" aria-label="GTD Guide" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <BookOpenText className="size-4" />
-            GTD Guide
+            <span className="hidden sm:inline">GTD Guide</span>
           </Link>
         </div>
       </header>
 
-      <main className="space-y-10 px-6 py-10 lg:px-10">
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_24rem]">
-          <div className="rounded-[2rem] border border-border bg-background p-8 shadow-[0_24px_80px_rgba(0,0,0,0.04)]">
+      <main className="space-y-8 px-4 py-8 sm:space-y-10 sm:px-6 sm:py-10 lg:px-10">
+        <section className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1.15fr)_24rem]">
+          <div className="rounded-[1.5rem] border border-border bg-background p-5 shadow-[0_24px_80px_rgba(0,0,0,0.04)] sm:rounded-[2rem] sm:p-8">
             <p className="caption-editorial">Phase 1 Module</p>
-            <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-pretty">GTD Workspace</h1>
-            <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">Quick capture, buckets, clarify flow และ weekly review สำหรับคุมงานหลายโปรเจกต์ในที่เดียว</p>
+            <h1 className="mt-3 font-display text-3xl font-medium tracking-tight text-pretty sm:text-4xl lg:text-5xl">GTD Workspace</h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground sm:mt-4 sm:text-lg sm:leading-8">Quick capture, buckets, clarify flow และ weekly review สำหรับคุมงานหลายโปรเจกต์ในที่เดียว</p>
             <div className="mt-8 flex flex-col gap-3 rounded-[1.6rem] border border-border bg-secondary/40 p-5 sm:flex-row">
               <input
                 value={draftText}
@@ -657,7 +657,7 @@ export function GtdWorkspace() {
               </p>
             </div>
           </div>
-          <div className="grid gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-1">
             <MetricCard icon={<Inbox className="size-4" />} label="Inbox" value={counts.inbox} body="สิ่งที่ยังไม่ได้ clarify" />
             <MetricCard icon={<ClipboardCheck className="size-4" />} label="Done This Week" value={doneThisWeek} body="งานที่ปิดได้ใน 7 วันที่ผ่านมา" />
             <MetricCard icon={<CalendarDays className="size-4" />} label="Overdue" value={overdueCount} body="งานที่เลยกำหนดและยังไม่ done" />
