@@ -219,6 +219,83 @@ async function listClientRoomAssetsByIds(
   );
 }
 
+async function listClientRoomAssetsByProjectId(
+  db: D1Database,
+  projectId: string,
+) {
+  return queryAll<ClientRoomAssetRow>(
+    db,
+    `SELECT *
+     FROM client_room_assets
+     WHERE project_id = ?
+     ORDER BY created_at DESC`,
+    projectId,
+  );
+}
+
+function collectReferencedClientRoomAssetIds(
+  draftData: ClientRoomDraftData,
+  publishedData: ClientRoomDraftData | null,
+) {
+  const assetIds = new Set<string>(collectClientRoomAssetIds(draftData));
+
+  if (publishedData) {
+    for (const assetId of collectClientRoomAssetIds(publishedData)) {
+      assetIds.add(assetId);
+    }
+  }
+
+  return assetIds;
+}
+
+async function cleanupUnreferencedClientRoomAssets(
+  env: TrackerEnv,
+  input: {
+    projectId: string;
+    draftData: ClientRoomDraftData;
+    publishedData: ClientRoomDraftData | null;
+  },
+) {
+  const referencedAssetIds = collectReferencedClientRoomAssetIds(
+    input.draftData,
+    input.publishedData,
+  );
+  const assetRows = await listClientRoomAssetsByProjectId(env.DB, input.projectId);
+  const orphanAssets = assetRows.filter((asset) => !referencedAssetIds.has(asset.id));
+
+  if (orphanAssets.length === 0) {
+    return;
+  }
+
+  const cleanupResults = await Promise.allSettled(
+    orphanAssets.map((asset) => env.ARTIFACTS_BUCKET.delete(asset.object_key)),
+  );
+  const deletedAssetIds: string[] = [];
+
+  cleanupResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      deletedAssetIds.push(orphanAssets[index].id);
+      return;
+    }
+
+    console.error(
+      "Failed to delete orphan client room asset",
+      orphanAssets[index].object_key,
+      result.reason,
+    );
+  });
+
+  if (deletedAssetIds.length === 0) {
+    return;
+  }
+
+  await env.DB.batch(
+    deletedAssetIds.map((assetId) =>
+      env.DB.prepare("DELETE FROM client_room_assets WHERE id = ?").bind(assetId)
+    ),
+  );
+}
+
 function resolveDocumentKind(
   currentKind: ClientRoomDocument["kind"],
   mimeType: string,
@@ -268,13 +345,10 @@ async function hydrateClientRoomProjectAssets(
   env: TrackerEnv,
   project: ClientRoomProjectRecord,
 ) {
-  const assetIds = new Set<string>(collectClientRoomAssetIds(project.draftData));
-
-  if (project.publishedData) {
-    for (const assetId of collectClientRoomAssetIds(project.publishedData)) {
-      assetIds.add(assetId);
-    }
-  }
+  const assetIds = collectReferencedClientRoomAssetIds(
+    project.draftData,
+    project.publishedData,
+  );
 
   if (assetIds.size === 0) {
     return project;
@@ -465,6 +539,12 @@ export async function saveClientRoomProject(
     projectId,
   );
 
+  await cleanupUnreferencedClientRoomAssets(env, {
+    projectId,
+    draftData: normalizedDraft,
+    publishedData: existing.publishedData,
+  });
+
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
     throw new NotFoundError("Failed to reload client room");
@@ -500,6 +580,12 @@ export async function publishClientRoomProject(
     projectId,
   );
 
+  await cleanupUnreferencedClientRoomAssets(env, {
+    projectId,
+    draftData: existing.draftData,
+    publishedData: existing.draftData,
+  });
+
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
     throw new NotFoundError("Failed to reload published client room");
@@ -525,6 +611,12 @@ export async function unpublishClientRoomProject(
      WHERE id = ?`,
     projectId,
   );
+
+  await cleanupUnreferencedClientRoomAssets(env, {
+    projectId,
+    draftData: existing.draftData,
+    publishedData: null,
+  });
 
   const project = await getClientRoomProjectById(env, projectId);
   if (!project) {
