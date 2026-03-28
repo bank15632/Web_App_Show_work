@@ -29,9 +29,21 @@ function getSafeRedirectPath(raw: string): string {
   return raw;
 }
 
+function isE2EBypassRequest(request: NextRequest) {
+  return (
+    process.env.E2E_BYPASS_OWNER_AUTH === "1" &&
+    (request.headers.get("x-e2e-test") === "1" ||
+      request.cookies.get("e2e_bypass")?.value === "1")
+  );
+}
+
 // Cloudflare's current OpenNext adapter still expects the Edge middleware convention.
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isE2EBypassRequest(request)) {
+    return NextResponse.next();
+  }
 
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
