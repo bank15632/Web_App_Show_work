@@ -10,7 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, BookOpenText, ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import { ArrowLeft, BookOpenText, ChevronLeft, ChevronRight, Copy, ListChecks } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
@@ -689,6 +689,13 @@ export function TodoListView() {
               >
                 <ArrowLeft className="size-4" />
                 Dashboard
+              </Link>
+              <Link
+                href="/gtd"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
+              >
+                <ListChecks className="size-4" />
+                GTD
               </Link>
               <Link
                 href="/todos/guide"
