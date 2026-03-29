@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bot, FolderPlus, ListTodo } from "lucide-react";
+import { Bot, FolderPlus, ListChecks, ListTodo } from "lucide-react";
 
 import { phaseAccents, phaseLabels } from "@/lib/tracker/constants";
 import type { TrackerProjectDetail } from "@/lib/tracker/types";
@@ -39,13 +39,6 @@ export function ProjectRail({
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
-          <Link
-            href="/dashboard"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border px-4 py-2 text-[13px] leading-5 text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
-          >
-            <ListTodo className="size-4" />
-            Dashboard
-          </Link>
           <div className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-[13px] leading-5 sm:text-sm">
             <Bot className="size-4" />
             {pendingReviewCount} pending review
