@@ -10,7 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpenText, ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import { ArrowLeft, BookOpenText, ChevronLeft, ChevronRight, Copy } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
@@ -683,6 +683,13 @@ export function TodoListView() {
                 showLabel="Show projects"
                 onClick={() => setIsLeftRailCollapsed((prev) => !prev)}
               />
+              <Link
+                href="/"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
+              >
+                <ArrowLeft className="size-4" />
+                Dashboard
+              </Link>
               <Link
                 href="/todos/guide"
                 className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
