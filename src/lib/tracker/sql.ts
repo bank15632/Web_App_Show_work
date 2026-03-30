@@ -65,6 +65,17 @@ CREATE TABLE IF NOT EXISTS tasks (
   FOREIGN KEY (source_artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS task_subtasks (
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  completed INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS project_checklist_items (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,
@@ -155,6 +166,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_tasks_project_status ON tasks(project_id, status, sort_order);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(project_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(project_id, task_type);
+CREATE INDEX IF NOT EXISTS idx_task_subtasks_task ON task_subtasks(task_id, sort_order, created_at);
 CREATE INDEX IF NOT EXISTS idx_project_checklist_project_phase ON project_checklist_items(project_id, phase, sort_order);
 CREATE INDEX IF NOT EXISTS idx_project_checklist_custom_project_phase ON project_checklist_custom_items(project_id, phase, section_key, sort_order);
 CREATE INDEX IF NOT EXISTS idx_project_checklist_hidden_project_phase ON project_checklist_hidden_items(project_id, phase, item_key);

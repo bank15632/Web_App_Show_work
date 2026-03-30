@@ -15,7 +15,6 @@ import { ArrowLeft, BookOpenText, ChevronLeft, ChevronRight, Copy, ListChecks } 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
 import { ReviewQueue } from "@/components/portal/tracker/review-queue";
-import { SavedViewBar } from "@/components/portal/tracker/saved-view-bar";
 import { TaskBoard } from "@/components/portal/tracker/task-board";
 import { WeeklyReportPanel } from "@/components/portal/tracker/weekly-report-panel";
 import { WorkspaceHeader } from "@/components/portal/tracker/workspace-header";
@@ -34,13 +33,11 @@ import type {
   TrackerLegacyTodoImport,
   TrackerProjectDetail,
   TrackerProjectMutationInput,
-  TrackerSavedView,
   TrackerTaskMutationInput,
   TrackerTaskRecord,
   TrackerWorkspaceData,
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
-import { filterTasksForSavedView } from "@/lib/tracker/views";
 
 type DialogState =
   | null
@@ -113,6 +110,7 @@ function createEmptyTaskDraft(phase: TrackerProjectDetail["phase"]): TaskDraft {
     nextAction: "",
     blocker: "",
     humanVerified: true,
+    subtasks: [],
   };
 }
 
@@ -161,17 +159,15 @@ function formatLabel(value: string) {
 
 function buildAiChatBrief({
   project,
-  filteredTasks,
+  visibleTasks,
   revisionArtifacts,
   weeklyReports,
-  savedView,
   domainTab,
 }: {
   project: TrackerProjectDetail;
-  filteredTasks: TrackerTaskRecord[];
+  visibleTasks: TrackerTaskRecord[];
   revisionArtifacts: TrackerArtifactRecord[];
   weeklyReports: TrackerArtifactRecord[];
-  savedView: TrackerSavedView;
   domainTab: TrackerDomainTab;
 }) {
   const openTasks = project.tasks.filter((task) => task.status !== "done");
@@ -185,7 +181,7 @@ function buildAiChatBrief({
     `Status: ${formatLabel(project.status)}`,
     `Client: ${project.clientName || "BNJ Studio"}`,
     `Location: ${project.location || "Bangkok"}`,
-    `Current filter: ${formatLabel(savedView)}`,
+    "Task scope: All tasks on the current board",
     `Current section: ${formatLabel(domainTab)}`,
     `Open tasks: ${openTasks.length}`,
     `Total tasks: ${project.tasks.length}`,
@@ -194,10 +190,10 @@ function buildAiChatBrief({
     "# Tasks in current view",
   ];
 
-  if (filteredTasks.length === 0) {
+  if (visibleTasks.length === 0) {
     lines.push("- None");
   } else {
-    filteredTasks.forEach((task, index) => {
+    visibleTasks.forEach((task, index) => {
       lines.push(`${index + 1}. ${task.title}`);
       lines.push(`   Status: ${taskStatusLabels[task.status]}`);
       lines.push(`   Priority: ${formatLabel(task.priority)}`);
@@ -259,6 +255,44 @@ function downloadTextFile(filename: string, contents: string) {
   link.click();
   link.remove();
   window.URL.revokeObjectURL(url);
+}
+
+function formatSubtaskDraftLines(
+  subtasks: TrackerTaskMutationInput["subtasks"] | TrackerTaskRecord["subtasks"],
+) {
+  return (subtasks ?? [])
+    .map((subtask) => `${subtask.completed ? "[x]" : "[ ]"} ${subtask.title}`.trim())
+    .join("\n");
+}
+
+function parseSubtaskDraftLines(text: string): NonNullable<TrackerTaskMutationInput["subtasks"]> {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const checkedMatch = line.match(/^\[(x|X)\]\s*(.+)$/);
+      if (checkedMatch) {
+        return {
+          title: checkedMatch[2].trim(),
+          completed: true,
+        };
+      }
+
+      const uncheckedMatch = line.match(/^\[\s\]\s*(.+)$/);
+      if (uncheckedMatch) {
+        return {
+          title: uncheckedMatch[1].trim(),
+          completed: false,
+        };
+      }
+
+      return {
+        title: line,
+        completed: false,
+      };
+    })
+    .filter((subtask) => subtask.title.length > 0);
 }
 
 function readLegacyTodos(): TrackerLegacyTodoImport[] {
@@ -330,7 +364,6 @@ export function TodoListView() {
   const searchParams = useSearchParams();
   const [workspace, setWorkspace] = useState<TrackerWorkspaceData | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [savedView, setSavedView] = useState<TrackerSavedView>("today");
   const [domainTab, setDomainTab] = useState<TrackerDomainTab>("tasks");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
@@ -397,28 +430,7 @@ export function TodoListView() {
     [workspace],
   );
 
-  const savedViewCounts = useMemo(() => {
-    const tasks = activeProject?.tasks ?? [];
-    const artifacts = activeProject?.artifacts ?? [];
-
-    return {
-      today: filterTasksForSavedView(tasks, "today").length,
-      this_week: filterTasksForSavedView(tasks, "this_week").length,
-      waiting_on: filterTasksForSavedView(tasks, "waiting_on").length,
-      overdue: filterTasksForSavedView(tasks, "overdue").length,
-      rfis: filterTasksForSavedView(tasks, "rfis").length,
-      submittals: filterTasksForSavedView(tasks, "submittals").length,
-      site_issues: filterTasksForSavedView(tasks, "site_issues").length,
-      revision_log: artifacts.filter((artifact) => artifact.kind === "drawing_revision").length,
-      punch_list: filterTasksForSavedView(tasks, "punch_list").length,
-      weekly_report: artifacts.filter((artifact) => artifact.kind === "weekly_report").length,
-    } satisfies Record<TrackerSavedView, number>;
-  }, [activeProject]);
-
-  const filteredTasks = useMemo(
-    () => filterTasksForSavedView(activeProject?.tasks ?? [], savedView),
-    [activeProject, savedView],
-  );
+  const visibleTasks = activeProject?.tasks ?? [];
 
   async function loadWorkspace() {
     setLoading(true);
@@ -464,23 +476,15 @@ export function TodoListView() {
     }
   }
 
-  function handleSavedViewChange(view: TrackerSavedView) {
-    setSavedView(view);
-    if (view === "revision_log") setDomainTab("revision_log");
-    else if (view === "weekly_report") setDomainTab("weekly_report");
-    else setDomainTab("tasks");
-  }
-
   async function handleCopyAiBrief() {
     if (!activeProject) return;
 
     const project = activeProject;
     const brief = buildAiChatBrief({
       project,
-      filteredTasks,
+      visibleTasks,
       revisionArtifacts,
       weeklyReports,
-      savedView,
       domainTab,
     });
 
@@ -828,12 +832,7 @@ export function TodoListView() {
             onOpenIntake={() => setDialog("meeting")}
           />
 
-          <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <SavedViewBar
-              activeView={savedView}
-              counts={savedViewCounts}
-              onChange={handleSavedViewChange}
-            />
+          <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
             <DomainTabs activeTab={domainTab} onChange={setDomainTab} />
           </div>
 
@@ -847,7 +846,7 @@ export function TodoListView() {
             {domainTab === "tasks" ? (
               <TaskBoard
                 phase={activeProject.phase}
-                tasks={filteredTasks}
+                tasks={visibleTasks}
                 checklistItems={activeProject.checklistItems}
                 hiddenChecklistItems={activeProject.hiddenChecklistItems}
                 checklistBusy={working}
@@ -1030,7 +1029,25 @@ export function TodoListView() {
             <TaskFormFields
               draft={editingTask}
               onChange={(draft) =>
-                setEditingTask((prev) => (prev ? { ...prev, ...draft } : prev))
+                setEditingTask((prev) => {
+                  if (!prev) {
+                    return prev;
+                  }
+
+                  const nextSubtasks =
+                    draft.subtasks?.map((subtask, index) => ({
+                      id: prev.subtasks[index]?.id ?? `draft-subtask-${index}`,
+                      title: subtask.title,
+                      completed: subtask.completed === true,
+                      sortOrder: index,
+                    })) ?? prev.subtasks;
+
+                  return {
+                    ...prev,
+                    ...draft,
+                    subtasks: nextSubtasks,
+                  };
+                })
               }
             />
             <div className="flex items-center justify-between gap-3">
@@ -1487,6 +1504,9 @@ function TaskFormFields({
   draft: TrackerTaskMutationInput;
   onChange: (draft: TrackerTaskMutationInput) => void;
 }) {
+  const subtaskLines = formatSubtaskDraftLines(draft.subtasks ?? []);
+  const subtaskCount = draft.subtasks?.length ?? 0;
+
   return (
     <>
       <DialogHelperCard
@@ -1508,6 +1528,31 @@ function TaskFormFields({
         rows={5}
         className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
       />
+      <label className="grid gap-2 text-sm text-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            Sub-Tasks
+          </span>
+          <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+            {subtaskCount} item{subtaskCount === 1 ? "" : "s"}
+          </span>
+        </div>
+        <textarea
+          value={subtaskLines}
+          onChange={(event) => {
+            onChange({
+              ...draft,
+              subtasks: parseSubtaskDraftLines(event.target.value),
+            });
+          }}
+          placeholder={"[ ] Floor plan update\n[ ] Coordinate reflected ceiling plan\n[x] Confirm section markers"}
+          rows={5}
+          className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
+        />
+        <p className="text-xs leading-5 text-muted-foreground">
+          ใส่หนึ่งบรรทัดต่อหนึ่งงานย่อย พิมพ์แบบ `[ ]` หรือ `[x]` ได้เลย เพื่อบอกว่างานย่อยไหนเสร็จแล้ว
+        </p>
+      </label>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm text-foreground">
           <span className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground">

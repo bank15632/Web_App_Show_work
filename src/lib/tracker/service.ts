@@ -33,6 +33,7 @@ import type {
   TrackerReviewItemRecord,
   TrackerReviewProposal,
   TrackerReviewResolution,
+  TrackerSubtaskRecord,
   TrackerTaskMutationInput,
   TrackerTaskRecord,
   TrackerWorkspaceData,
@@ -84,6 +85,16 @@ interface TaskRow {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+}
+
+interface TaskSubtaskRow {
+  id: string;
+  task_id: string;
+  title: string;
+  completed: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface DecisionRow {
@@ -305,6 +316,16 @@ function mapTaskRow(row: TaskRow): TrackerTaskRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
+    subtasks: [],
+  };
+}
+
+function mapTaskSubtaskRow(row: TaskSubtaskRow): TrackerSubtaskRecord {
+  return {
+    id: row.id,
+    title: row.title,
+    completed: toBoolean(row.completed),
+    sortOrder: row.sort_order,
   };
 }
 
@@ -505,7 +526,7 @@ async function ensureProjectChecklistItems(
       return [
         db
           .prepare(
-            `INSERT INTO project_checklist_items (
+            `INSERT OR IGNORE INTO project_checklist_items (
               id, project_id, phase, section_key, item_key, completed, sort_order,
               completed_at, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, 0, ?, NULL, ?, ?)`,
@@ -545,6 +566,7 @@ export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspac
 
   const [
     taskRows,
+    taskSubtaskRows,
     decisionRows,
     artifactRows,
     checklistRows,
@@ -555,6 +577,10 @@ export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspac
     queryAll<TaskRow>(
       env.DB,
       "SELECT * FROM tasks ORDER BY status ASC, sort_order ASC, due_date ASC, created_at ASC",
+    ),
+    queryAll<TaskSubtaskRow>(
+      env.DB,
+      "SELECT * FROM task_subtasks ORDER BY task_id ASC, sort_order ASC, created_at ASC",
     ),
     queryAll<DecisionRow>(
       env.DB,
@@ -584,6 +610,7 @@ export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspac
   ]);
 
   const tasksByProject = new Map<string, TrackerTaskRecord[]>();
+  const tasksById = new Map<string, TrackerTaskRecord>();
   const decisionsByProject = new Map<string, TrackerDecisionRecord[]>();
   const artifactsByProject = new Map<string, TrackerArtifactRecord[]>();
   const checklistItemsByProject = new Map<string, TrackerChecklistItemRecord[]>();
@@ -605,6 +632,16 @@ export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspac
     const tasks = tasksByProject.get(mapped.projectId) ?? [];
     tasks.push(mapped);
     tasksByProject.set(mapped.projectId, tasks);
+    tasksById.set(mapped.id, mapped);
+  }
+
+  for (const row of taskSubtaskRows) {
+    const task = tasksById.get(row.task_id);
+    if (!task) {
+      continue;
+    }
+
+    task.subtasks.push(mapTaskSubtaskRow(row));
   }
 
   for (const row of decisionRows) {
@@ -728,7 +765,18 @@ export async function getProjectById(env: TrackerEnv, projectId: string) {
 
 async function getTaskByIdInternal(db: D1Database, taskId: string) {
   const row = await queryFirst<TaskRow>(db, "SELECT * FROM tasks WHERE id = ?", taskId);
-  return row ? mapTaskRow(row) : null;
+  if (!row) {
+    return null;
+  }
+
+  const task = mapTaskRow(row);
+  const subtaskRows = await queryAll<TaskSubtaskRow>(
+    db,
+    "SELECT * FROM task_subtasks WHERE task_id = ? ORDER BY sort_order ASC, created_at ASC",
+    taskId,
+  );
+  task.subtasks = subtaskRows.map(mapTaskSubtaskRow);
+  return task;
 }
 
 async function getProjectRowByIdInternal(db: D1Database, projectId: string) {
@@ -818,6 +866,46 @@ async function getNextSortOrder(
   );
 
   return row?.next_sort_order ?? 0;
+}
+
+async function replaceTaskSubtasks(
+  db: D1Database,
+  taskId: string,
+  subtasks: NonNullable<TrackerTaskMutationInput["subtasks"]>,
+  timestamp: string,
+) {
+  await runStatement(db, "DELETE FROM task_subtasks WHERE task_id = ?", taskId);
+
+  const normalizedSubtasks = subtasks
+    .map((subtask) => ({
+      title: subtask.title.trim(),
+      completed: subtask.completed === true,
+    }))
+    .filter((subtask) => subtask.title.length > 0);
+
+  if (normalizedSubtasks.length === 0) {
+    return;
+  }
+
+  const statements = normalizedSubtasks.map((subtask, index) =>
+    db
+      .prepare(
+        `INSERT INTO task_subtasks (
+          id, task_id, title, completed, sort_order, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        createId("subtask"),
+        taskId,
+        subtask.title,
+        subtask.completed ? 1 : 0,
+        index,
+        timestamp,
+        timestamp,
+      ),
+  );
+
+  await db.batch(statements);
 }
 
 async function writeAuditLog(
@@ -1070,6 +1158,8 @@ export async function createTask(
     projectId,
   );
 
+  await replaceTaskSubtasks(env.DB, taskId, parsed.subtasks ?? [], createdAt);
+
   await writeAuditLog(
     env.DB,
     projectId,
@@ -1128,6 +1218,12 @@ export async function updateTask(
       (patch.status && patch.status !== existing.status
         ? await getNextSortOrder(env.DB, existing.projectId, patch.status)
         : existing.sortOrder),
+    subtasks:
+      patch.subtasks ??
+      existing.subtasks.map((subtask) => ({
+        title: subtask.title,
+        completed: subtask.completed,
+      })),
   };
 
   const parsed = taskMutationSchema.parse(merged);
@@ -1171,6 +1267,8 @@ export async function updateTask(
     updatedAt,
     existing.projectId,
   );
+
+  await replaceTaskSubtasks(env.DB, taskId, parsed.subtasks ?? [], updatedAt);
 
   await writeAuditLog(env.DB, existing.projectId, "task.update", options?.actor ?? "system", patch, {
     entityKind: "task",

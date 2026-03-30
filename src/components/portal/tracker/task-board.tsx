@@ -49,6 +49,7 @@ import type {
   TrackerPhase,
   TrackerTaskRecord,
 } from "@/lib/tracker/types";
+import { cn } from "@/lib/utils";
 import { isTaskOverdue } from "@/lib/tracker/views";
 
 type ViewMode = "board" | "list";
@@ -75,6 +76,16 @@ function buildBoardState(tasks: TrackerTaskRecord[]): BoardState {
       .sort((a, b) => a.sortOrder - b.sortOrder);
     return acc;
   }, {} as BoardState);
+}
+
+function getSubtaskProgress(task: TrackerTaskRecord) {
+  const total = task.subtasks.length;
+  const completed = task.subtasks.filter((subtask) => subtask.completed).length;
+
+  return {
+    total,
+    completed,
+  };
 }
 
 function formatDate(value: string | null) {
@@ -689,6 +700,56 @@ function ChecklistItemButton({
   );
 }
 
+function TaskSubtaskPreview({
+  task,
+  compact = false,
+}: {
+  task: TrackerTaskRecord;
+  compact?: boolean;
+}) {
+  const progress = getSubtaskProgress(task);
+
+  if (progress.total === 0) {
+    return null;
+  }
+
+  const visibleSubtasks = task.subtasks.slice(0, compact ? 2 : 4);
+
+  return (
+    <div className="mt-4 rounded-[1rem] border border-border bg-background/80 px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Sub-Tasks
+        </span>
+        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {progress.completed}/{progress.total} complete
+        </span>
+      </div>
+      <div className="mt-2 space-y-1.5">
+        {visibleSubtasks.map((subtask) => (
+          <div key={subtask.id} className="flex items-start gap-2 text-[12px] leading-5 text-muted-foreground">
+            <span
+              className={cn(
+                "mt-1 inline-flex size-3 shrink-0 rounded-full border",
+                subtask.completed ? "border-emerald-500 bg-emerald-500" : "border-border bg-transparent",
+              )}
+            />
+            <span className={subtask.completed ? "line-through opacity-70" : ""}>
+              {subtask.title}
+            </span>
+          </div>
+        ))}
+      </div>
+      {task.subtasks.length > visibleSubtasks.length ? (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          +{task.subtasks.length - visibleSubtasks.length} more sub-task
+          {task.subtasks.length - visibleSubtasks.length === 1 ? "" : "s"}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskColumn({
   status,
   tasks,
@@ -779,6 +840,7 @@ function TaskCard({
   handleProps?: ButtonHTMLAttributes<HTMLButtonElement>;
 }) {
   const dragHandleProps = handleProps ?? {};
+  const progress = getSubtaskProgress(task);
 
   return (
     <article
@@ -814,6 +876,11 @@ function TaskCard({
             <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground sm:text-xs">
               {taskTypeLabels[task.taskType]}
             </span>
+            {progress.total > 0 ? (
+              <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground sm:text-xs">
+                {progress.completed}/{progress.total} sub-tasks
+              </span>
+            ) : null}
             {task.dueDate ? (
               <span
                 className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] sm:text-xs ${
@@ -827,6 +894,7 @@ function TaskCard({
               </span>
             ) : null}
           </div>
+          <TaskSubtaskPreview task={task} />
         </div>
       </div>
     </article>
@@ -840,6 +908,8 @@ function TaskRow({
   task: TrackerTaskRecord;
   onEdit: () => void;
 }) {
+  const progress = getSubtaskProgress(task);
+
   return (
     <button
       type="button"
@@ -849,7 +919,9 @@ function TaskRow({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[13px] font-medium sm:text-sm">{task.title}</p>
-          <p className="mt-1 text-[13px] text-muted-foreground sm:text-sm">{task.description}</p>
+          {task.description ? (
+            <p className="mt-1 text-[13px] text-muted-foreground sm:text-sm">{task.description}</p>
+          ) : null}
         </div>
         <span
           className={`rounded-full border px-3 py-1 text-[11px] font-medium sm:text-xs ${taskStatusTone[task.status]}`}
@@ -866,10 +938,16 @@ function TaskRow({
         <span className="rounded-full border border-border px-2.5 py-1 text-[0.7rem] text-muted-foreground">
           {taskTypeLabels[task.taskType]}
         </span>
+        {progress.total > 0 ? (
+          <span className="rounded-full border border-border px-2.5 py-1 text-[0.7rem] text-muted-foreground">
+            {progress.completed}/{progress.total} sub-tasks
+          </span>
+        ) : null}
         {task.dueDate ? (
           <span className="text-xs text-muted-foreground">{formatDate(task.dueDate)}</span>
         ) : null}
       </div>
+      <TaskSubtaskPreview task={task} compact />
     </button>
   );
 }

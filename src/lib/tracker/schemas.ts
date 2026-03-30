@@ -17,6 +17,10 @@ export const trackerArtifactKindSchema = z.enum(trackerArtifactKinds);
 export const trackerPrioritySchema = z.enum(trackerPriorities);
 export const trackerProjectStatusSchema = z.enum(projectStatuses);
 export const reviewActionSchema = z.enum(reviewActions);
+const taskSubtaskSchema = z.object({
+  title: z.string().trim().min(1),
+  completed: z.boolean().optional(),
+});
 
 export const projectMutationSchema = z.object({
   name: z.string().trim().min(1),
@@ -51,6 +55,7 @@ export const taskMutationSchema = z.object({
   blocker: z.string().trim().optional(),
   humanVerified: z.boolean().optional(),
   sortOrder: z.number().int().nonnegative().optional(),
+  subtasks: z.array(taskSubtaskSchema).optional(),
 });
 
 export const decisionMutationSchema = z.object({

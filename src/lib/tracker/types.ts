@@ -46,6 +46,13 @@ export interface TrackerProjectRecord {
   updatedAt: string;
 }
 
+export interface TrackerSubtaskRecord {
+  id: string;
+  title: string;
+  completed: boolean;
+  sortOrder: number;
+}
+
 export interface TrackerTaskRecord {
   id: string;
   projectId: string;
@@ -70,6 +77,7 @@ export interface TrackerTaskRecord {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  subtasks: TrackerSubtaskRecord[];
 }
 
 export interface TrackerDecisionRecord {
@@ -202,6 +210,10 @@ export interface TrackerTaskMutationInput {
   blocker?: string;
   humanVerified?: boolean;
   sortOrder?: number;
+  subtasks?: Array<{
+    title: string;
+    completed?: boolean;
+  }>;
 }
 
 export interface TrackerDecisionMutationInput {
