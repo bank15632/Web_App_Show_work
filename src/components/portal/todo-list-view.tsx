@@ -4,6 +4,7 @@ import {
   startTransition,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type ReactNode,
@@ -13,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, BookOpenText, ChevronLeft, ChevronRight, Copy, ListChecks } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
+import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
 import { ReviewQueue } from "@/components/portal/tracker/review-queue";
 import { TaskBoard } from "@/components/portal/tracker/task-board";
@@ -29,6 +31,7 @@ import {
 } from "@/lib/tracker/constants";
 import type {
   TrackerArtifactRecord,
+  TrackerDecisionMutationInput,
   TrackerDomainTab,
   TrackerLegacyTodoImport,
   TrackerProjectDetail,
@@ -42,12 +45,14 @@ import { cn } from "@/lib/utils";
 type DialogState =
   | null
   | "task"
+  | "decision"
   | "project"
   | "meeting"
   | "log"
   | "upload";
 
 type TaskDraft = TrackerTaskMutationInput;
+type DecisionDraft = TrackerDecisionMutationInput;
 type ProjectDraft = TrackerProjectMutationInput;
 
 type MeetingDraft = {
@@ -111,6 +116,16 @@ function createEmptyTaskDraft(phase: TrackerProjectDetail["phase"]): TaskDraft {
     blocker: "",
     humanVerified: true,
     subtasks: [],
+  };
+}
+
+function createEmptyDecisionDraft(): DecisionDraft {
+  return {
+    title: "",
+    decisionText: "",
+    decidedBy: "BNJ Studio",
+    decidedAt: new Date().toISOString().slice(0, 10),
+    sourceArtifactId: null,
   };
 }
 
@@ -257,42 +272,22 @@ function downloadTextFile(filename: string, contents: string) {
   window.URL.revokeObjectURL(url);
 }
 
-function formatSubtaskDraftLines(
+function getEditableSubtasks(
   subtasks: TrackerTaskMutationInput["subtasks"] | TrackerTaskRecord["subtasks"],
 ) {
-  return (subtasks ?? [])
-    .map((subtask) => `${subtask.completed ? "[x]" : "[ ]"} ${subtask.title}`.trim())
-    .join("\n");
+  const rows = [...(subtasks ?? [])].map((subtask) => ({
+    title: subtask.title,
+    completed: subtask.completed === true,
+  }));
+
+  return rows.length > 0 ? rows : [{ title: "", completed: false }];
 }
 
-function parseSubtaskDraftLines(text: string): NonNullable<TrackerTaskMutationInput["subtasks"]> {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const checkedMatch = line.match(/^\[(x|X)\]\s*(.+)$/);
-      if (checkedMatch) {
-        return {
-          title: checkedMatch[2].trim(),
-          completed: true,
-        };
-      }
-
-      const uncheckedMatch = line.match(/^\[\s\]\s*(.+)$/);
-      if (uncheckedMatch) {
-        return {
-          title: uncheckedMatch[1].trim(),
-          completed: false,
-        };
-      }
-
-      return {
-        title: line,
-        completed: false,
-      };
-    })
-    .filter((subtask) => subtask.title.length > 0);
+function sanitizeTaskDraft(draft: TrackerTaskMutationInput): TrackerTaskMutationInput {
+  return {
+    ...draft,
+    subtasks: (draft.subtasks ?? []).filter((subtask) => subtask.title.trim().length > 0),
+  };
 }
 
 function readLegacyTodos(): TrackerLegacyTodoImport[] {
@@ -367,6 +362,7 @@ export function TodoListView() {
   const [domainTab, setDomainTab] = useState<TrackerDomainTab>("tasks");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
+  const [decisionDraft, setDecisionDraft] = useState<DecisionDraft>(createEmptyDecisionDraft);
   const [editingTask, setEditingTask] = useState<TrackerTaskRecord | null>(null);
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(createEmptyProjectDraft);
   const [meetingDraft, setMeetingDraft] = useState<MeetingDraft>(createEmptyMeetingDraft);
@@ -629,6 +625,23 @@ export function TodoListView() {
     );
   }
 
+  async function handleCreateDecision() {
+    if (!activeProject) return;
+
+    await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>(
+          `/api/tracker/projects/${activeProject.id}/decisions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(decisionDraft),
+          },
+        ),
+      "Decision saved.",
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -886,13 +899,46 @@ export function TodoListView() {
 
             {domainTab === "decisions" ? (
               <section className="space-y-4">
-                <div>
-                  <p className="caption-editorial text-[0.7rem]">Decision Log</p>
-                  <h3 className="mt-1 font-display text-3xl font-medium tracking-tight">
-                    Approved decisions
-                  </h3>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="caption-editorial text-[0.7rem]">Decision Log</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <h3 className="font-display text-3xl font-medium tracking-tight">
+                        Approved decisions
+                      </h3>
+                      <HoverHelp
+                        label="Decisions ใช้ยังไง"
+                        buttonLabel="Show decisions help"
+                        body="ใช้เก็บข้อสรุปที่ตกลงแล้วจริง เช่น approve material, confirm design direction, หรือข้อสรุปจากประชุมที่ไม่อยากให้หลุดหาย ถ้ายังไม่ชัด ใช้ Intake ก่อนแล้วค่อย approve จาก Review Queue"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDecisionDraft(createEmptyDecisionDraft());
+                        setDialog("decision");
+                      }}
+                      className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                    >
+                      Add decision
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDomainTab("review_queue")}
+                      className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                    >
+                      Open review queue
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
+                  {activeProject.decisions.length === 0 ? (
+                    <div className="rounded-[1.5rem] border border-dashed border-border bg-background px-5 py-10 text-center text-muted-foreground">
+                      No approved decisions yet. Use <span className="font-medium text-foreground">Add decision</span> for manual entries or approve proposals from Review Queue.
+                    </div>
+                  ) : null}
                   {activeProject.decisions.map((decision) => (
                     <article
                       key={decision.id}
@@ -918,12 +964,33 @@ export function TodoListView() {
                 title="Revision log"
                 subtitle="Drawing revisions and approved summaries"
                 artifacts={revisionArtifacts}
+                helpLabel="Revision Log ใช้ยังไง"
+                helpBody="ใช้เก็บ revision notes, RFI log, submittal log และ drawing updates ที่อยากให้ระบบสรุปผลกระทบก่อน ถ้ามีข้อความยาวหรือ log ให้เริ่มจาก Log intake ถ้าเป็นรูปหน้างานหรือ markup ให้ใช้ Image intake"
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setDialog("log")}
+                      className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                    >
+                      Open log intake
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDialog("upload")}
+                      className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                    >
+                      Open image intake
+                    </button>
+                  </>
+                }
               />
             ) : null}
 
             {domainTab === "weekly_report" ? (
               <WeeklyReportPanel
                 reports={weeklyReports}
+                onOpenReviewQueue={() => setDomainTab("review_queue")}
                 onGenerate={async () => {
                   await withWorkspaceMutation(
                     () =>
@@ -991,7 +1058,7 @@ export function TodoListView() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       projectId: activeProject.id,
-                      task: taskDraft,
+                      task: sanitizeTaskDraft(taskDraft),
                     }),
                   }),
                 "Task created.",
@@ -1018,7 +1085,7 @@ export function TodoListView() {
                     {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(editingTask),
+                      body: JSON.stringify(sanitizeTaskDraft(editingTask)),
                     },
                   ),
                 "Task updated.",
@@ -1072,6 +1139,23 @@ export function TodoListView() {
               </button>
               <DialogActions onCancel={() => setEditingTask(null)} working={working} />
             </div>
+          </form>
+        </DialogFrame>
+      ) : null}
+
+      {dialog === "decision" ? (
+        <DialogFrame title="Add decision" onClose={() => setDialog(null)}>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleCreateDecision();
+              setDecisionDraft(createEmptyDecisionDraft());
+              setDialog(null);
+            }}
+          >
+            <DecisionFormFields draft={decisionDraft} onChange={setDecisionDraft} />
+            <DialogActions onCancel={() => setDialog(null)} working={working} />
           </form>
         </DialogFrame>
       ) : null}
@@ -1384,18 +1468,36 @@ function ArtifactPanel({
   title,
   subtitle,
   artifacts,
+  helpLabel,
+  helpBody,
+  actions,
 }: {
   title: string;
   subtitle: string;
   artifacts: TrackerArtifactRecord[];
+  helpLabel?: string;
+  helpBody?: string;
+  actions?: ReactNode;
 }) {
   return (
     <section className="space-y-4">
-      <div>
-        <p className="caption-editorial text-[0.7rem]">{title}</p>
-        <h3 className="mt-1 font-display text-3xl font-medium tracking-tight">
-          {subtitle}
-        </h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="caption-editorial text-[0.7rem]">{title}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <h3 className="font-display text-3xl font-medium tracking-tight">
+              {subtitle}
+            </h3>
+            {helpLabel && helpBody ? (
+              <HoverHelp
+                label={helpLabel}
+                buttonLabel={`Show help for ${title}`}
+                body={helpBody}
+              />
+            ) : null}
+          </div>
+        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
       <div className="space-y-3">
         {artifacts.length === 0 ? (
@@ -1504,8 +1606,41 @@ function TaskFormFields({
   draft: TrackerTaskMutationInput;
   onChange: (draft: TrackerTaskMutationInput) => void;
 }) {
-  const subtaskLines = formatSubtaskDraftLines(draft.subtasks ?? []);
-  const subtaskCount = draft.subtasks?.length ?? 0;
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const subtaskRows = getEditableSubtasks(draft.subtasks ?? []);
+  const subtaskCount = subtaskRows.filter((subtask) => subtask.title.trim().length > 0).length;
+
+  function updateSubtasks(nextSubtasks: NonNullable<TrackerTaskMutationInput["subtasks"]>) {
+    onChange({
+      ...draft,
+      subtasks: nextSubtasks,
+    });
+  }
+
+  function handleSubtaskChange(
+    index: number,
+    patch: Partial<NonNullable<TrackerTaskMutationInput["subtasks"]>[number]>,
+  ) {
+    const nextSubtasks = subtaskRows.map((subtask, subtaskIndex) =>
+      subtaskIndex === index ? { ...subtask, ...patch } : subtask,
+    );
+    updateSubtasks(nextSubtasks);
+  }
+
+  function handleAddSubtask(afterIndex?: number) {
+    const insertAt = afterIndex === undefined ? subtaskRows.length : afterIndex + 1;
+    const nextSubtasks = [...subtaskRows];
+    nextSubtasks.splice(insertAt, 0, { title: "", completed: false });
+    updateSubtasks(nextSubtasks);
+    window.requestAnimationFrame(() => {
+      inputRefs.current[insertAt]?.focus();
+    });
+  }
+
+  function handleRemoveSubtask(index: number) {
+    const remainingSubtasks = subtaskRows.filter((_, subtaskIndex) => subtaskIndex !== index);
+    updateSubtasks(remainingSubtasks);
+  }
 
   return (
     <>
@@ -1537,20 +1672,63 @@ function TaskFormFields({
             {subtaskCount} item{subtaskCount === 1 ? "" : "s"}
           </span>
         </div>
-        <textarea
-          value={subtaskLines}
-          onChange={(event) => {
-            onChange({
-              ...draft,
-              subtasks: parseSubtaskDraftLines(event.target.value),
-            });
-          }}
-          placeholder={"[ ] Floor plan update\n[ ] Coordinate reflected ceiling plan\n[x] Confirm section markers"}
-          rows={5}
-          className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
-        />
+        <div className="space-y-2 rounded-[1.25rem] border border-border px-3 py-3">
+          {subtaskRows.map((subtask, index) => (
+            <div key={`subtask-row-${index}`} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={subtask.completed === true}
+                onChange={(event) =>
+                  handleSubtaskChange(index, { completed: event.target.checked })
+                }
+                className="size-4 rounded border-border"
+              />
+              <input
+                ref={(element) => {
+                  inputRefs.current[index] = element;
+                }}
+                value={subtask.title}
+                onChange={(event) =>
+                  handleSubtaskChange(index, { title: event.target.value })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleAddSubtask(index);
+                    return;
+                  }
+
+                  if (event.key === "Backspace" && subtask.title.length === 0 && subtaskRows.length > 1) {
+                    event.preventDefault();
+                    const focusIndex = Math.max(index - 1, 0);
+                    handleRemoveSubtask(index);
+                    window.requestAnimationFrame(() => {
+                      inputRefs.current[focusIndex]?.focus();
+                    });
+                  }
+                }}
+                placeholder={index === 0 ? "เช่น เพิ่ม Printer ใน Perspective" : "Next sub-task"}
+                className="h-11 flex-1 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveSubtask(index)}
+                className="inline-flex h-11 items-center rounded-full border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => handleAddSubtask()}
+            className="inline-flex h-10 items-center rounded-full border border-border px-4 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+          >
+            Add another sub-task
+          </button>
+        </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          ใส่หนึ่งบรรทัดต่อหนึ่งงานย่อย พิมพ์แบบ `[ ]` หรือ `[x]` ได้เลย เพื่อบอกว่างานย่อยไหนเสร็จแล้ว
+          กด `Enter` เพื่อเพิ่ม sub-task แถวถัดไปได้ทันที และติ๊ก checkbox เมื่องานย่อยเสร็จแล้ว
         </p>
       </label>
       <div className="grid gap-4 md:grid-cols-2">
@@ -1645,6 +1823,52 @@ function TaskFormFields({
             ใส่เมื่อมี deadline จริง, commitment ที่คนอื่นรอ หรือวันติดตามที่ต้องเห็นบนบอร์ด
           </p>
         </label>
+      </div>
+    </>
+  );
+}
+
+function DecisionFormFields({
+  draft,
+  onChange,
+}: {
+  draft: DecisionDraft;
+  onChange: (draft: DecisionDraft) => void;
+}) {
+  return (
+    <>
+      <DialogHelperCard
+        title="ใช้เมื่อมีข้อสรุปที่ตกลงแล้ว"
+        body="เหมาะกับ decision ที่ชัดและไม่อยากให้หลุดหาย เช่น approve material, ยืนยัน design direction หรือข้อสรุปจากประชุม ถ้ายังเป็นข้อมูลดิบให้เริ่มจาก Intake ก่อน"
+      />
+      <input
+        value={draft.title}
+        onChange={(event) => onChange({ ...draft, title: event.target.value })}
+        placeholder="Decision title"
+        className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+      />
+      <textarea
+        value={draft.decisionText}
+        onChange={(event) =>
+          onChange({ ...draft, decisionText: event.target.value })
+        }
+        placeholder="What was decided, what changed, and what the team should follow next?"
+        rows={5}
+        className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <input
+          value={draft.decidedBy ?? ""}
+          onChange={(event) => onChange({ ...draft, decidedBy: event.target.value })}
+          placeholder="Decided by"
+          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+        />
+        <input
+          type="date"
+          value={draft.decidedAt ?? ""}
+          onChange={(event) => onChange({ ...draft, decidedAt: event.target.value })}
+          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+        />
       </div>
     </>
   );

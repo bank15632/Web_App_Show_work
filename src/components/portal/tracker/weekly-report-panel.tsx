@@ -2,40 +2,62 @@
 
 import { FileText, Sparkles } from "lucide-react";
 
+import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import type { TrackerArtifactRecord } from "@/lib/tracker/types";
 
 export function WeeklyReportPanel({
   reports,
   onGenerate,
+  onOpenReviewQueue,
 }: {
   reports: TrackerArtifactRecord[];
   onGenerate: () => Promise<void>;
+  onOpenReviewQueue: () => void;
 }) {
   return (
     <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="caption-editorial text-[0.7rem]">Weekly Report</p>
-          <h3 className="mt-1 font-display text-3xl font-medium tracking-tight">
-            Review-ready summaries
-          </h3>
+          <div className="mt-1 flex items-center gap-2">
+            <h3 className="font-display text-3xl font-medium tracking-tight">
+              Review-ready summaries
+            </h3>
+            <HoverHelp
+              label="Weekly Report ใช้ยังไง"
+              buttonLabel="Show weekly report help"
+              body="หน้านี้ไม่ได้กรอกข้อมูลตรง ๆ แต่จะสรุปจาก task, status และข้อมูลล่าสุดของโปรเจ็กต์ กด Generate report เพื่อสร้าง proposal แล้วไป approve ต่อใน Review Queue เมื่อ approve แล้ว report ที่ผ่านจะกลับมาแสดงที่หน้านี้"
+            />
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            void onGenerate();
-          }}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-        >
-          <Sparkles className="size-4" />
-          Generate report
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              void onGenerate();
+            }}
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+          >
+            <Sparkles className="size-4" />
+            Generate report
+          </button>
+          <button
+            type="button"
+            onClick={onOpenReviewQueue}
+            className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+          >
+            Open review queue
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
         {reports.length === 0 ? (
           <div className="rounded-[1.5rem] border border-dashed border-border bg-background px-5 py-10 text-center text-muted-foreground">
-            No approved weekly reports yet.
+            <p>No approved weekly reports yet.</p>
+            <p className="mt-2 text-sm">
+              Generate a report from the current project state, then approve it in Review Queue.
+            </p>
           </div>
         ) : null}
         {reports.map((report) => (
