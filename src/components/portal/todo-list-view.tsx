@@ -555,6 +555,76 @@ export function TodoListView() {
     }
   }
 
+  async function handleChecklistToggle(itemId: string, completed: boolean) {
+    if (!activeProject) return;
+
+    await withWorkspaceMutation(() =>
+      requestJson<{ workspace: TrackerWorkspaceData }>(
+        `/api/tracker/projects/${activeProject.id}/checklist`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId, completed }),
+        },
+      ),
+    );
+  }
+
+  async function handleChecklistCreate(
+    sectionKey: string,
+    label: string,
+    description: string,
+  ) {
+    if (!activeProject) return;
+
+    await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>(
+          `/api/tracker/projects/${activeProject.id}/checklist`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sectionKey, label, description }),
+          },
+        ),
+      "Added checklist item to this project.",
+    );
+  }
+
+  async function handleChecklistRemove(itemId: string) {
+    if (!activeProject) return;
+
+    await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>(
+          `/api/tracker/projects/${activeProject.id}/checklist`,
+          {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId }),
+          },
+        ),
+      "Removed checklist item from this project.",
+    );
+  }
+
+  async function handleChecklistRestore(itemKey: string) {
+    if (!activeProject) return;
+
+    await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>(
+          `/api/tracker/projects/${activeProject.id}/checklist`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemKey }),
+          },
+        ),
+      "Restored hidden checklist item.",
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -776,12 +846,26 @@ export function TodoListView() {
           <div className="mt-6 flex-1 space-y-6 pb-10">
             {domainTab === "tasks" ? (
               <TaskBoard
+                phase={activeProject.phase}
                 tasks={filteredTasks}
+                checklistItems={activeProject.checklistItems}
+                hiddenChecklistItems={activeProject.hiddenChecklistItems}
+                checklistBusy={working}
                 onCreateTask={() => {
                   setTaskDraft(createEmptyTaskDraft(activeProject.phase));
                   setDialog("task");
                 }}
                 onEditTask={(task) => setEditingTask(task)}
+                onToggleChecklist={(itemId, completed) => {
+                  void handleChecklistToggle(itemId, completed);
+                }}
+                onAddChecklistItem={(sectionKey, label, description) =>
+                  handleChecklistCreate(sectionKey, label, description)
+                }
+                onRemoveChecklistItem={(itemId) => handleChecklistRemove(itemId)}
+                onRestoreHiddenChecklistItem={(itemKey) =>
+                  handleChecklistRestore(itemKey)
+                }
                 onReorder={async (items) => {
                   await withWorkspaceMutation(
                     () =>

@@ -1,7 +1,15 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { trackerPhaseChecklistTemplates } from "@/lib/tracker/checklists";
 import type { TrackerEnv } from "@/lib/tracker/env";
-import { projectMutationSchema, taskMutationSchema } from "@/lib/tracker/schemas";
+import {
+  checklistCreateSchema,
+  checklistMutationSchema,
+  checklistRemoveSchema,
+  checklistRestoreSchema,
+  projectMutationSchema,
+  taskMutationSchema,
+} from "@/lib/tracker/schemas";
 import { trackerMigrationSql } from "@/lib/tracker/sql";
 import type {
   TrackerAiGenerationResult,
@@ -9,8 +17,14 @@ import type {
   TrackerArtifactRecord,
   TrackerAuditLogRecord,
   TrackerBoardMove,
+  TrackerChecklistItemRecord,
+  TrackerChecklistCreateInput,
+  TrackerChecklistMutationInput,
+  TrackerChecklistRemoveInput,
+  TrackerChecklistRestoreInput,
   TrackerDecisionMutationInput,
   TrackerDecisionRecord,
+  TrackerHiddenChecklistItemRecord,
   TrackerLegacyTodoImport,
   TrackerProjectDetail,
   TrackerProjectMutationInput,
@@ -84,6 +98,52 @@ interface DecisionRow {
   created_at: string;
   updated_at: string;
 }
+
+interface ChecklistItemRow {
+  id: string;
+  project_id: string;
+  phase: string;
+  section_key: string;
+  item_key: string;
+  completed: number;
+  sort_order: number;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CustomChecklistItemRow {
+  id: string;
+  project_id: string;
+  phase: string;
+  section_key: string;
+  label: string;
+  description: string;
+  completed: number;
+  sort_order: number;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface HiddenChecklistItemRow {
+  project_id: string;
+  phase: string;
+  item_key: string;
+}
+
+type ChecklistItemLookup = {
+  item: TrackerChecklistItemRecord;
+  source: "template" | "custom";
+};
+
+type ChecklistTemplateLookup = {
+  sectionKey: string;
+  sectionTitle: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+};
 
 interface ArtifactRow {
   id: string;
@@ -282,6 +342,69 @@ function mapArtifactRow(row: ArtifactRow): TrackerArtifactRecord {
   };
 }
 
+function mapChecklistItemRow(row: ChecklistItemRow): TrackerChecklistItemRecord {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    phase: row.phase as TrackerChecklistItemRecord["phase"],
+    sectionKey: row.section_key,
+    itemKey: row.item_key,
+    label: null,
+    description: null,
+    isCustom: false,
+    completed: toBoolean(row.completed),
+    sortOrder: row.sort_order,
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCustomChecklistItemRow(
+  row: CustomChecklistItemRow,
+): TrackerChecklistItemRecord {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    phase: row.phase as TrackerChecklistItemRecord["phase"],
+    sectionKey: row.section_key,
+    itemKey: row.id,
+    label: row.label,
+    description: row.description,
+    isCustom: true,
+    completed: toBoolean(row.completed),
+    sortOrder: row.sort_order,
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getChecklistTemplateLookup(
+  phase: TrackerProjectRecord["phase"],
+  itemKey: string,
+): ChecklistTemplateLookup | null {
+  const sections = trackerPhaseChecklistTemplates[phase] ?? [];
+
+  for (const [sectionIndex, section] of sections.entries()) {
+    const itemIndex = section.items.findIndex((item) => item.key === itemKey);
+    if (itemIndex === -1) {
+      continue;
+    }
+
+    const item = section.items[itemIndex];
+    return {
+      sectionKey: section.key,
+      sectionTitle: section.title,
+      label: item.label,
+      description: item.description,
+      sortOrder: sectionIndex * 100 + itemIndex,
+    };
+  }
+
+  return null;
+}
+
 function mapReviewItemRow(row: ReviewItemRow): TrackerReviewItemRecord {
   return {
     id: row.id,
@@ -353,36 +476,129 @@ export async function ensureTrackerReady(env: TrackerEnv) {
   await pending;
 }
 
+async function ensureProjectChecklistItems(
+  db: D1Database,
+  projectId: string,
+  phase: TrackerProjectRecord["phase"],
+) {
+  const templateSections = trackerPhaseChecklistTemplates[phase] ?? [];
+  if (templateSections.length === 0) {
+    return;
+  }
+
+  const existingRows = await queryAll<Pick<ChecklistItemRow, "item_key">>(
+    db,
+    "SELECT item_key FROM project_checklist_items WHERE project_id = ? AND phase = ?",
+    projectId,
+    phase,
+  );
+  const existingKeys = new Set(existingRows.map((row) => row.item_key));
+
+  const createdAt = nowIso();
+  const statements = templateSections.flatMap((section, sectionIndex) =>
+    section.items.flatMap((item, itemIndex) => {
+      if (existingKeys.has(item.key)) {
+        return [];
+      }
+
+      const sortOrder = sectionIndex * 100 + itemIndex;
+      return [
+        db
+          .prepare(
+            `INSERT INTO project_checklist_items (
+              id, project_id, phase, section_key, item_key, completed, sort_order,
+              completed_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 0, ?, NULL, ?, ?)`,
+          )
+          .bind(
+            createId("check"),
+            projectId,
+            phase,
+            section.key,
+            item.key,
+            sortOrder,
+            createdAt,
+            createdAt,
+          ),
+      ];
+    }),
+  );
+
+  if (statements.length > 0) {
+    await db.batch(statements);
+  }
+}
+
 export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspaceData> {
   await ensureTrackerReady(env);
 
-  const [projectRows, taskRows, decisionRows, artifactRows, reviewItemRows] =
-    await Promise.all([
-      queryAll<ProjectRow>(
-        env.DB,
-        "SELECT * FROM projects ORDER BY updated_at DESC, name ASC",
-      ),
-      queryAll<TaskRow>(
-        env.DB,
-        "SELECT * FROM tasks ORDER BY status ASC, sort_order ASC, due_date ASC, created_at ASC",
-      ),
-      queryAll<DecisionRow>(
-        env.DB,
-        "SELECT * FROM decisions ORDER BY decided_at DESC, created_at DESC",
-      ),
-      queryAll<ArtifactRow>(
-        env.DB,
-        "SELECT * FROM artifacts ORDER BY created_at DESC, updated_at DESC",
-      ),
-      queryAll<ReviewItemRow>(
-        env.DB,
-        "SELECT * FROM review_items ORDER BY status ASC, created_at DESC",
-      ),
-    ]);
+  const projectRows = await queryAll<ProjectRow>(
+    env.DB,
+    "SELECT * FROM projects ORDER BY updated_at DESC, name ASC",
+  );
+
+  await Promise.all(
+    projectRows.map((project) =>
+      ensureProjectChecklistItems(env.DB, project.id, project.phase as TrackerProjectRecord["phase"]),
+    ),
+  );
+
+  const [
+    taskRows,
+    decisionRows,
+    artifactRows,
+    checklistRows,
+    customChecklistRows,
+    hiddenChecklistRows,
+    reviewItemRows,
+  ] = await Promise.all([
+    queryAll<TaskRow>(
+      env.DB,
+      "SELECT * FROM tasks ORDER BY status ASC, sort_order ASC, due_date ASC, created_at ASC",
+    ),
+    queryAll<DecisionRow>(
+      env.DB,
+      "SELECT * FROM decisions ORDER BY decided_at DESC, created_at DESC",
+    ),
+    queryAll<ArtifactRow>(
+      env.DB,
+      "SELECT * FROM artifacts ORDER BY created_at DESC, updated_at DESC",
+    ),
+    queryAll<ChecklistItemRow>(
+      env.DB,
+      "SELECT * FROM project_checklist_items ORDER BY phase ASC, sort_order ASC, created_at ASC",
+    ),
+    queryAll<CustomChecklistItemRow>(
+      env.DB,
+      `SELECT * FROM project_checklist_custom_items
+       ORDER BY phase ASC, section_key ASC, sort_order ASC, created_at ASC`,
+    ),
+    queryAll<HiddenChecklistItemRow>(
+      env.DB,
+      "SELECT project_id, phase, item_key FROM project_checklist_hidden_items",
+    ),
+    queryAll<ReviewItemRow>(
+      env.DB,
+      "SELECT * FROM review_items ORDER BY status ASC, created_at DESC",
+    ),
+  ]);
 
   const tasksByProject = new Map<string, TrackerTaskRecord[]>();
   const decisionsByProject = new Map<string, TrackerDecisionRecord[]>();
   const artifactsByProject = new Map<string, TrackerArtifactRecord[]>();
+  const checklistItemsByProject = new Map<string, TrackerChecklistItemRecord[]>();
+  const hiddenChecklistItemsByProject = new Map<
+    string,
+    TrackerHiddenChecklistItemRecord[]
+  >();
+  const projectPhaseById = new Map(
+    projectRows.map((row) => [row.id, row.phase as TrackerProjectRecord["phase"]]),
+  );
+  const hiddenChecklistKeys = new Set(
+    hiddenChecklistRows.map(
+      (row) => `${row.project_id}:${row.phase}:${row.item_key}`,
+    ),
+  );
 
   for (const row of taskRows) {
     const mapped = mapTaskRow(row);
@@ -405,13 +621,79 @@ export async function getWorkspaceData(env: TrackerEnv): Promise<TrackerWorkspac
     artifactsByProject.set(mapped.projectId, artifacts);
   }
 
+  for (const row of checklistRows) {
+    const currentPhase = projectPhaseById.get(row.project_id);
+    if (!currentPhase || row.phase !== currentPhase) {
+      continue;
+    }
+
+    const hiddenKey = `${row.project_id}:${row.phase}:${row.item_key}`;
+    if (hiddenChecklistKeys.has(hiddenKey)) {
+      continue;
+    }
+
+    const mapped = mapChecklistItemRow(row);
+    const items = checklistItemsByProject.get(mapped.projectId) ?? [];
+    items.push(mapped);
+    checklistItemsByProject.set(mapped.projectId, items);
+  }
+
+  for (const row of customChecklistRows) {
+    const currentPhase = projectPhaseById.get(row.project_id);
+    if (!currentPhase || row.phase !== currentPhase) {
+      continue;
+    }
+
+    const mapped = mapCustomChecklistItemRow(row);
+    const items = checklistItemsByProject.get(mapped.projectId) ?? [];
+    items.push(mapped);
+    checklistItemsByProject.set(mapped.projectId, items);
+  }
+
+  for (const row of hiddenChecklistRows) {
+    const currentPhase = projectPhaseById.get(row.project_id);
+    if (!currentPhase || row.phase !== currentPhase) {
+      continue;
+    }
+
+    const lookup = getChecklistTemplateLookup(currentPhase, row.item_key);
+    if (!lookup) {
+      continue;
+    }
+
+    const items = hiddenChecklistItemsByProject.get(row.project_id) ?? [];
+    items.push({
+      projectId: row.project_id,
+      phase: currentPhase,
+      sectionKey: lookup.sectionKey,
+      sectionTitle: lookup.sectionTitle,
+      itemKey: row.item_key,
+      label: lookup.label,
+      description: lookup.description,
+      sortOrder: lookup.sortOrder,
+    });
+    hiddenChecklistItemsByProject.set(row.project_id, items);
+  }
+
   const projects: TrackerProjectDetail[] = projectRows.map((row) => {
     const project = mapProjectRow(row);
+    const hiddenChecklistItems = [
+      ...(hiddenChecklistItemsByProject.get(project.id) ?? []),
+    ].sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+
+      return a.label.localeCompare(b.label);
+    });
+
     return {
       ...project,
       tasks: tasksByProject.get(project.id) ?? [],
       decisions: decisionsByProject.get(project.id) ?? [],
       artifacts: artifactsByProject.get(project.id) ?? [],
+      checklistItems: checklistItemsByProject.get(project.id) ?? [],
+      hiddenChecklistItems,
     };
   });
 
@@ -447,6 +729,71 @@ export async function getProjectById(env: TrackerEnv, projectId: string) {
 async function getTaskByIdInternal(db: D1Database, taskId: string) {
   const row = await queryFirst<TaskRow>(db, "SELECT * FROM tasks WHERE id = ?", taskId);
   return row ? mapTaskRow(row) : null;
+}
+
+async function getProjectRowByIdInternal(db: D1Database, projectId: string) {
+  return queryFirst<ProjectRow>(db, "SELECT * FROM projects WHERE id = ?", projectId);
+}
+
+async function getChecklistItemByIdInternal(
+  db: D1Database,
+  itemId: string,
+): Promise<ChecklistItemLookup | null> {
+  const row = await queryFirst<ChecklistItemRow>(
+    db,
+    "SELECT * FROM project_checklist_items WHERE id = ?",
+    itemId,
+  );
+  if (row) {
+    return {
+      item: mapChecklistItemRow(row),
+      source: "template",
+    };
+  }
+
+  const customRow = await queryFirst<CustomChecklistItemRow>(
+    db,
+    "SELECT * FROM project_checklist_custom_items WHERE id = ?",
+    itemId,
+  );
+
+  if (!customRow) {
+    return null;
+  }
+
+  return {
+    item: mapCustomChecklistItemRow(customRow),
+    source: "custom",
+  };
+}
+
+async function getNextChecklistSortOrder(
+  db: D1Database,
+  projectId: string,
+  phase: TrackerProjectRecord["phase"],
+  sectionKey: string,
+) {
+  const row = await queryFirst<{ max_sort_order: number | null }>(
+    db,
+    `SELECT MAX(sort_order) AS max_sort_order
+     FROM (
+       SELECT sort_order
+       FROM project_checklist_items
+       WHERE project_id = ? AND phase = ? AND section_key = ?
+       UNION ALL
+       SELECT sort_order
+       FROM project_checklist_custom_items
+       WHERE project_id = ? AND phase = ? AND section_key = ?
+     )`,
+    projectId,
+    phase,
+    sectionKey,
+    projectId,
+    phase,
+    sectionKey,
+  );
+
+  return (row?.max_sort_order ?? -1) + 1;
 }
 
 async function getReviewItemByIdInternal(db: D1Database, reviewItemId: string) {
@@ -544,6 +891,8 @@ export async function createProject(
     entityId: projectId,
   });
 
+  await ensureProjectChecklistItems(env.DB, projectId, parsed.phase);
+
   const project = await getProjectById(env, projectId);
   if (!project) {
     throw new Error("Failed to create project");
@@ -613,6 +962,8 @@ export async function updateProject(
     entityKind: "project",
     entityId: projectId,
   });
+
+  await ensureProjectChecklistItems(env.DB, projectId, parsed.phase);
 
   const project = await getProjectById(env, projectId);
   if (!project) {
@@ -854,6 +1205,263 @@ export async function deleteTask(env: TrackerEnv, taskId: string) {
     entityKind: "task",
     entityId: taskId,
   });
+
+  return true;
+}
+
+export async function createChecklistItem(
+  env: TrackerEnv,
+  projectId: string,
+  input: TrackerChecklistCreateInput,
+  actor = "system",
+) {
+  await ensureTrackerReady(env);
+  const parsed = checklistCreateSchema.parse(input);
+  const projectRow = await getProjectRowByIdInternal(env.DB, projectId);
+
+  if (!projectRow) {
+    throw new Error("Project not found");
+  }
+
+  const templateSections =
+    trackerPhaseChecklistTemplates[projectRow.phase as TrackerProjectRecord["phase"]] ?? [];
+  const section = templateSections.find(
+    (entry) => entry.key === parsed.sectionKey,
+  );
+
+  if (!section) {
+    throw new Error("Checklist section not found");
+  }
+
+  const createdAt = nowIso();
+  const itemId = createId("check");
+  const sortOrder = await getNextChecklistSortOrder(
+    env.DB,
+    projectId,
+    projectRow.phase as TrackerProjectRecord["phase"],
+    parsed.sectionKey,
+  );
+
+  await runStatement(
+    env.DB,
+    `INSERT INTO project_checklist_custom_items (
+      id, project_id, phase, section_key, label, description,
+      completed, sort_order, completed_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, NULL, ?, ?)`,
+    itemId,
+    projectId,
+    projectRow.phase,
+    parsed.sectionKey,
+    parsed.label,
+    parsed.description ?? "",
+    sortOrder,
+    createdAt,
+    createdAt,
+  );
+
+  await runStatement(
+    env.DB,
+    "UPDATE projects SET updated_at = ? WHERE id = ?",
+    createdAt,
+    projectId,
+  );
+
+  await writeAuditLog(
+    env.DB,
+    projectId,
+    "checklist.create",
+    actor,
+    parsed,
+    {
+      entityKind: "checklist_item",
+      entityId: itemId,
+    },
+  );
+
+  const created = await getChecklistItemByIdInternal(env.DB, itemId);
+  if (!created) {
+    throw new Error("Failed to create checklist item");
+  }
+
+  return created.item;
+}
+
+export async function updateChecklistItem(
+  env: TrackerEnv,
+  projectId: string,
+  input: TrackerChecklistMutationInput,
+  actor = "system",
+) {
+  await ensureTrackerReady(env);
+  const parsed = checklistMutationSchema.parse(input);
+  const existing = await getChecklistItemByIdInternal(env.DB, parsed.itemId);
+
+  if (!existing || existing.item.projectId !== projectId) {
+    throw new Error("Checklist item not found");
+  }
+
+  const updatedAt = nowIso();
+  const completedAt = parsed.completed
+    ? existing.item.completedAt ?? updatedAt
+    : null;
+  const targetTable =
+    existing.source === "custom"
+      ? "project_checklist_custom_items"
+      : "project_checklist_items";
+
+  await runStatement(
+    env.DB,
+    `UPDATE ${targetTable}
+     SET completed = ?, completed_at = ?, updated_at = ?
+     WHERE id = ? AND project_id = ?`,
+    parsed.completed ? 1 : 0,
+    completedAt,
+    updatedAt,
+    parsed.itemId,
+    projectId,
+  );
+
+  await runStatement(
+    env.DB,
+    "UPDATE projects SET updated_at = ? WHERE id = ?",
+    updatedAt,
+    projectId,
+  );
+
+  await writeAuditLog(
+    env.DB,
+    projectId,
+    "checklist.update",
+    actor,
+    parsed,
+    {
+      entityKind: "checklist_item",
+      entityId: parsed.itemId,
+    },
+  );
+
+  const updated = await getChecklistItemByIdInternal(env.DB, parsed.itemId);
+  if (!updated) {
+    throw new Error("Failed to update checklist item");
+  }
+
+  return updated.item;
+}
+
+export async function removeChecklistItem(
+  env: TrackerEnv,
+  projectId: string,
+  input: TrackerChecklistRemoveInput,
+  actor = "system",
+) {
+  await ensureTrackerReady(env);
+  const parsed = checklistRemoveSchema.parse(input);
+  const existing = await getChecklistItemByIdInternal(env.DB, parsed.itemId);
+
+  if (!existing || existing.item.projectId !== projectId) {
+    throw new Error("Checklist item not found");
+  }
+
+  const updatedAt = nowIso();
+
+  if (existing.source === "custom") {
+    await runStatement(
+      env.DB,
+      "DELETE FROM project_checklist_custom_items WHERE id = ? AND project_id = ?",
+      parsed.itemId,
+      projectId,
+    );
+  } else {
+    await runStatement(
+      env.DB,
+      `INSERT OR IGNORE INTO project_checklist_hidden_items (
+        id, project_id, phase, item_key, created_at
+      ) VALUES (?, ?, ?, ?, ?)`,
+      createId("hide"),
+      projectId,
+      existing.item.phase,
+      existing.item.itemKey,
+      updatedAt,
+    );
+  }
+
+  await runStatement(
+    env.DB,
+    "UPDATE projects SET updated_at = ? WHERE id = ?",
+    updatedAt,
+    projectId,
+  );
+
+  await writeAuditLog(
+    env.DB,
+    projectId,
+    "checklist.remove",
+    actor,
+    {
+      itemId: parsed.itemId,
+      itemKey: existing.item.itemKey,
+      isCustom: existing.item.isCustom,
+      sectionKey: existing.item.sectionKey,
+    },
+    {
+      entityKind: "checklist_item",
+      entityId: parsed.itemId,
+    },
+  );
+
+  return true;
+}
+
+export async function restoreHiddenChecklistItem(
+  env: TrackerEnv,
+  projectId: string,
+  input: TrackerChecklistRestoreInput,
+  actor = "system",
+) {
+  await ensureTrackerReady(env);
+  const parsed = checklistRestoreSchema.parse(input);
+  const projectRow = await getProjectRowByIdInternal(env.DB, projectId);
+
+  if (!projectRow) {
+    throw new Error("Project not found");
+  }
+
+  const lookup = getChecklistTemplateLookup(
+    projectRow.phase as TrackerProjectRecord["phase"],
+    parsed.itemKey,
+  );
+  if (!lookup) {
+    throw new Error("Checklist item not found");
+  }
+
+  await runStatement(
+    env.DB,
+    `DELETE FROM project_checklist_hidden_items
+     WHERE project_id = ? AND phase = ? AND item_key = ?`,
+    projectId,
+    projectRow.phase,
+    parsed.itemKey,
+  );
+
+  const updatedAt = nowIso();
+  await runStatement(
+    env.DB,
+    "UPDATE projects SET updated_at = ? WHERE id = ?",
+    updatedAt,
+    projectId,
+  );
+
+  await writeAuditLog(
+    env.DB,
+    projectId,
+    "checklist.restore",
+    actor,
+    parsed,
+    {
+      entityKind: "checklist_item",
+      entityId: parsed.itemKey,
+    },
+  );
 
   return true;
 }

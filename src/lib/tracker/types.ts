@@ -102,6 +102,33 @@ export interface TrackerArtifactRecord {
   updatedAt: string;
 }
 
+export interface TrackerChecklistItemRecord {
+  id: string;
+  projectId: string;
+  phase: TrackerPhase;
+  sectionKey: string;
+  itemKey: string;
+  label: string | null;
+  description: string | null;
+  isCustom: boolean;
+  completed: boolean;
+  sortOrder: number;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TrackerHiddenChecklistItemRecord {
+  projectId: string;
+  phase: TrackerPhase;
+  sectionKey: string;
+  sectionTitle: string;
+  itemKey: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+}
+
 export interface TrackerReviewProposal<
   Action extends TrackerReviewAction = TrackerReviewAction,
   Entity = unknown,
@@ -147,6 +174,8 @@ export interface TrackerProjectDetail extends TrackerProjectRecord {
   tasks: TrackerTaskRecord[];
   decisions: TrackerDecisionRecord[];
   artifacts: TrackerArtifactRecord[];
+  checklistItems: TrackerChecklistItemRecord[];
+  hiddenChecklistItems: TrackerHiddenChecklistItemRecord[];
 }
 
 export interface TrackerWorkspaceData {
@@ -231,6 +260,25 @@ export interface TrackerBoardMove {
   taskId: string;
   status: TrackerTaskStatus;
   sortOrder: number;
+}
+
+export interface TrackerChecklistMutationInput {
+  itemId: string;
+  completed: boolean;
+}
+
+export interface TrackerChecklistCreateInput {
+  sectionKey: string;
+  label: string;
+  description?: string;
+}
+
+export interface TrackerChecklistRemoveInput {
+  itemId: string;
+}
+
+export interface TrackerChecklistRestoreInput {
+  itemKey: string;
 }
 
 export interface TrackerQueryResult {

@@ -72,6 +72,25 @@ export const taskReorderSchema = z.object({
   ),
 });
 
+export const checklistMutationSchema = z.object({
+  itemId: z.string().trim().min(1),
+  completed: z.boolean(),
+});
+
+export const checklistCreateSchema = z.object({
+  sectionKey: z.string().trim().min(1),
+  label: z.string().trim().min(1),
+  description: z.string().trim().optional().default(""),
+});
+
+export const checklistRemoveSchema = z.object({
+  itemId: z.string().trim().min(1),
+});
+
+export const checklistRestoreSchema = z.object({
+  itemKey: z.string().trim().min(1),
+});
+
 export const reviewRejectSchema = z.object({
   reason: z.string().trim().min(1),
   reviewedBy: z.string().trim().optional(),

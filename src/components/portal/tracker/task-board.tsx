@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, FormEvent } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -20,22 +20,53 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, GripVertical, List, SquareKanban } from "lucide-react";
+import {
+  CalendarDays,
+  GripVertical,
+  List,
+  Plus,
+  RotateCcw,
+  SquareKanban,
+  Trash2,
+} from "lucide-react";
 
 import {
   priorityLabels,
   priorityTone,
+  phaseLabels,
   taskStatusLabels,
   taskStatusTone,
   taskTypeLabels,
   trackerTaskStatuses,
 } from "@/lib/tracker/constants";
-import type { TrackerTaskRecord } from "@/lib/tracker/types";
+import {
+  trackerPhaseChecklistTemplates,
+  type TrackerChecklistTemplateSection,
+} from "@/lib/tracker/checklists";
+import type {
+  TrackerChecklistItemRecord,
+  TrackerHiddenChecklistItemRecord,
+  TrackerPhase,
+  TrackerTaskRecord,
+} from "@/lib/tracker/types";
 import { isTaskOverdue } from "@/lib/tracker/views";
 
 type ViewMode = "board" | "list";
 
 type BoardState = Record<(typeof trackerTaskStatuses)[number], TrackerTaskRecord[]>;
+
+type ChecklistItemView = {
+  key: string;
+  label: string;
+  description: string;
+  isCustom: boolean;
+  record: TrackerChecklistItemRecord;
+};
+
+type ChecklistSectionView = Omit<TrackerChecklistTemplateSection, "items"> & {
+  completedCount: number;
+  items: ChecklistItemView[];
+};
 
 function buildBoardState(tasks: TrackerTaskRecord[]): BoardState {
   return trackerTaskStatuses.reduce<BoardState>((acc, status) => {
@@ -64,17 +95,100 @@ function findTaskStatus(board: BoardState, taskId: string) {
   );
 }
 
-export function TaskBoard({
-  tasks,
-  onEditTask,
-  onCreateTask,
-  onReorder,
-}: {
+function buildChecklistSections(
+  phase: TrackerPhase,
+  checklistItems: TrackerChecklistItemRecord[],
+): ChecklistSectionView[] {
+  const templateSections = trackerPhaseChecklistTemplates[phase] ?? [];
+  const customItemsBySection = new Map<string, TrackerChecklistItemRecord[]>();
+  const templateItemByKey = new Map<string, TrackerChecklistItemRecord>();
+
+  for (const item of checklistItems) {
+    if (item.isCustom) {
+      const items = customItemsBySection.get(item.sectionKey) ?? [];
+      items.push(item);
+      customItemsBySection.set(item.sectionKey, items);
+      continue;
+    }
+
+    templateItemByKey.set(item.itemKey, item);
+  }
+
+  return templateSections.map((section) => {
+    const templateItems = section.items.flatMap((item) => {
+      const record = templateItemByKey.get(item.key);
+      if (!record) {
+        return [];
+      }
+
+      return [
+        {
+          key: item.key,
+          label: record.label ?? item.label,
+          description: record.description ?? item.description,
+          isCustom: false,
+          record,
+        },
+      ];
+    });
+    const customItems = [...(customItemsBySection.get(section.key) ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt))
+      .map((item) => ({
+        key: item.id,
+        label: item.label ?? "Custom item",
+        description: item.description ?? "",
+        isCustom: true,
+        record: item,
+      }));
+    const items = [...templateItems, ...customItems];
+
+    return {
+      ...section,
+      items,
+      completedCount: items.filter((item) => item.record.completed).length,
+    };
+  });
+}
+
+interface TaskBoardProps {
+  phase: TrackerPhase;
   tasks: TrackerTaskRecord[];
+  checklistItems: TrackerChecklistItemRecord[];
+  hiddenChecklistItems: TrackerHiddenChecklistItemRecord[];
+  checklistBusy: boolean;
   onEditTask: (task: TrackerTaskRecord) => void;
   onCreateTask: () => void;
-  onReorder: (items: Array<{ taskId: string; status: TrackerTaskRecord["status"]; sortOrder: number }>) => Promise<void>;
-}) {
+  onToggleChecklist: (itemId: string, completed: boolean) => void;
+  onAddChecklistItem: (
+    sectionKey: string,
+    label: string,
+    description: string,
+  ) => Promise<void>;
+  onRemoveChecklistItem: (itemId: string) => Promise<void>;
+  onRestoreHiddenChecklistItem: (itemKey: string) => Promise<void>;
+  onReorder: (
+    items: Array<{
+      taskId: string;
+      status: TrackerTaskRecord["status"];
+      sortOrder: number;
+    }>,
+  ) => Promise<void>;
+}
+
+export function TaskBoard({
+  phase,
+  tasks,
+  checklistItems,
+  hiddenChecklistItems,
+  checklistBusy,
+  onEditTask,
+  onCreateTask,
+  onToggleChecklist,
+  onAddChecklistItem,
+  onRemoveChecklistItem,
+  onRestoreHiddenChecklistItem,
+  onReorder,
+}: TaskBoardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
       ? "list"
@@ -82,7 +196,28 @@ export function TaskBoard({
   );
   const [board, setBoard] = useState<BoardState>(() => buildBoardState(tasks));
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [showHiddenItems, setShowHiddenItems] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor));
+  const checklistSections = useMemo(
+    () => buildChecklistSections(phase, checklistItems),
+    [phase, checklistItems],
+  );
+  const checklistStats = useMemo(() => {
+    let totalItems = 0;
+    let completedItems = 0;
+
+    for (const section of checklistSections) {
+      totalItems += section.items.length;
+      completedItems += section.completedCount;
+    }
+
+    return {
+      totalItems,
+      completedItems,
+      completionRate:
+        totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100),
+    };
+  }, [checklistSections]);
 
   useEffect(() => {
     setBoard(buildBoardState(tasks));
@@ -166,6 +301,115 @@ export function TaskBoard({
 
   return (
     <section className="space-y-4">
+      {checklistSections.length > 0 ? (
+        <section className="rounded-[1.9rem] border border-border bg-stone-50/70 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="caption-editorial text-[0.68rem]">Phase Checklist</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h3 className="font-display text-[1.35rem] font-medium tracking-tight sm:text-[1.55rem]">
+                  {phaseLabels[phase]} readiness
+                </h3>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 sm:text-xs">
+                  {checklistStats.completedItems}/{checklistStats.totalItems} complete
+                </span>
+              </div>
+              <p className="mt-2 text-[12px] leading-5 text-muted-foreground sm:text-[13px] sm:leading-6">
+                เช็ก deliverables สำคัญของแต่ละ phase ให้ครบก่อนปล่อย drawing set
+                หรือส่งต่องานในทีม โดยเฉพาะหมวด construction documents ที่ต้องเห็นว่า
+                floor plan, electrical, ceiling, elevations, sections และ isometric พร้อมแล้วหรือยัง
+              </p>
+            </div>
+            <div className="min-w-full rounded-[1.35rem] border border-border bg-background px-4 py-3 sm:min-w-[15rem]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Completion
+                </span>
+                <span className="text-[13px] font-medium text-foreground sm:text-sm">
+                  {checklistStats.completionRate}%
+                </span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-foreground transition-all"
+                  style={{ width: `${checklistStats.completionRate}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
+                ใช้เป็นเช็กลิสต์ก่อน review ภายใน หรือก่อนออกชุดแบบ revision ถัดไป
+              </p>
+            </div>
+          </div>
+
+          {hiddenChecklistItems.length > 0 ? (
+            <div className="mt-4 rounded-[1.35rem] border border-border bg-background p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[13px] font-medium text-foreground sm:text-sm">
+                    Hidden default items
+                  </p>
+                  <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                    รายการมาตรฐานที่ถูกซ่อนจาก checklist ของโปรเจ็กต์นี้ สามารถกด restore กลับมาได้ทุกเมื่อ
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowHiddenItems((value) => !value)}
+                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-[13px]"
+                >
+                  <RotateCcw className="size-3.5" />
+                  {showHiddenItems
+                    ? "Hide restore list"
+                    : `Restore hidden items (${hiddenChecklistItems.length})`}
+                </button>
+              </div>
+
+              {showHiddenItems ? (
+                <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                  {hiddenChecklistItems.map((item) => (
+                    <button
+                      key={`${item.phase}:${item.itemKey}`}
+                      type="button"
+                      disabled={checklistBusy}
+                      onClick={() => {
+                        void onRestoreHiddenChecklistItem(item.itemKey);
+                      }}
+                      className="flex items-start justify-between gap-3 rounded-[1rem] border border-border px-3 py-3 text-left transition-colors hover:border-foreground/30 disabled:opacity-60"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium text-foreground sm:text-sm">
+                          {item.label}
+                        </span>
+                        <span className="mt-1 block text-[12px] leading-5 text-muted-foreground">
+                          {item.sectionTitle}
+                          {item.description ? ` • ${item.description}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
+                        Restore
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-5 grid gap-3 xl:grid-cols-3">
+            {checklistSections.map((section) => (
+              <ChecklistSectionCard
+                key={section.key}
+                section={section}
+                busy={checklistBusy}
+                onToggleChecklist={onToggleChecklist}
+                onAddChecklistItem={onAddChecklistItem}
+                onRemoveChecklistItem={onRemoveChecklistItem}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="caption-editorial text-[0.7rem]">Execution</p>
@@ -237,6 +481,211 @@ export function TaskBoard({
         </DndContext>
       )}
     </section>
+  );
+}
+
+function ChecklistSectionCard({
+  section,
+  busy,
+  onToggleChecklist,
+  onAddChecklistItem,
+  onRemoveChecklistItem,
+}: {
+  section: ChecklistSectionView;
+  busy: boolean;
+  onToggleChecklist: (itemId: string, completed: boolean) => void;
+  onAddChecklistItem: (
+    sectionKey: string,
+    label: string,
+    description: string,
+  ) => Promise<void>;
+  onRemoveChecklistItem: (itemId: string) => Promise<void>;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [draftLabel, setDraftLabel] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+
+  async function handleCreateItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const label = draftLabel.trim();
+    if (!label) return;
+
+    await onAddChecklistItem(section.key, label, draftDescription.trim());
+    setDraftLabel("");
+    setDraftDescription("");
+    setIsAdding(false);
+  }
+
+  return (
+    <article className="rounded-[1.45rem] border border-border bg-background p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="text-[15px] font-semibold leading-6 text-foreground sm:text-base">
+            {section.title}
+          </h4>
+          <p className="mt-1 text-[12px] leading-5 text-muted-foreground sm:text-[13px] sm:leading-6">
+            {section.description}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
+            {section.completedCount}/{section.items.length}
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setIsAdding((value) => !value)}
+            className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:opacity-60 sm:text-xs"
+          >
+            <Plus className="size-3.5" />
+            Add item
+          </button>
+        </div>
+      </div>
+
+      {isAdding ? (
+        <form
+          className="mt-4 space-y-2 rounded-[1rem] border border-dashed border-border bg-stone-50/70 p-3"
+          onSubmit={(event) => {
+            void handleCreateItem(event);
+          }}
+        >
+          <input
+            value={draftLabel}
+            onChange={(event) => setDraftLabel(event.target.value)}
+            placeholder="Checklist item name"
+            className="h-10 w-full rounded-full border border-border bg-background px-4 text-[13px] outline-none transition-colors focus:border-foreground"
+          />
+          <input
+            value={draftDescription}
+            onChange={(event) => setDraftDescription(event.target.value)}
+            placeholder="Short note or acceptance criteria"
+            className="h-10 w-full rounded-full border border-border bg-background px-4 text-[13px] outline-none transition-colors focus:border-foreground"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDraftLabel("");
+                setDraftDescription("");
+                setIsAdding(false);
+              }}
+              className="rounded-full border border-border px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || draftLabel.trim().length === 0}
+              className="rounded-full bg-foreground px-3 py-1.5 text-[11px] font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-60 sm:text-xs"
+            >
+              Save item
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="mt-4 space-y-2.5">
+        {section.items.length === 0 ? (
+          <div className="rounded-[1rem] border border-dashed border-border px-3 py-4 text-[12px] leading-5 text-muted-foreground">
+            No checklist items in this section right now. Add project-specific items here when this package needs extra deliverables.
+          </div>
+        ) : null}
+        {section.items.map((item) => (
+          <ChecklistItemButton
+            key={item.key}
+            item={item}
+            busy={busy}
+            onToggleChecklist={onToggleChecklist}
+            onRemoveChecklistItem={onRemoveChecklistItem}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ChecklistItemButton({
+  item,
+  busy,
+  onToggleChecklist,
+  onRemoveChecklistItem,
+}: {
+  item: ChecklistItemView;
+  busy: boolean;
+  onToggleChecklist: (itemId: string, completed: boolean) => void;
+  onRemoveChecklistItem: (itemId: string) => Promise<void>;
+}) {
+  const checked = item.record.completed;
+  const disabled = busy;
+
+  return (
+    <div
+      className={`flex w-full items-start gap-3 rounded-[1rem] border px-3 py-3 text-left transition-colors ${
+        checked
+          ? "border-emerald-200 bg-emerald-50/70"
+          : "border-border bg-background hover:border-foreground/30"
+      } disabled:cursor-not-allowed disabled:opacity-60`}
+    >
+      <button
+        type="button"
+        disabled={disabled}
+        aria-pressed={checked}
+        onClick={() => {
+          onToggleChecklist(item.record.id, !checked);
+        }}
+        className="flex min-w-0 flex-1 items-start gap-3 text-left disabled:cursor-not-allowed"
+      >
+        <span
+          className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border ${
+            checked
+              ? "border-emerald-500 text-emerald-600"
+              : "border-border text-transparent"
+          }`}
+        >
+          <span
+            className={`size-2 rounded-full ${
+              checked ? "bg-current" : "bg-transparent"
+            }`}
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="block text-[13px] font-medium leading-5 text-foreground sm:text-sm">
+              {item.label}
+            </span>
+            {item.isCustom ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-amber-700">
+                Custom
+              </span>
+            ) : null}
+          </span>
+          {item.description ? (
+            <span className="mt-1 block text-[12px] leading-5 text-muted-foreground">
+              {item.description}
+            </span>
+          ) : null}
+        </span>
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          const confirmed = window.confirm(
+            `Remove "${item.label}" from this project's checklist?`,
+          );
+          if (!confirmed) {
+            return;
+          }
+
+          void onRemoveChecklistItem(item.record.id);
+        }}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-rose-300 hover:text-rose-600 disabled:opacity-60"
+        aria-label={`Remove ${item.label}`}
+      >
+        <Trash2 className="size-3.5" />
+      </button>
+    </div>
   );
 }
 

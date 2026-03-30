@@ -65,6 +65,46 @@ CREATE TABLE IF NOT EXISTS tasks (
   FOREIGN KEY (source_artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_checklist_items (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  phase TEXT NOT NULL,
+  section_key TEXT NOT NULL,
+  item_key TEXT NOT NULL,
+  completed INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  completed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, phase, item_key)
+);
+
+CREATE TABLE IF NOT EXISTS project_checklist_custom_items (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  phase TEXT NOT NULL,
+  section_key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  completed INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  completed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS project_checklist_hidden_items (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  phase TEXT NOT NULL,
+  item_key TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, phase, item_key)
+);
+
 CREATE TABLE IF NOT EXISTS decisions (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,
@@ -115,6 +155,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_tasks_project_status ON tasks(project_id, status, sort_order);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(project_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(project_id, task_type);
+CREATE INDEX IF NOT EXISTS idx_project_checklist_project_phase ON project_checklist_items(project_id, phase, sort_order);
+CREATE INDEX IF NOT EXISTS idx_project_checklist_custom_project_phase ON project_checklist_custom_items(project_id, phase, section_key, sort_order);
+CREATE INDEX IF NOT EXISTS idx_project_checklist_hidden_project_phase ON project_checklist_hidden_items(project_id, phase, item_key);
 CREATE INDEX IF NOT EXISTS idx_decisions_project ON decisions(project_id, decided_at DESC);
 CREATE INDEX IF NOT EXISTS idx_artifacts_project_kind ON artifacts(project_id, kind, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_review_items_status ON review_items(status, created_at DESC);
