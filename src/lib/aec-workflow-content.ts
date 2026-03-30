@@ -246,7 +246,7 @@ export const aecPhaseModules: AecPhaseModule[] = [
         deliverable: "Kanban-style execution workspace สำหรับงานจริง",
         currentFit: "ใช้แทน basic Kanban ของ roadmap ได้ทันที",
         launchHref: "/todos",
-        launchLabel: "Open tracker",
+        launchLabel: "Open Kanban board",
       },
       {
         name: "AI Chat Brief Export",
@@ -256,7 +256,7 @@ export const aecPhaseModules: AecPhaseModule[] = [
         deliverable: "Brief พร้อม copy/download สำหรับ external AI",
         currentFit: "แทนชั้น AI ในช่วงแรกโดยไม่ต้องผูก API เพิ่ม",
         launchHref: "/todos",
-        launchLabel: "Copy from tracker",
+        launchLabel: "Copy from Kanban board",
       },
       {
         name: "Workspace Header + Quick Intake",

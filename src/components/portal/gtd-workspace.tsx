@@ -581,9 +581,9 @@ export function GtdWorkspace() {
             <ListChecks className="size-4" />
             <span className="hidden sm:inline">Dashboard</span>
           </Link>
-          <Link href="/todos" aria-label="Open tracker" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
+          <Link href="/todos" aria-label="Open Kanban board" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <ArrowLeft className="size-4 rotate-180" />
-            <span className="hidden sm:inline">Open tracker</span>
+            <span className="hidden sm:inline">Open Kanban board</span>
           </Link>
           <Link href="/settings" aria-label="Settings & Export" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
             <Settings2 className="size-4" />
@@ -898,7 +898,7 @@ export function GtdWorkspace() {
                     <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                       <p className="font-medium">Linked to Kanban.</p>
                       <p className="mt-1">
-                        This GTD item is connected to a tracker task. Open it in Kanban to
+                        This GTD item is connected to a Kanban task. Open it in Kanban to
                         update board status or execution details.
                       </p>
                     </div>
@@ -1127,7 +1127,7 @@ export function GtdWorkspace() {
         >
           <div className="space-y-4">
             <p className="text-sm leading-7 text-muted-foreground">
-              Create a tracker task from this GTD item and keep a link back to the Kanban board.
+              Create a Kanban task from this GTD item and keep a link back to the Kanban board.
             </p>
             <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">
               <p className="font-medium text-foreground">ควรใช้เมื่อไหร่</p>

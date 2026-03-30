@@ -20,7 +20,7 @@ test("tracker can create a task from the workspace", async ({ page }) => {
   await page.locator('input[type="date"]').fill(today);
   await page.getByRole("button", { name: "Save" }).click();
 
-  await expect(page.getByText("Updating tracker...")).toBeVisible();
+  await expect(page.getByText("Updating Kanban board...")).toBeVisible();
   await expect(page.getByText("Task created.")).toBeVisible();
   await expect(page.getByText(taskTitle)).toBeVisible();
 });
@@ -28,7 +28,7 @@ test("tracker can create a task from the workspace", async ({ page }) => {
 test("tracker section help opens from the tab bar", async ({ page }) => {
   await ensureTrackerWorkspace(page);
 
-  await page.getByRole("button", { name: "Show section guide" }).hover();
+  await page.getByRole("button", { name: "Show Kanban board guide" }).hover();
 
   await expect(page.getByRole("tooltip")).toContainText("Tasks:");
   await expect(page.getByRole("tooltip")).toContainText("Review Queue:");

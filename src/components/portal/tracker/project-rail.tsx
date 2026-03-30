@@ -2,6 +2,7 @@
 
 import { Bot, FolderPlus } from "lucide-react";
 
+import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { phaseAccents, phaseLabels } from "@/lib/tracker/constants";
 import type { TrackerProjectDetail } from "@/lib/tracker/types";
 
@@ -31,17 +32,31 @@ export function ProjectRail({
             className="h-9 w-auto shrink-0 sm:h-10"
           />
           <div className="min-w-0">
-            <p className="caption-editorial text-[0.65rem] sm:text-[0.7rem]">Tracker</p>
+            <p className="caption-editorial text-[0.65rem] sm:text-[0.7rem]">Workspace</p>
             <h1 className="mt-1 font-display text-xl font-medium leading-tight tracking-tight text-balance sm:text-2xl">
-              AI Project Tracker
+              Kanban board
             </h1>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
           <div className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-[13px] leading-5 sm:text-sm">
             <Bot className="size-4" />
-            {pendingReviewCount} pending review
+            {pendingReviewCount} in Review Queue
           </div>
+          <HoverHelp
+            label="Pending review คืออะไร"
+            buttonLabel="Show pending review explanation"
+            body="ตัวเลขนี้นับจำนวนรายการใน Review Queue ที่ยัง pending อยู่ทั้ง Kanban board เช่น meeting note, intake log, site photo, markup หรือ weekly report draft ที่ยังไม่ได้ approve หรือ reject"
+            panelClassName="left-0 right-auto w-80"
+          />
+          <button
+            type="button"
+            onClick={onCreateProject}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-dashed border-border bg-background px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
+          >
+            <FolderPlus className="size-4" />
+            Create Project
+          </button>
         </div>
       </div>
 
@@ -97,16 +112,6 @@ export function ProjectRail({
         </div>
       </div>
 
-      <div className="border-t border-border p-4">
-        <button
-          type="button"
-          onClick={onCreateProject}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-dashed border-border px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-sm"
-        >
-          <FolderPlus className="size-4" />
-          Create Project
-        </button>
-      </div>
     </aside>
   );
 }

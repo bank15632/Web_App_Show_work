@@ -653,7 +653,7 @@ export function TodoListView() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <p className="caption-editorial">Tracker</p>
+          <p className="caption-editorial">Kanban board</p>
           <h1 className="mt-2 font-display text-4xl font-medium">Loading workspace…</h1>
         </div>
       </div>
@@ -665,7 +665,7 @@ export function TodoListView() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <WorkspaceMutationOverlay open={working} />
         <div className="max-w-xl text-center">
-          <p className="caption-editorial">Tracker</p>
+          <p className="caption-editorial">Kanban board</p>
           <h1 className="mt-2 font-display text-4xl font-medium">No project workspace</h1>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
             Workspace นี้ว่างอยู่จริงแล้ว สามารถเริ่มจากการสร้างโปรเจกต์แรก
@@ -1562,7 +1562,7 @@ function DialogFrame({
       >
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <p className="caption-editorial text-[0.7rem]">Tracker</p>
+            <p className="caption-editorial text-[0.7rem]">Kanban board</p>
             <h3 className="mt-1 font-display text-3xl font-medium tracking-tight">
               {title}
             </h3>
@@ -1595,7 +1595,7 @@ function WorkspaceMutationOverlay({ open }: { open: boolean }) {
       >
         <span className="size-4 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground" />
         <div>
-          <p className="text-sm font-medium text-foreground">Updating tracker...</p>
+          <p className="text-sm font-medium text-foreground">Updating Kanban board...</p>
           <p className="text-xs text-muted-foreground">Please wait so actions are not submitted twice.</p>
         </div>
       </div>

@@ -199,7 +199,7 @@ export function DashboardView() {
         setTrackerStatus(
           trackerResult.reason instanceof Error
             ? trackerResult.reason.message
-            : "Tracker workspace unavailable.",
+            : "Kanban board unavailable.",
         );
       }
 
@@ -378,7 +378,7 @@ export function DashboardView() {
     {
       href: "/todos",
       label: "เช็ก Kanban Board",
-      description: "ดู blocked, waiting และ pending review ของทีม",
+      description: "ดู blocked, waiting และรายการที่ค้างใน Review Queue ของทีม",
       icon: <ListTodo className="size-4" />,
     },
     {
@@ -573,7 +573,7 @@ export function DashboardView() {
               icon={<ClipboardList className="size-4" />}
               label="Kanban Overview"
               metric={`${trackerTasks.length} tasks`}
-              title={`${trackerWorkspace?.projects.length ?? 0} projects · ${openReviewCount} pending review`}
+              title={`${trackerWorkspace?.projects.length ?? 0} projects · ${openReviewCount} in review queue`}
               body={
                 trackerWorkspace
                   ? `${blockedTaskCount} blocked · ${waitingTaskCount} waiting · พร้อมเช็กสถานะทั้งทีมได้จากหน้าเดียว`
@@ -1151,7 +1151,7 @@ async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
   const data = (await response.json()) as { error?: string; workspace?: TrackerWorkspaceData };
 
   if (!response.ok || !data.workspace) {
-    throw new Error(data.error || "Tracker workspace unavailable.");
+    throw new Error(data.error || "Kanban board unavailable.");
   }
 
   return data.workspace;

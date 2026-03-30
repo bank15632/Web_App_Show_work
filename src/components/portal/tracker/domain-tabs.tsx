@@ -52,11 +52,11 @@ export function DomainTabs({
         </div>
       </div>
       <HoverHelp
-        label="Tracker sections"
-        buttonLabel="Show section guide"
+        label="Kanban board sections"
+        buttonLabel="Show Kanban board guide"
         body={helperBody}
         className="shrink-0"
-        panelClassName="right-0 md:right-auto md:left-0"
+        panelClassName="left-auto right-0"
       />
     </div>
   );

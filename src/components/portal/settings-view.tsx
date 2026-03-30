@@ -591,7 +591,7 @@ async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
   const data = (await response.json()) as { error?: string; workspace?: TrackerWorkspaceData };
 
   if (!response.ok || !data.workspace) {
-    throw new Error(data.error || "Tracker workspace unavailable.");
+    throw new Error(data.error || "Kanban board unavailable.");
   }
 
   return data.workspace;
