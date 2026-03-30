@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { expect, test } from "./fixtures";
 import { ensureTrackerWorkspace } from "./helpers/tracker";
 
 test("tracker can create a task from the workspace", async ({ page }) => {
@@ -6,14 +6,14 @@ test("tracker can create a task from the workspace", async ({ page }) => {
 
   const taskTitle = `Playwright task ${Date.now()}`;
   const today = new Date().toISOString().slice(0, 10);
+
   await page.route("**/api/tracker/tasks", async (route) => {
     await page.waitForTimeout(250);
     await route.continue();
   });
-  await page.getByRole("button", { name: "Add Task" }).click();
 
-  const dialog = page.getByRole("heading", { name: "Add task" });
-  await expect(dialog).toBeVisible();
+  await page.getByRole("button", { name: "Add Task" }).click();
+  await expect(page.getByRole("heading", { name: "Add task" })).toBeVisible();
 
   await page.getByPlaceholder("Task title").fill(taskTitle);
   await page.getByPlaceholder("Description").fill("Created by the Playwright smoke suite.");
@@ -31,29 +31,40 @@ test("tracker section help opens from the tab bar", async ({ page }) => {
   await page.getByRole("button", { name: "Show Kanban board guide" }).hover();
 
   await expect(page.getByRole("tooltip")).toContainText("Tasks:");
-  await expect(page.getByRole("tooltip")).toContainText("Review Queue:");
+  await expect(page.getByRole("tooltip")).toContainText("Decisions:");
 });
 
-test("tracker intake flow can switch modes and queue a meeting note", async ({ page }) => {
+test("approved decisions can be created edited and deleted", async ({ page }) => {
   await ensureTrackerWorkspace(page);
 
-  const meetingTitle = `Playwright meeting ${Date.now()}`;
-  await page.getByRole("button", { name: "Intake" }).click();
+  const baseTitle = `Playwright decision ${Date.now()}`;
+  const updatedTitle = `${baseTitle} updated`;
 
-  await expect(page.getByRole("heading", { name: "Meeting note intake" })).toBeVisible();
-  await page.getByRole("button", { name: "Switch to log intake" }).click();
-  await expect(page.getByRole("heading", { name: "RFI / revision intake" })).toBeVisible();
-  await page.getByRole("button", { name: "Switch to image intake" }).click();
-  await expect(page.getByRole("heading", { name: "Site photo / markup intake" })).toBeVisible();
+  await page.getByRole("button", { name: "Decisions" }).click();
+  await page.getByRole("button", { name: "Add decision" }).click();
 
-  await page.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("button", { name: "Intake" }).click();
-
-  await page.getByPlaceholder("Meeting title").fill(meetingTitle);
+  await expect(page.getByRole("heading", { name: "Add decision" })).toBeVisible();
+  await page.getByPlaceholder("Decision title").fill(baseTitle);
   await page
-    .getByPlaceholder("Paste minutes, discussion notes, or action items...")
-    .fill("1. Review revised elevation.\n2. Confirm updated site measurement.");
-  await page.getByRole("button", { name: "Save" }).click();
+    .getByPlaceholder("What was decided, what changed, and what the team should follow next?")
+    .fill("Confirm updated detail direction for the current phase.");
+  await page.getByRole("button", { name: "Save decision" }).click();
 
-  await expect(page.getByText("Meeting note queued for review.")).toBeVisible();
+  await expect(page.getByText("Decision saved.")).toBeVisible();
+  await expect(page.getByText(baseTitle)).toBeVisible();
+
+  await page.getByRole("button", { name: `Edit decision ${baseTitle}` }).click();
+  await expect(page.getByRole("heading", { name: "Edit decision" })).toBeVisible();
+  await page.getByPlaceholder("Decision title").fill(updatedTitle);
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  await expect(page.getByText("Decision updated.")).toBeVisible();
+  await expect(page.getByText(updatedTitle)).toBeVisible();
+
+  await page.getByRole("button", { name: `Edit decision ${updatedTitle}` }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+
+  await expect(page.getByText("Decision deleted.")).toBeVisible();
+  await expect(page.getByText(updatedTitle)).not.toBeVisible();
 });

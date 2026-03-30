@@ -1,8 +1,7 @@
 "use client";
 
-import { ChevronDown, Plus, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 
-import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { phaseAccents, phaseLabels, projectStatuses } from "@/lib/tracker/constants";
 import type { TrackerPhase, TrackerProjectDetail, TrackerProjectStatus } from "@/lib/tracker/types";
 
@@ -13,7 +12,6 @@ export function WorkspaceHeader({
   onStatusChange,
   onDeleteProject,
   onNewTask,
-  onOpenIntake,
 }: {
   isWorking: boolean;
   project: TrackerProjectDetail;
@@ -21,7 +19,6 @@ export function WorkspaceHeader({
   onStatusChange: (status: TrackerProjectStatus) => void;
   onDeleteProject: () => void;
   onNewTask: () => void;
-  onOpenIntake: () => void;
 }) {
   const doneCount = project.tasks.filter((task) => task.status === "done").length;
   const progress = project.tasks.length
@@ -37,7 +34,7 @@ export function WorkspaceHeader({
             {project.name}
           </h2>
           <p className="mt-3 max-w-3xl text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
-            {project.overview || "AI review queue for architecture tasks, artifacts, and decisions."}
+            {project.overview || "Project board for active tasks, owner decisions, and phase readiness."}
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-2 sm:gap-3">
             <span
@@ -69,15 +66,6 @@ export function WorkspaceHeader({
             />
             <button
               type="button"
-              onClick={onOpenIntake}
-              disabled={isWorking}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[13px] font-medium transition-colors hover:border-foreground sm:text-sm"
-            >
-              <Upload className="size-4" />
-              Intake
-            </button>
-            <button
-              type="button"
               onClick={onNewTask}
               disabled={isWorking}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-[13px] font-medium text-background transition-colors hover:bg-foreground/90 sm:text-sm"
@@ -94,15 +82,6 @@ export function WorkspaceHeader({
               <Trash2 className="size-4" />
               Delete Project
             </button>
-          </div>
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground sm:text-[13px]">
-            <span className="font-medium text-foreground">Intake ใช้ยังไง</span>
-            <HoverHelp
-              label="Intake ใช้ตอนไหน"
-              buttonLabel="Show help"
-              body="ใช้ตอนมีข้อมูลใหม่ที่ยังไม่ควรสร้างเป็น task ตรง ๆ เช่น minutes จากประชุม, RFI log, revision text, site photo หรือ markup แล้วค่อยส่งเข้า review queue ก่อนแตกเป็นงานจริง"
-              panelClassName="w-80"
-            />
           </div>
         </div>
       </div>

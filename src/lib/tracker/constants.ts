@@ -68,9 +68,6 @@ export const savedViews = [
 export const domainTabs = [
   "tasks",
   "decisions",
-  "revision_log",
-  "weekly_report",
-  "review_queue",
 ] as const;
 
 export const phaseLabels = {

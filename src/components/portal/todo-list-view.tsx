@@ -6,19 +6,23 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, BookOpenText, ChevronLeft, ChevronRight, Copy, ListChecks } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpenText,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ListChecks,
+} from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
 import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { ProjectRail } from "@/components/portal/tracker/project-rail";
-import { ReviewQueue } from "@/components/portal/tracker/review-queue";
 import { TaskBoard } from "@/components/portal/tracker/task-board";
-import { WeeklyReportPanel } from "@/components/portal/tracker/weekly-report-panel";
 import { WorkspaceHeader } from "@/components/portal/tracker/workspace-header";
 import {
   priorityDescriptions,
@@ -30,8 +34,8 @@ import {
   trackerStorageKeys,
 } from "@/lib/tracker/constants";
 import type {
-  TrackerArtifactRecord,
   TrackerDecisionMutationInput,
+  TrackerDecisionRecord,
   TrackerDomainTab,
   TrackerLegacyTodoImport,
   TrackerProjectDetail,
@@ -42,47 +46,11 @@ import type {
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 
-type DialogState =
-  | null
-  | "task"
-  | "decision"
-  | "project"
-  | "meeting"
-  | "log"
-  | "upload";
+type DialogState = null | "task" | "decision" | "project";
 
 type TaskDraft = TrackerTaskMutationInput;
 type DecisionDraft = TrackerDecisionMutationInput;
 type ProjectDraft = TrackerProjectMutationInput;
-
-type MeetingDraft = {
-  title: string;
-  content: string;
-};
-
-type LogDraft = {
-  title: string;
-  kind: "rfi_log" | "submittal_log" | "drawing_revision";
-  content: string;
-};
-
-type UploadDraft = {
-  title: string;
-  kind: "site_photo" | "site_markup";
-  notes: string;
-  file: File | null;
-};
-
-const intakeLogKindDescriptions: Record<LogDraft["kind"], string> = {
-  drawing_revision: "ใช้เมื่อมี revision notes, clouded comments หรือ drawing updates ที่ต้องสรุปผลกระทบ",
-  rfi_log: "ใช้กับคำถามจาก site หรือทีมก่อสร้างที่ต้องการคำตอบชัดก่อนเดินงานต่อ",
-  submittal_log: "ใช้กับ material approval, shop drawing หรือเอกสารส่งอนุมัติที่ต้องติดตามสถานะ",
-};
-
-const intakeUploadKindDescriptions: Record<UploadDraft["kind"], string> = {
-  site_photo: "ใช้กับรูปหน้างานจริงเพื่อเก็บหลักฐานและช่วยแตก issue หรือ follow-up ต่อ",
-  site_markup: "ใช้กับภาพที่วงหรือเขียนโน้ตไว้แล้ว เพื่อให้ระบบอ่าน context ของปัญหาได้ตรงขึ้น",
-};
 
 async function requestJson<T>(input: RequestInfo, init?: RequestInit) {
   const response = await fetch(input, init);
@@ -91,7 +59,7 @@ async function requestJson<T>(input: RequestInfo, init?: RequestInit) {
   } & T;
 
   if (!response.ok) {
-    throw new Error(data.error || "Tracker request failed");
+    throw new Error(data.error || "Kanban board request failed");
   }
 
   return data;
@@ -146,16 +114,14 @@ function createEmptyProjectDraft(): ProjectDraft {
   };
 }
 
-function createEmptyMeetingDraft(): MeetingDraft {
-  return { title: "", content: "" };
-}
-
-function createEmptyLogDraft(): LogDraft {
-  return { title: "", kind: "drawing_revision", content: "" };
-}
-
-function createEmptyUploadDraft(): UploadDraft {
-  return { title: "", kind: "site_photo", notes: "", file: null };
+function toDecisionDraft(decision: TrackerDecisionRecord): DecisionDraft {
+  return {
+    title: decision.title,
+    decisionText: decision.decisionText,
+    decidedBy: decision.decidedBy,
+    decidedAt: decision.decidedAt,
+    sourceArtifactId: decision.sourceArtifactId,
+  };
 }
 
 function formatFullDate(value: string) {
@@ -175,20 +141,16 @@ function formatLabel(value: string) {
 function buildAiChatBrief({
   project,
   visibleTasks,
-  revisionArtifacts,
-  weeklyReports,
   domainTab,
 }: {
   project: TrackerProjectDetail;
   visibleTasks: TrackerTaskRecord[];
-  revisionArtifacts: TrackerArtifactRecord[];
-  weeklyReports: TrackerArtifactRecord[];
   domainTab: TrackerDomainTab;
 }) {
   const openTasks = project.tasks.filter((task) => task.status !== "done");
   const lines = [
-    "You are helping me review an architecture project tracker.",
-    "Use only the approved data below. If something is missing, say so clearly.",
+    "You are helping me review an architecture Kanban board.",
+    "Use only the approved project data below. If something is missing, say so clearly.",
     "",
     "# Project snapshot",
     `Project: ${project.name} (${project.code || project.slug})`,
@@ -196,7 +158,6 @@ function buildAiChatBrief({
     `Status: ${formatLabel(project.status)}`,
     `Client: ${project.clientName || "BNJ Studio"}`,
     `Location: ${project.location || "Bangkok"}`,
-    "Task scope: All tasks on the current board",
     `Current section: ${formatLabel(domainTab)}`,
     `Open tasks: ${openTasks.length}`,
     `Total tasks: ${project.tasks.length}`,
@@ -218,43 +179,31 @@ function buildAiChatBrief({
       if (task.description) lines.push(`   Details: ${task.description}`);
       if (task.blocker) lines.push(`   Blocker: ${task.blocker}`);
       if (task.nextAction) lines.push(`   Next action: ${task.nextAction}`);
+      if (task.subtasks.length > 0) {
+        lines.push(
+          `   Sub-tasks: ${task.subtasks
+            .map((subtask) => `${subtask.completed ? "[x]" : "[ ]"} ${subtask.title}`)
+            .join(", ")}`,
+        );
+      }
       lines.push("");
     });
   }
 
-  lines.push("# Recent decisions");
+  lines.push("# Approved decisions");
   if (project.decisions.length === 0) {
     lines.push("- None");
   } else {
-    project.decisions.slice(0, 5).forEach((decision, index) => {
+    project.decisions.slice(0, 6).forEach((decision, index) => {
       lines.push(`${index + 1}. ${decision.title} (${formatFullDate(decision.decidedAt)})`);
+      lines.push(`   Owner: ${decision.decidedBy || "BNJ Studio"}`);
       lines.push(`   ${decision.decisionText}`);
-    });
-  }
-
-  lines.push("", "# Recent revision summaries");
-  if (revisionArtifacts.length === 0) {
-    lines.push("- None");
-  } else {
-    revisionArtifacts.slice(0, 5).forEach((artifact, index) => {
-      lines.push(`${index + 1}. ${artifact.title}`);
-      lines.push(`   ${artifact.extractedSummary || artifact.sourceText || "No summary yet."}`);
-    });
-  }
-
-  lines.push("", "# Recent weekly reports");
-  if (weeklyReports.length === 0) {
-    lines.push("- None");
-  } else {
-    weeklyReports.slice(0, 3).forEach((report, index) => {
-      lines.push(`${index + 1}. ${report.title}`);
-      lines.push(`   ${report.extractedSummary || "No summary yet."}`);
     });
   }
 
   lines.push(
     "",
-    "Please answer in Thai and keep recommendations practical and specific.",
+    "Please answer in Thai and keep recommendations practical, short, and specific.",
   );
 
   return lines.join("\n").trim();
@@ -362,12 +311,10 @@ export function TodoListView() {
   const [domainTab, setDomainTab] = useState<TrackerDomainTab>("tasks");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
-  const [decisionDraft, setDecisionDraft] = useState<DecisionDraft>(createEmptyDecisionDraft);
   const [editingTask, setEditingTask] = useState<TrackerTaskRecord | null>(null);
+  const [decisionDraft, setDecisionDraft] = useState<DecisionDraft>(createEmptyDecisionDraft);
+  const [editingDecision, setEditingDecision] = useState<TrackerDecisionRecord | null>(null);
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(createEmptyProjectDraft);
-  const [meetingDraft, setMeetingDraft] = useState<MeetingDraft>(createEmptyMeetingDraft);
-  const [logDraft, setLogDraft] = useState<LogDraft>(createEmptyLogDraft);
-  const [uploadDraft, setUploadDraft] = useState<UploadDraft>(createEmptyUploadDraft);
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -422,11 +369,6 @@ export function TodoListView() {
     );
   }, [workspace, activeProjectId]);
 
-  const pendingReviewCount = useMemo(
-    () => workspace?.reviewItems.filter((item) => item.status === "pending").length ?? 0,
-    [workspace],
-  );
-
   const visibleTasks = activeProject?.tasks ?? [];
 
   async function loadWorkspace() {
@@ -440,19 +382,20 @@ export function TodoListView() {
       });
     } catch (error) {
       setStatusMessage(
-        error instanceof Error ? error.message : "Failed to load tracker workspace",
+        error instanceof Error ? error.message : "Failed to load Kanban board",
       );
     } finally {
       setLoading(false);
     }
   }
 
-  async function withWorkspaceMutation(
-    action: () => Promise<{ workspace?: TrackerWorkspaceData }>,
+  async function withWorkspaceMutation<T extends { workspace?: TrackerWorkspaceData }>(
+    action: () => Promise<T>,
     successMessage?: string,
+    onSuccess?: (data: T) => void,
   ) {
     if (workingRef.current) {
-      return;
+      return false;
     }
 
     workingRef.current = true;
@@ -466,13 +409,16 @@ export function TodoListView() {
       } else {
         await loadWorkspace();
       }
+      onSuccess?.(data);
       if (successMessage) {
         setStatusMessage(successMessage);
       }
+      return true;
     } catch (error) {
       setStatusMessage(
-        error instanceof Error ? error.message : "Tracker request failed",
+        error instanceof Error ? error.message : "Kanban board request failed",
       );
+      return false;
     } finally {
       workingRef.current = false;
       setWorking(false);
@@ -482,12 +428,9 @@ export function TodoListView() {
   async function handleCopyAiBrief() {
     if (!activeProject) return;
 
-    const project = activeProject;
     const brief = buildAiChatBrief({
-      project,
+      project: activeProject,
       visibleTasks,
-      revisionArtifacts,
-      weeklyReports,
       domainTab,
     });
 
@@ -495,7 +438,7 @@ export function TodoListView() {
       await navigator.clipboard.writeText(brief);
       setStatusMessage("Copied project brief for AI chat.");
     } catch {
-      downloadTextFile(`${project.slug}-ai-brief.md`, brief);
+      downloadTextFile(`${activeProject.slug}-ai-brief.md`, brief);
       setStatusMessage("Clipboard blocked, downloaded an AI brief instead.");
     }
   }
@@ -508,58 +451,40 @@ export function TodoListView() {
       return;
     }
 
-    setWorking(true);
-    try {
-      const data = await requestJson<{ workspace: TrackerWorkspaceData }>(
-        "/api/tracker/import/legacy",
-        {
+    await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>("/api/tracker/import/legacy", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ items }),
-        },
-      );
-      startTransition(() => {
-        setWorkspace(data.workspace);
-      });
-      setStatusMessage(`Imported ${items.length} legacy todo item(s).`);
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Legacy import failed",
-      );
-    } finally {
-      setWorking(false);
-    }
+        }),
+      `Imported ${items.length} legacy todo item(s).`,
+    );
   }
 
   async function handleDeleteProject(project: TrackerProjectDetail) {
     const confirmed = window.confirm(
-      `Delete "${project.name}" and all of its tasks, decisions, review items, and uploads? This cannot be undone.`,
+      `Delete "${project.name}" and all of its tasks, decisions, and project data? This cannot be undone.`,
     );
 
     if (!confirmed) return;
 
-    setWorking(true);
-    try {
-      const data = await requestJson<{ deleted: boolean; workspace: TrackerWorkspaceData }>(
-        `/api/tracker/projects/${project.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      startTransition(() => {
-        setWorkspace(data.workspace);
-        setActiveProjectId(data.workspace.projects[0]?.id ?? null);
-      });
-      setDialog(null);
-      setStatusMessage(`Deleted project "${project.name}".`);
-    } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Failed to delete project",
-      );
-    } finally {
-      setWorking(false);
-    }
+    await withWorkspaceMutation(
+      () =>
+        requestJson<{ deleted: boolean; workspace: TrackerWorkspaceData }>(
+          `/api/tracker/projects/${project.id}`,
+          {
+            method: "DELETE",
+          },
+        ),
+      `Deleted project "${project.name}".`,
+      (data) => {
+        setDialog(null);
+        setEditingTask(null);
+        setEditingDecision(null);
+        setActiveProjectId(data.workspace?.projects[0]?.id ?? null);
+      },
+    );
   }
 
   async function handleChecklistToggle(itemId: string, completed: boolean) {
@@ -632,21 +557,72 @@ export function TodoListView() {
     );
   }
 
-  async function handleCreateDecision() {
+  async function handleSaveDecision() {
     if (!activeProject) return;
 
-    await withWorkspaceMutation(
+    const isEditing = editingDecision !== null;
+    const didSave = await withWorkspaceMutation(
       () =>
         requestJson<{ workspace: TrackerWorkspaceData }>(
-          `/api/tracker/projects/${activeProject.id}/decisions`,
+          isEditing
+            ? `/api/tracker/projects/${activeProject.id}/decisions/${editingDecision.id}`
+            : `/api/tracker/projects/${activeProject.id}/decisions`,
           {
-            method: "POST",
+            method: isEditing ? "PATCH" : "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(decisionDraft),
           },
         ),
-      "Decision saved.",
+      isEditing ? "Decision updated." : "Decision saved.",
     );
+
+    if (didSave) {
+      setDecisionDraft(createEmptyDecisionDraft());
+      setEditingDecision(null);
+      setDialog(null);
+    }
+  }
+
+  async function handleDeleteDecision() {
+    if (!activeProject || !editingDecision) return;
+
+    const confirmed = window.confirm(`Delete decision "${editingDecision.title}"?`);
+    if (!confirmed) return;
+
+    const didDelete = await withWorkspaceMutation(
+      () =>
+        requestJson<{ deleted: boolean; workspace: TrackerWorkspaceData }>(
+          `/api/tracker/projects/${activeProject.id}/decisions/${editingDecision.id}`,
+          {
+            method: "DELETE",
+          },
+        ),
+      "Decision deleted.",
+    );
+
+    if (didDelete) {
+      setDecisionDraft(createEmptyDecisionDraft());
+      setEditingDecision(null);
+      setDialog(null);
+    }
+  }
+
+  function openCreateTask() {
+    if (!activeProject) return;
+    setTaskDraft(createEmptyTaskDraft(activeProject.phase));
+    setDialog("task");
+  }
+
+  function openCreateDecision() {
+    setEditingDecision(null);
+    setDecisionDraft(createEmptyDecisionDraft());
+    setDialog("decision");
+  }
+
+  function openEditDecision(decision: TrackerDecisionRecord) {
+    setEditingDecision(decision);
+    setDecisionDraft(toDecisionDraft(decision));
+    setDialog("decision");
   }
 
   if (loading) {
@@ -654,13 +630,13 @@ export function TodoListView() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <p className="caption-editorial">Kanban board</p>
-          <h1 className="mt-2 font-display text-4xl font-medium">Loading workspace…</h1>
+          <h1 className="mt-2 font-display text-4xl font-medium">Loading workspace...</h1>
         </div>
       </div>
     );
   }
 
-  if (!workspace || !activeProject) {
+  if (!workspace || workspace.projects.length === 0 || !activeProject) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <WorkspaceMutationOverlay open={working} />
@@ -668,8 +644,8 @@ export function TodoListView() {
           <p className="caption-editorial">Kanban board</p>
           <h1 className="mt-2 font-display text-4xl font-medium">No project workspace</h1>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">
-            Workspace นี้ว่างอยู่จริงแล้ว สามารถเริ่มจากการสร้างโปรเจกต์แรก
-            หรือค่อย import ข้อมูล legacy จาก browser เครื่องนี้ด้วยตัวเองภายหลัง
+            Start with the first project, or import legacy browser data from this machine if you
+            want to bring older tasks into the board.
           </p>
           {statusMessage ? (
             <div className="mt-4 rounded-[1.25rem] border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
@@ -719,8 +695,11 @@ export function TodoListView() {
                       body: JSON.stringify(projectDraft),
                     }),
                   "Project created.",
+                  (data) => {
+                    setDialog(null);
+                    setActiveProjectId(data.workspace?.projects[0]?.id ?? null);
+                  },
                 );
-                setDialog(null);
               }}
             >
               <ProjectFormFields draft={projectDraft} onChange={setProjectDraft} />
@@ -732,15 +711,6 @@ export function TodoListView() {
     );
   }
 
-  const revisionArtifacts = activeProject.artifacts.filter(
-    (artifact) => artifact.kind === "drawing_revision",
-  );
-  const weeklyReports = activeProject.artifacts.filter(
-    (artifact) => artifact.kind === "weekly_report",
-  );
-  const projectReviewItems = workspace.reviewItems.filter(
-    (item) => item.projectId === activeProject.id,
-  );
   const layoutClassName = isLeftRailCollapsed
     ? "lg:grid-cols-[minmax(0,1fr)]"
     : "lg:grid-cols-[290px_minmax(0,1fr)]";
@@ -759,7 +729,6 @@ export function TodoListView() {
             <ProjectRail
               projects={workspace.projects}
               activeProjectId={activeProject.id}
-              pendingReviewCount={pendingReviewCount}
               onSelect={setActiveProjectId}
               onCreateProject={() => {
                 setProjectDraft(createEmptyProjectDraft());
@@ -847,11 +816,7 @@ export function TodoListView() {
             onDeleteProject={() => {
               void handleDeleteProject(activeProject);
             }}
-            onNewTask={() => {
-              setTaskDraft(createEmptyTaskDraft(activeProject.phase));
-              setDialog("task");
-            }}
-            onOpenIntake={() => setDialog("meeting")}
+            onNewTask={openCreateTask}
           />
 
           <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
@@ -872,10 +837,7 @@ export function TodoListView() {
                 checklistItems={activeProject.checklistItems}
                 hiddenChecklistItems={activeProject.hiddenChecklistItems}
                 checklistBusy={working}
-                onCreateTask={() => {
-                  setTaskDraft(createEmptyTaskDraft(activeProject.phase));
-                  setDialog("task");
-                }}
+                onCreateTask={openCreateTask}
                 onEditTask={(task) => setEditingTask(task)}
                 onToggleChecklist={(itemId, completed) => {
                   void handleChecklistToggle(itemId, completed);
@@ -888,19 +850,18 @@ export function TodoListView() {
                   handleChecklistRestore(itemKey)
                 }
                 onReorder={async (items) => {
-                  await withWorkspaceMutation(
-                    () =>
-                      requestJson<{ workspace: TrackerWorkspaceData }>(
-                        "/api/tracker/tasks/reorder",
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            projectId: activeProject.id,
-                            tasks: items,
-                          }),
-                        },
-                      ),
+                  await withWorkspaceMutation(() =>
+                    requestJson<{ workspace: TrackerWorkspaceData }>(
+                      "/api/tracker/tasks/reorder",
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          projectId: activeProject.id,
+                          tasks: items,
+                        }),
+                      },
+                    ),
                   );
                 }}
               />
@@ -916,139 +877,63 @@ export function TodoListView() {
                         Approved decisions
                       </h3>
                       <HoverHelp
-                        label="Decisions ใช้ยังไง"
+                        label="What belongs in approved decisions?"
                         buttonLabel="Show decisions help"
-                        body="ใช้เก็บข้อสรุปที่ตกลงแล้วจริง เช่น approve material, confirm design direction, หรือข้อสรุปจากประชุมที่ไม่อยากให้หลุดหาย ถ้ายังไม่ชัด ใช้ Intake ก่อนแล้วค่อย approve จาก Review Queue"
+                        body="Store confirmed client approvals, design directions, scope decisions, and material calls here so the board always keeps the latest approved direction visible."
                       />
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDecisionDraft(createEmptyDecisionDraft());
-                        setDialog("decision");
-                      }}
-                      className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-                    >
-                      Add decision
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDomainTab("review_queue")}
-                      className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-                    >
-                      Open review queue
-                    </button>
+                  <button
+                    type="button"
+                    onClick={openCreateDecision}
+                    className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                  >
+                    Add decision
+                  </button>
+                </div>
+
+                {activeProject.decisions.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-dashed border-border bg-background px-5 py-10 text-center text-muted-foreground">
+                    No approved decisions yet. Use <span className="font-medium text-foreground">Add decision</span> to keep final direction visible to the team.
                   </div>
-                </div>
-                <div className="space-y-3">
-                  {activeProject.decisions.length === 0 ? (
-                    <div className="rounded-[1.5rem] border border-dashed border-border bg-background px-5 py-10 text-center text-muted-foreground">
-                      No approved decisions yet. Use <span className="font-medium text-foreground">Add decision</span> for manual entries or approve proposals from Review Queue.
-                    </div>
-                  ) : null}
-                  {activeProject.decisions.map((decision) => (
-                    <article
-                      key={decision.id}
-                      className="rounded-[1.5rem] border border-border bg-background p-5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h4 className="text-base font-medium">{decision.title}</h4>
-                        <span className="text-sm text-muted-foreground">
-                          {formatFullDate(decision.decidedAt)}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                        {decision.decisionText}
-                      </p>
-                    </article>
-                  ))}
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeProject.decisions.map((decision) => (
+                      <article
+                        key={decision.id}
+                        className="rounded-[1.5rem] border border-border bg-background p-5"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <h4 className="text-base font-medium text-foreground">
+                              {decision.title}
+                            </h4>
+                            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                              {decision.decisionText}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                            <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+                              {decision.decidedBy || "BNJ Studio"}
+                            </span>
+                            <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+                              {formatFullDate(decision.decidedAt)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => openEditDecision(decision)}
+                              className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                              aria-label={`Edit decision ${decision.title}`}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </section>
-            ) : null}
-
-            {domainTab === "revision_log" ? (
-              <ArtifactPanel
-                title="Revision log"
-                subtitle="Drawing revisions and approved summaries"
-                artifacts={revisionArtifacts}
-                helpLabel="Revision Log ใช้ยังไง"
-                helpBody="ใช้เก็บ revision notes, RFI log, submittal log และ drawing updates ที่อยากให้ระบบสรุปผลกระทบก่อน ถ้ามีข้อความยาวหรือ log ให้เริ่มจาก Log intake ถ้าเป็นรูปหน้างานหรือ markup ให้ใช้ Image intake"
-                actions={
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setDialog("log")}
-                      className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-                    >
-                      Open log intake
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDialog("upload")}
-                      className="inline-flex h-11 items-center rounded-full border border-border px-5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-                    >
-                      Open image intake
-                    </button>
-                  </>
-                }
-              />
-            ) : null}
-
-            {domainTab === "weekly_report" ? (
-              <WeeklyReportPanel
-                reports={weeklyReports}
-                onOpenReviewQueue={() => setDomainTab("review_queue")}
-                onGenerate={async () => {
-                  await withWorkspaceMutation(
-                    () =>
-                      requestJson<{ workspace: TrackerWorkspaceData }>(
-                        "/api/tracker/weekly-report",
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ projectId: activeProject.id }),
-                        },
-                      ),
-                    "Weekly report proposal queued for review.",
-                  );
-                }}
-              />
-            ) : null}
-
-            {domainTab === "review_queue" ? (
-              <ReviewQueue
-                items={projectReviewItems}
-                onApprove={async (reviewItemId) => {
-                  await withWorkspaceMutation(
-                    () =>
-                      requestJson<{ workspace: TrackerWorkspaceData }>(
-                        `/api/tracker/review/${reviewItemId}/approve`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ reviewedBy: "BNJ Studio" }),
-                        },
-                      ),
-                    "Review item approved.",
-                  );
-                }}
-                onReject={async (reviewItemId, reason) => {
-                  await withWorkspaceMutation(
-                    () =>
-                      requestJson<{ workspace: TrackerWorkspaceData }>(
-                        `/api/tracker/review/${reviewItemId}/reject`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ reviewedBy: "BNJ Studio", reason }),
-                        },
-                      ),
-                    "Review item rejected.",
-                  );
-                }}
-              />
             ) : null}
           </div>
         </main>
@@ -1071,8 +956,11 @@ export function TodoListView() {
                     }),
                   }),
                 "Task created.",
+                () => {
+                  setTaskDraft(null);
+                  setDialog(null);
+                },
               );
-              setDialog(null);
             }}
           >
             <TaskFormFields draft={taskDraft} onChange={setTaskDraft} />
@@ -1098,8 +986,10 @@ export function TodoListView() {
                     },
                   ),
                 "Task updated.",
+                () => {
+                  setEditingTask(null);
+                },
               );
-              setEditingTask(null);
             }}
           >
             <TaskFormFields
@@ -1139,8 +1029,10 @@ export function TodoListView() {
                         },
                       ),
                     "Task deleted.",
+                    () => {
+                      setEditingTask(null);
+                    },
                   );
-                  setEditingTask(null);
                 }}
                 className="rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
               >
@@ -1153,18 +1045,46 @@ export function TodoListView() {
       ) : null}
 
       {dialog === "decision" ? (
-        <DialogFrame title="Add decision" onClose={() => setDialog(null)}>
+        <DialogFrame
+          title={editingDecision ? "Edit decision" : "Add decision"}
+          onClose={() => {
+            setDialog(null);
+            setEditingDecision(null);
+            setDecisionDraft(createEmptyDecisionDraft());
+          }}
+        >
           <form
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              void handleCreateDecision();
-              setDecisionDraft(createEmptyDecisionDraft());
-              setDialog(null);
+              void handleSaveDecision();
             }}
           >
             <DecisionFormFields draft={decisionDraft} onChange={setDecisionDraft} />
-            <DialogActions onCancel={() => setDialog(null)} working={working} />
+            <div className="flex items-center justify-between gap-3">
+              {editingDecision ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleDeleteDecision();
+                  }}
+                  className="rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
+                >
+                  Delete
+                </button>
+              ) : (
+                <span />
+              )}
+              <DialogActions
+                onCancel={() => {
+                  setDialog(null);
+                  setEditingDecision(null);
+                  setDecisionDraft(createEmptyDecisionDraft());
+                }}
+                working={working}
+                submitLabel={editingDecision ? "Save changes" : "Save decision"}
+              />
+            </div>
           </form>
         </DialogFrame>
       ) : null}
@@ -1183,231 +1103,13 @@ export function TodoListView() {
                     body: JSON.stringify(projectDraft),
                   }),
                 "Project created.",
+                () => {
+                  setDialog(null);
+                },
               );
-              setDialog(null);
             }}
           >
             <ProjectFormFields draft={projectDraft} onChange={setProjectDraft} />
-            <DialogActions onCancel={() => setDialog(null)} working={working} />
-          </form>
-        </DialogFrame>
-      ) : null}
-
-      {dialog === "meeting" ? (
-        <DialogFrame title="Meeting note intake" onClose={() => setDialog(null)}>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void withWorkspaceMutation(
-                () =>
-                  requestJson<{ workspace: TrackerWorkspaceData }>(
-                    "/api/tracker/intake/meeting-notes",
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        projectId: activeProject.id,
-                        ...meetingDraft,
-                      }),
-                    },
-                  ),
-                "Meeting note queued for review.",
-              );
-              setMeetingDraft(createEmptyMeetingDraft());
-              setDialog(null);
-            }}
-          >
-            <DialogHelperCard
-              title="ใช้เมื่อมี minutes หรือ action items จากประชุม"
-              body="วางบันทึกประชุม, discussion notes หรือ commitment ลงมาได้เลย แล้วระบบจะส่งข้อเสนอเข้า Review Queue ก่อนสร้าง task หรือ decision จริง"
-            />
-            <input
-              value={meetingDraft.title}
-              onChange={(event) =>
-                setMeetingDraft((prev) => ({ ...prev, title: event.target.value }))
-              }
-              placeholder="Meeting title"
-              className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-            />
-            <textarea
-              value={meetingDraft.content}
-              onChange={(event) =>
-                setMeetingDraft((prev) => ({ ...prev, content: event.target.value }))
-              }
-              placeholder="Paste minutes, discussion notes, or action items..."
-              rows={8}
-              className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
-            />
-            <div className="flex justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setDialog("log")}
-                className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-              >
-                Switch to log intake
-              </button>
-              <DialogActions onCancel={() => setDialog(null)} working={working} />
-            </div>
-          </form>
-        </DialogFrame>
-      ) : null}
-
-      {dialog === "log" ? (
-        <DialogFrame title="RFI / revision intake" onClose={() => setDialog(null)}>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void withWorkspaceMutation(
-                () =>
-                  requestJson<{ workspace: TrackerWorkspaceData }>(
-                    "/api/tracker/intake/logs",
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        projectId: activeProject.id,
-                        ...logDraft,
-                      }),
-                    },
-                  ),
-                "Log intake queued for review.",
-              );
-              setLogDraft(createEmptyLogDraft());
-              setDialog(null);
-            }}
-          >
-            <DialogHelperCard
-              title="ใช้เมื่อข้อมูลมาเป็น log หรือข้อความยาว"
-              body="เหมาะกับ RFI log, submittal log, revision summary หรือ text ที่ดึงมาจากเอกสาร เพื่อให้ระบบแยกประเด็นและเตรียมรายการรอตรวจ"
-            />
-            <input
-              value={logDraft.title}
-              onChange={(event) =>
-                setLogDraft((prev) => ({ ...prev, title: event.target.value }))
-              }
-              placeholder="Log title"
-              className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-            />
-            <select
-              value={logDraft.kind}
-              onChange={(event) =>
-                setLogDraft((prev) => ({
-                  ...prev,
-                  kind: event.target.value as LogDraft["kind"],
-                }))
-              }
-              className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-            >
-              <option value="drawing_revision">Drawing Revision</option>
-              <option value="rfi_log">RFI Log</option>
-              <option value="submittal_log">Submittal Log</option>
-            </select>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {intakeLogKindDescriptions[logDraft.kind]}
-            </p>
-            <textarea
-              value={logDraft.content}
-              onChange={(event) =>
-                setLogDraft((prev) => ({ ...prev, content: event.target.value }))
-              }
-              placeholder="Paste CSV rows, revision notes, or extracted text..."
-              rows={8}
-              className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
-            />
-            <div className="flex justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setDialog("upload")}
-                className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-              >
-                Switch to image intake
-              </button>
-              <DialogActions onCancel={() => setDialog(null)} working={working} />
-            </div>
-          </form>
-        </DialogFrame>
-      ) : null}
-
-      {dialog === "upload" ? (
-        <DialogFrame title="Site photo / markup intake" onClose={() => setDialog(null)}>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const formData = new FormData();
-              formData.set("projectId", activeProject.id);
-              formData.set("title", uploadDraft.title);
-              formData.set("kind", uploadDraft.kind);
-              formData.set("notes", uploadDraft.notes);
-              if (uploadDraft.file) {
-                formData.set("file", uploadDraft.file);
-              }
-
-              void withWorkspaceMutation(
-                () =>
-                  requestJson<{ workspace: TrackerWorkspaceData }>(
-                    "/api/tracker/intake/uploads",
-                    {
-                      method: "POST",
-                      body: formData,
-                    },
-                  ),
-                "Image intake queued for review.",
-              );
-              setUploadDraft(createEmptyUploadDraft());
-              setDialog(null);
-            }}
-          >
-            <DialogHelperCard
-              title="ใช้เมื่อมีรูปหน้างานหรือภาพ markup"
-              body="อัปโหลดรูป site, screenshot หรือภาพที่วงจุดปัญหาไว้ เพื่อให้ระบบเก็บเป็น artifact และช่วยแตก issue, blocker หรือ follow-up ต่อ"
-            />
-            <input
-              value={uploadDraft.title}
-              onChange={(event) =>
-                setUploadDraft((prev) => ({ ...prev, title: event.target.value }))
-              }
-              placeholder="Artifact title"
-              className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-            />
-            <select
-              value={uploadDraft.kind}
-              onChange={(event) =>
-                setUploadDraft((prev) => ({
-                  ...prev,
-                  kind: event.target.value as UploadDraft["kind"],
-                }))
-              }
-              className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
-            >
-              <option value="site_photo">Site Photo</option>
-              <option value="site_markup">Site Markup</option>
-            </select>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {intakeUploadKindDescriptions[uploadDraft.kind]}
-            </p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                setUploadDraft((prev) => ({
-                  ...prev,
-                  file: event.target.files?.[0] ?? null,
-                }))
-              }
-              className="h-11 w-full rounded-full border border-border px-4 py-2 text-sm outline-none transition-colors focus:border-foreground"
-            />
-            <textarea
-              value={uploadDraft.notes}
-              onChange={(event) =>
-                setUploadDraft((prev) => ({ ...prev, notes: event.target.value }))
-              }
-              placeholder="Optional site notes"
-              rows={6}
-              className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm outline-none transition-colors focus:border-foreground"
-            />
             <DialogActions onCancel={() => setDialog(null)} working={working} />
           </form>
         </DialogFrame>
@@ -1473,75 +1175,6 @@ function SidebarToggleButton({
   );
 }
 
-function ArtifactPanel({
-  title,
-  subtitle,
-  artifacts,
-  helpLabel,
-  helpBody,
-  actions,
-}: {
-  title: string;
-  subtitle: string;
-  artifacts: TrackerArtifactRecord[];
-  helpLabel?: string;
-  helpBody?: string;
-  actions?: ReactNode;
-}) {
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="caption-editorial text-[0.7rem]">{title}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <h3 className="font-display text-3xl font-medium tracking-tight">
-              {subtitle}
-            </h3>
-            {helpLabel && helpBody ? (
-              <HoverHelp
-                label={helpLabel}
-                buttonLabel={`Show help for ${title}`}
-                body={helpBody}
-              />
-            ) : null}
-          </div>
-        </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-      </div>
-      <div className="space-y-3">
-        {artifacts.length === 0 ? (
-          <div className="rounded-[1.5rem] border border-dashed border-border bg-background px-5 py-10 text-center text-muted-foreground">
-            No artifacts for {title.toLowerCase()}.
-          </div>
-        ) : null}
-        {artifacts.map((artifact) => (
-          <article
-            key={artifact.id}
-            className="rounded-[1.5rem] border border-border bg-background p-5"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-base font-medium">{artifact.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {formatFullDate(artifact.createdAt)}
-                </p>
-              </div>
-              {artifact.revision ? (
-                <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
-                  {artifact.revision}
-                </span>
-              ) : null}
-            </div>
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-              {artifact.extractedSummary || artifact.sourceText || "No summary yet."}
-            </p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function DialogFrame({
   title,
   children,
@@ -1596,7 +1229,9 @@ function WorkspaceMutationOverlay({ open }: { open: boolean }) {
         <span className="size-4 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground" />
         <div>
           <p className="text-sm font-medium text-foreground">Updating Kanban board...</p>
-          <p className="text-xs text-muted-foreground">Please wait so actions are not submitted twice.</p>
+          <p className="text-xs text-muted-foreground">
+            Please wait so actions are not submitted twice.
+          </p>
         </div>
       </div>
     </div>
@@ -1606,9 +1241,11 @@ function WorkspaceMutationOverlay({ open }: { open: boolean }) {
 function DialogActions({
   onCancel,
   working,
+  submitLabel = "Save",
 }: {
   onCancel: () => void;
   working: boolean;
+  submitLabel?: string;
 }) {
   return (
     <div className="flex justify-end gap-3">
@@ -1624,7 +1261,7 @@ function DialogActions({
         disabled={working}
         className="rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
       >
-        {working ? "Working..." : "Save"}
+        {working ? "Working..." : submitLabel}
       </button>
     </div>
   );
@@ -1676,8 +1313,8 @@ function TaskFormFields({
   return (
     <>
       <DialogHelperCard
-        title="ใช้ฟอร์มนี้เมื่อ task ชัดแล้ว"
-        body="ถ้ารู้งาน, owner และอยากให้ขึ้นบอร์ดทันที ให้สร้างหรือแก้จากฟอร์มนี้ได้เลย ถ้ายังเป็นข้อมูลดิบจากประชุม, log หรือรูป ควรเริ่มจาก Intake ก่อน"
+        title="Use this form when the task is already clear."
+        body="Create or update a task here when the owner, scope, and next step are known enough to track directly on the Kanban board."
       />
       <input
         value={draft.title}
@@ -1729,7 +1366,11 @@ function TaskFormFields({
                     return;
                   }
 
-                  if (event.key === "Backspace" && subtask.title.length === 0 && subtaskRows.length > 1) {
+                  if (
+                    event.key === "Backspace" &&
+                    subtask.title.length === 0 &&
+                    subtaskRows.length > 1
+                  ) {
                     event.preventDefault();
                     const focusIndex = Math.max(index - 1, 0);
                     handleRemoveSubtask(index);
@@ -1738,7 +1379,7 @@ function TaskFormFields({
                     });
                   }
                 }}
-                placeholder={index === 0 ? "เช่น เพิ่ม Printer ใน Perspective" : "Next sub-task"}
+                placeholder={index === 0 ? "Example: Add printer to perspective" : "Next sub-task"}
                 className="h-11 flex-1 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
               />
               <button
@@ -1759,7 +1400,8 @@ function TaskFormFields({
           </button>
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
-          กด `Enter` เพื่อเพิ่ม sub-task แถวถัดไปได้ทันที และติ๊ก checkbox เมื่องานย่อยเสร็จแล้ว
+          Press Enter to add the next row right away, and tick the checkbox when that sub-task is
+          done.
         </p>
       </label>
       <div className="grid gap-4 md:grid-cols-2">
@@ -1851,7 +1493,8 @@ function TaskFormFields({
             className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
           />
           <p className="text-xs leading-5 text-muted-foreground">
-            ใส่เมื่อมี deadline จริง, commitment ที่คนอื่นรอ หรือวันติดตามที่ต้องเห็นบนบอร์ด
+            Use this when there is a real deadline, handoff date, or follow-up date the team should
+            see on the board.
           </p>
         </label>
       </div>
@@ -1869,8 +1512,8 @@ function DecisionFormFields({
   return (
     <>
       <DialogHelperCard
-        title="ใช้เมื่อมีข้อสรุปที่ตกลงแล้ว"
-        body="เหมาะกับ decision ที่ชัดและไม่อยากให้หลุดหาย เช่น approve material, ยืนยัน design direction หรือข้อสรุปจากประชุม ถ้ายังเป็นข้อมูลดิบให้เริ่มจาก Intake ก่อน"
+        title="Use this for final approved direction."
+        body="Record client approvals, design choices, scope calls, or internal decisions that the team should be able to reopen, edit, and trust later."
       />
       <input
         value={draft.title}

@@ -40,12 +40,12 @@ export async function ensureTrackerWorkspace(page: Page) {
 }
 
 async function waitForTrackerShell(page: Page) {
-  const intakeButton = page.getByRole("button", { name: "Intake" });
+  const addTaskButton = page.getByRole("button", { name: "Add Task" });
   const createFirstProjectButton = page.getByRole("button", { name: "Create first project" });
   const emptyWorkspaceHeading = page.getByRole("heading", { name: "No project workspace" });
 
   await Promise.any([
-    intakeButton.waitFor({ state: "visible" }),
+    addTaskButton.waitFor({ state: "visible" }),
     createFirstProjectButton.waitFor({ state: "visible" }),
     emptyWorkspaceHeading.waitFor({ state: "visible" }),
   ]);

@@ -779,6 +779,15 @@ async function getTaskByIdInternal(db: D1Database, taskId: string) {
   return task;
 }
 
+async function getDecisionByIdInternal(db: D1Database, decisionId: string) {
+  const row = await queryFirst<DecisionRow>(
+    db,
+    "SELECT * FROM decisions WHERE id = ?",
+    decisionId,
+  );
+  return row ? mapDecisionRow(row) : null;
+}
+
 async function getProjectRowByIdInternal(db: D1Database, projectId: string) {
   return queryFirst<ProjectRow>(db, "SELECT * FROM projects WHERE id = ?", projectId);
 }
@@ -1718,6 +1727,88 @@ export async function createDecision(
   }
 
   return mapDecisionRow(row);
+}
+
+export async function updateDecision(
+  env: TrackerEnv,
+  decisionId: string,
+  patch: Partial<TrackerDecisionMutationInput>,
+  options?: {
+    actor?: string;
+  },
+) {
+  await ensureTrackerReady(env);
+  const existing = await getDecisionByIdInternal(env.DB, decisionId);
+  if (!existing) {
+    throw new Error("Decision not found");
+  }
+
+  const updatedAt = nowIso();
+  const merged: TrackerDecisionMutationInput = {
+    title: patch.title ?? existing.title,
+    decisionText: patch.decisionText ?? existing.decisionText,
+    decidedBy: patch.decidedBy ?? existing.decidedBy,
+    decidedAt: patch.decidedAt ?? existing.decidedAt,
+    sourceArtifactId:
+      patch.sourceArtifactId === undefined ? existing.sourceArtifactId : patch.sourceArtifactId,
+  };
+
+  await runStatement(
+    env.DB,
+    `UPDATE decisions
+     SET title = ?, decision_text = ?, decided_by = ?, decided_at = ?, source_artifact_id = ?, updated_at = ?
+     WHERE id = ?`,
+    merged.title,
+    merged.decisionText,
+    merged.decidedBy ?? "",
+    merged.decidedAt ?? updatedAt,
+    merged.sourceArtifactId ?? null,
+    updatedAt,
+    decisionId,
+  );
+
+  await runStatement(
+    env.DB,
+    "UPDATE projects SET updated_at = ? WHERE id = ?",
+    updatedAt,
+    existing.projectId,
+  );
+
+  await writeAuditLog(env.DB, existing.projectId, "decision.update", options?.actor ?? "system", merged, {
+    entityKind: "decision",
+    entityId: decisionId,
+  });
+
+  const updated = await getDecisionByIdInternal(env.DB, decisionId);
+  if (!updated) {
+    throw new Error("Failed to update decision");
+  }
+
+  return updated;
+}
+
+export async function deleteDecision(env: TrackerEnv, decisionId: string) {
+  await ensureTrackerReady(env);
+  const existing = await getDecisionByIdInternal(env.DB, decisionId);
+  if (!existing) {
+    return false;
+  }
+
+  const updatedAt = nowIso();
+  await runStatement(env.DB, "DELETE FROM decisions WHERE id = ?", decisionId);
+  await runStatement(
+    env.DB,
+    "UPDATE projects SET updated_at = ? WHERE id = ?",
+    updatedAt,
+    existing.projectId,
+  );
+
+  await writeAuditLog(env.DB, existing.projectId, "decision.delete", "system", existing, {
+    entityKind: "decision",
+    entityId: decisionId,
+  });
+
+  return true;
 }
 
 export async function createReviewItems(

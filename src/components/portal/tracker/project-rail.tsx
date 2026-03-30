@@ -1,21 +1,18 @@
 "use client";
 
-import { Bot, FolderPlus } from "lucide-react";
+import { FolderPlus, SquareKanban } from "lucide-react";
 
-import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { phaseAccents, phaseLabels } from "@/lib/tracker/constants";
 import type { TrackerProjectDetail } from "@/lib/tracker/types";
 
 export function ProjectRail({
   projects,
   activeProjectId,
-  pendingReviewCount,
   onSelect,
   onCreateProject,
 }: {
   projects: TrackerProjectDetail[];
   activeProjectId: string | null;
-  pendingReviewCount: number;
   onSelect: (projectId: string) => void;
   onCreateProject: () => void;
 }) {
@@ -40,15 +37,9 @@ export function ProjectRail({
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
           <div className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-[13px] leading-5 sm:text-sm">
-            <Bot className="size-4" />
-            {pendingReviewCount} in Review Queue
+            <SquareKanban className="size-4" />
+            {projects.length} project{projects.length === 1 ? "" : "s"}
           </div>
-          <HoverHelp
-            label="Pending review คืออะไร"
-            buttonLabel="Show pending review explanation"
-            body="ตัวเลขนี้นับจำนวนรายการใน Review Queue ที่ยัง pending อยู่ทั้ง Kanban board เช่น meeting note, intake log, site photo, markup หรือ weekly report draft ที่ยังไม่ได้ approve หรือ reject"
-            panelClassName="left-0 right-auto w-80"
-          />
           <button
             type="button"
             onClick={onCreateProject}
@@ -111,7 +102,6 @@ export function ProjectRail({
           })}
         </div>
       </div>
-
     </aside>
   );
 }

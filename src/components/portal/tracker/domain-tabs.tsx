@@ -7,17 +7,11 @@ import type { TrackerDomainTab } from "@/lib/tracker/types";
 const labels: Record<TrackerDomainTab, string> = {
   tasks: "Tasks",
   decisions: "Decisions",
-  revision_log: "Revision Log",
-  weekly_report: "Weekly Report",
-  review_queue: "Review Queue",
 };
 
 const descriptions: Record<TrackerDomainTab, string> = {
-  tasks: "ดู Kanban board หลักของโปรเจ็กต์ จัด task, subtasks และ checklist readiness ใน phase ปัจจุบัน",
-  decisions: "เก็บข้อสรุปที่อนุมัติแล้ว เพื่อย้อนดูว่าใครตัดสินใจอะไร และเมื่อไร",
-  revision_log: "รวม revision summary, drawing updates และผลกระทบจากการแก้แบบ",
-  weekly_report: "ดูสรุปรายสัปดาห์ของโปรเจ็กต์ และใช้สร้าง weekly report ใหม่",
-  review_queue: "ตรวจข้อเสนอจาก Intake หรือ AI review ก่อนแปลงเป็น task, decision หรือ report จริง",
+  tasks: "View the main Kanban board, active tasks, sub-tasks, and the checklist for the current phase.",
+  decisions: "Store approved project decisions that can still be edited or removed later when the plan changes.",
 };
 
 const helperBody = domainTabs
