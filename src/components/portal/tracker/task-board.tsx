@@ -713,35 +713,33 @@ function TaskSubtaskPreview({
     return null;
   }
 
-  const visibleSubtasks = task.subtasks.slice(0, compact ? 2 : 4);
+  const visibleSubtasks = task.subtasks.slice(0, compact ? 2 : 3);
 
   return (
-    <div className="mt-4 rounded-[1rem] border border-border bg-background/80 px-3 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+    <div className="mt-3 space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+        <span className="font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Sub-Tasks
         </span>
-        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <span className="rounded-full border border-border px-2 py-0.5 font-medium">
           {progress.completed}/{progress.total} complete
         </span>
       </div>
-      <div className="mt-2 space-y-1.5">
-        {visibleSubtasks.map((subtask) => (
-          <div key={subtask.id} className="flex items-start gap-2 text-[12px] leading-5 text-muted-foreground">
-            <span
-              className={cn(
-                "mt-1 inline-flex size-3 shrink-0 rounded-full border",
-                subtask.completed ? "border-emerald-500 bg-emerald-500" : "border-border bg-transparent",
-              )}
-            />
-            <span className={subtask.completed ? "line-through opacity-70" : ""}>
-              {subtask.title}
-            </span>
-          </div>
-        ))}
-      </div>
+      {visibleSubtasks.map((subtask) => (
+        <div key={subtask.id} className="flex items-start gap-2 text-[11px] leading-5 text-muted-foreground">
+          <span
+            className={cn(
+              "mt-1 inline-flex size-2.5 shrink-0 rounded-full border",
+              subtask.completed ? "border-emerald-500 bg-emerald-500" : "border-border bg-transparent",
+            )}
+          />
+          <span className={cn("line-clamp-1", subtask.completed && "line-through opacity-70")}>
+            {subtask.title}
+          </span>
+        </div>
+      ))}
       {task.subtasks.length > visibleSubtasks.length ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           +{task.subtasks.length - visibleSubtasks.length} more sub-task
           {task.subtasks.length - visibleSubtasks.length === 1 ? "" : "s"}
         </p>
@@ -894,7 +892,7 @@ function TaskCard({
               </span>
             ) : null}
           </div>
-          <TaskSubtaskPreview task={task} />
+          <TaskSubtaskPreview task={task} compact />
         </div>
       </div>
     </article>

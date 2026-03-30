@@ -1,5 +1,6 @@
 "use client";
 
+import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { domainTabs } from "@/lib/tracker/constants";
 import type { TrackerDomainTab } from "@/lib/tracker/types";
 
@@ -11,6 +12,18 @@ const labels: Record<TrackerDomainTab, string> = {
   review_queue: "Review Queue",
 };
 
+const descriptions: Record<TrackerDomainTab, string> = {
+  tasks: "ดู Kanban board หลักของโปรเจ็กต์ จัด task, subtasks และ checklist readiness ใน phase ปัจจุบัน",
+  decisions: "เก็บข้อสรุปที่อนุมัติแล้ว เพื่อย้อนดูว่าใครตัดสินใจอะไร และเมื่อไร",
+  revision_log: "รวม revision summary, drawing updates และผลกระทบจากการแก้แบบ",
+  weekly_report: "ดูสรุปรายสัปดาห์ของโปรเจ็กต์ และใช้สร้าง weekly report ใหม่",
+  review_queue: "ตรวจข้อเสนอจาก Intake หรือ AI review ก่อนแปลงเป็น task, decision หรือ report จริง",
+};
+
+const helperBody = domainTabs
+  .map((tab) => `${labels[tab]}: ${descriptions[tab]}`)
+  .join("\n\n");
+
 export function DomainTabs({
   activeTab,
   onChange,
@@ -19,7 +32,7 @@ export function DomainTabs({
   onChange: (tab: TrackerDomainTab) => void;
 }) {
   return (
-    <div className="-mx-1 overflow-x-auto pb-1">
+    <div className="-mx-1 flex items-start gap-2 overflow-x-auto pb-1">
       <div className="inline-flex min-w-max items-center gap-2 rounded-full border border-border bg-background p-1 px-1">
         {domainTabs.map((tab) => (
           <button
@@ -36,6 +49,13 @@ export function DomainTabs({
           </button>
         ))}
       </div>
+      <HoverHelp
+        label="Tracker sections"
+        buttonLabel="Show section guide"
+        body={helperBody}
+        className="shrink-0"
+        panelClassName="right-0 md:right-auto md:left-0"
+      />
     </div>
   );
 }

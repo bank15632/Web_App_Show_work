@@ -2,6 +2,7 @@
 
 import { ChevronDown, Plus, Trash2, Upload } from "lucide-react";
 
+import { HoverHelp } from "@/components/portal/tracker/hover-help";
 import { phaseAccents, phaseLabels, projectStatuses } from "@/lib/tracker/constants";
 import type { TrackerPhase, TrackerProjectDetail, TrackerProjectStatus } from "@/lib/tracker/types";
 
@@ -94,13 +95,14 @@ export function WorkspaceHeader({
               Delete Project
             </button>
           </div>
-          <div className="rounded-[1.25rem] border border-border bg-background/80 px-4 py-3 text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
-            <p className="font-medium text-foreground">Intake ใช้ตอนไหน</p>
-            <p className="mt-1">
-              ใช้ตอนมีข้อมูลใหม่ที่ยังไม่ควรสร้างเป็น task ตรงๆ เช่น minutes จากประชุม,
-              RFI log, revision text, site photo หรือ markup แล้วให้ระบบส่งเข้า review queue
-              ก่อนค่อยแตกเป็นงานจริง
-            </p>
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground sm:text-[13px]">
+            <span className="font-medium text-foreground">Intake ใช้ยังไง</span>
+            <HoverHelp
+              label="Intake ใช้ตอนไหน"
+              buttonLabel="Show help"
+              body="ใช้ตอนมีข้อมูลใหม่ที่ยังไม่ควรสร้างเป็น task ตรง ๆ เช่น minutes จากประชุม, RFI log, revision text, site photo หรือ markup แล้วค่อยส่งเข้า review queue ก่อนแตกเป็นงานจริง"
+              panelClassName="w-80"
+            />
           </div>
         </div>
       </div>
