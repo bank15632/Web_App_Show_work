@@ -142,16 +142,17 @@
     scroll-behavior: smooth;
   }
   @media (min-width: 640px) {
-    html { font-size: 18px; }
+    html { font-size: 16px; }
   }
   @media (min-width: 1024px) {
-    html { font-size: 20px; }
+    html { font-size: 17px; }
   }
-  @media (min-width: 1280px) {
-    html { font-size: 22px; }
+  @media (min-width: 1536px) {
+    html { font-size: 18px; }
   }
   body {
     @apply bg-background font-sans text-foreground;
+    line-height: 1.5;
   }
   ::selection {
     @apply bg-primary text-primary-foreground;

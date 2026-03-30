@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Bot, FolderPlus, ListChecks, ListTodo } from "lucide-react";
+import { Bot, FolderPlus } from "lucide-react";
 
 import { phaseAccents, phaseLabels } from "@/lib/tracker/constants";
 import type { TrackerProjectDetail } from "@/lib/tracker/types";

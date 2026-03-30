@@ -5,7 +5,10 @@ test("dashboard exposes the main workflow navigation", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/$/);
   await expect(
-    page.getByRole("heading", { name: "หน้าเดียวเห็น GTD, Kanban, upcoming และ AI focus" }),
+    page.getByRole("heading", {
+      level: 1,
+      name: /เห็นงานสำคัญเร็วขึ้น/,
+    }),
   ).toBeVisible();
 
   await expect(page.getByRole("link", { name: "User Manual", exact: true })).toBeVisible();

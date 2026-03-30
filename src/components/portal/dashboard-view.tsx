@@ -143,7 +143,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+        className="h-10 min-w-[9.5rem] appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
       >
         <option value="all">{label}: ทั้งหมด</option>
         {options.map((option) => (
@@ -352,10 +352,81 @@ export function DashboardView() {
     trackerUpcomingCount,
   ]);
 
+  const focusLabel =
+    reviewStatus.tone === "danger"
+      ? "ทำ Weekly Review ก่อน"
+      : reviewStatus.tone === "warning"
+        ? "ปิด Weekly Review วันนี้"
+        : blockedTaskCount > 0
+          ? "เคลียร์ blocked task"
+          : "พร้อมกลับไป deep work";
+
+  const followUpCount = staleWaitingCount + blockedTaskCount;
+
+  const primaryActions: Array<{
+    href: string;
+    label: string;
+    description: string;
+    icon: ReactNode;
+  }> = [
+    {
+      href: "/gtd",
+      label: "เปิด GTD Workspace",
+      description: "เคลียร์ inbox และเลือก next action ของวัน",
+      icon: <ListChecks className="size-4" />,
+    },
+    {
+      href: "/todos",
+      label: "เช็ก Kanban Board",
+      description: "ดู blocked, waiting และ pending review ของทีม",
+      icon: <ListTodo className="size-4" />,
+    },
+    {
+      href: "/client-rooms",
+      label: "จัดการ Client Rooms",
+      description: "อัปเดต CMS และเช็กลิงก์ที่พร้อมส่งลูกค้า",
+      icon: <FolderOpen className="size-4" />,
+    },
+  ];
+
+  const workspaceHighlights = [
+    {
+      label: "โฟกัสหลัก",
+      value: focusLabel,
+      detail: aiInsight,
+    },
+    {
+      label: "งานที่ต้องตาม",
+      value: `${followUpCount} รายการ`,
+      detail:
+        followUpCount > 0
+          ? "รวม waiting ที่ค้างกับ blocked task ที่ควรตามต่อ"
+          : "ยังไม่มีรายการที่ต้องเร่งติดตาม",
+    },
+    {
+      label: "Client room ค้างส่ง",
+      value: `${pendingPublishes} โปรเจกต์`,
+      detail:
+        pendingPublishes > 0
+          ? "มี draft ที่ยังไม่ publish หรือมีข้อมูลใหม่กว่าลิงก์ลูกค้า"
+          : "ลิงก์ลูกค้าทันสมัยและพร้อมแชร์",
+    },
+  ];
+
+  const reviewBannerClassName = cn(
+    "rounded-[1.5rem] border px-5 py-4 sm:px-6",
+    reviewStatus.tone === "good" &&
+      "border-emerald-200 bg-emerald-50 text-emerald-800",
+    reviewStatus.tone === "warning" &&
+      "border-amber-200 bg-amber-50 text-amber-800",
+    reviewStatus.tone === "danger" &&
+      "border-rose-200 bg-rose-50 text-rose-800",
+  );
+
   return (
     <div ref={containerRef} className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5 lg:px-10">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:gap-6 lg:px-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-bnj.svg"
@@ -364,17 +435,19 @@ export function DashboardView() {
             height={60}
             className="h-8 w-auto shrink-0 sm:h-10"
           />
-          <div className="min-w-0">
+          <div className="min-w-0 lg:mr-auto">
             <p className="font-display text-base font-semibold tracking-tight sm:text-lg">
               AEC Workflow Platform
             </p>
-            <p className="caption-editorial text-xs">Dashboard</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Dashboard รวมงานส่วนตัว งานทีม และ client rooms
+            </p>
           </div>
-          <div className="ml-auto flex items-center justify-end gap-2 overflow-x-auto sm:gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:gap-3 lg:justify-end">
             <Link
               href="/aec-workflow"
               aria-label="User Manual"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <BookOpenText className="size-4" />
               <span className="hidden sm:inline">User Manual</span>
@@ -382,7 +455,7 @@ export function DashboardView() {
             <Link
               href="/gtd"
               aria-label="GTD Workspace"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <ListChecks className="size-4" />
               <span className="hidden sm:inline">GTD Workspace</span>
@@ -390,7 +463,7 @@ export function DashboardView() {
             <Link
               href="/todos"
               aria-label="Kanban Board"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <ListTodo className="size-4" />
               <span className="hidden sm:inline">Kanban Board</span>
@@ -398,7 +471,7 @@ export function DashboardView() {
             <Link
               href="/settings"
               aria-label="Settings & Export"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <Settings2 className="size-4" />
               <span className="hidden md:inline">Settings & Export</span>
@@ -406,7 +479,7 @@ export function DashboardView() {
             <Link
               href="/client-rooms"
               aria-label="Client Rooms CMS"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
             >
               <FolderOpen className="size-4" />
               <span className="hidden md:inline">Client Rooms CMS</span>
@@ -415,31 +488,72 @@ export function DashboardView() {
         </div>
       </header>
 
-      <main className="space-y-10 px-4 py-8 sm:space-y-12 sm:px-6 sm:py-10 lg:space-y-16 lg:px-10 lg:py-12">
-        <section className="fade-up space-y-6">
-          <div className="max-w-4xl">
-            <p className="caption-editorial mb-2">Dashboard</p>
-            <h1 className="font-display text-4xl font-medium tracking-tight sm:text-5xl">
-              หน้าเดียวเห็น GTD, Kanban, upcoming และ AI focus
-            </h1>
-            <p className="mt-4 text-base leading-8 text-muted-foreground">
-              โครงสร้างหน้านี้ถูกปรับตามคู่มือผู้ใช้: เริ่มจากดู GTD stats,
-              สถานะรวมของ board, deadline ที่กำลังจะถึง และสรุปสั้น ๆ
-              ว่าสัปดาห์นี้ควรโฟกัสอะไร
-            </p>
+      <main className="space-y-10 px-4 py-6 sm:space-y-12 sm:px-6 sm:py-8 lg:space-y-14 lg:px-10 lg:py-10">
+        <section className="fade-up grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
+          <div className="overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,rgba(26,26,26,0.06),transparent_32%),linear-gradient(180deg,rgba(248,248,248,0.7),rgba(255,255,255,1))] p-6 sm:p-8">
+            <div className="max-w-3xl">
+              <p className="caption-editorial mb-3">Owner Dashboard</p>
+              <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl lg:text-[2.85rem]">
+                เห็นงานสำคัญเร็วขึ้น และเข้าแต่ละระบบได้โดยไม่ต้องไล่หาเมนู
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                รวม GTD, Kanban, deadline และ client rooms ไว้ในลำดับที่สแกนง่ายกว่าเดิม
+                เพื่อให้รู้ทันทีว่าต้องเริ่มจากอะไรและควรเข้า workspace ไหนต่อ
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {workspaceHighlights.map((highlight) => (
+                <div
+                  key={highlight.label}
+                  className="rounded-[1.5rem] border border-border/80 bg-background/80 p-4 sm:p-5"
+                >
+                  <p className="caption-editorial text-[0.68rem]">{highlight.label}</p>
+                  <p className="mt-2 text-base font-semibold tracking-tight text-foreground">
+                    {highlight.value}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {highlight.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div
-            className={cn(
-              "rounded-[1.75rem] border px-5 py-4",
-              reviewStatus.tone === "good" &&
-                "border-emerald-200 bg-emerald-50 text-emerald-800",
-              reviewStatus.tone === "warning" &&
-                "border-amber-200 bg-amber-50 text-amber-800",
-              reviewStatus.tone === "danger" &&
-                "border-rose-200 bg-rose-50 text-rose-800",
-            )}
-          >
+          <aside className="rounded-[2rem] border border-border bg-secondary/45 p-5 sm:p-6">
+            <p className="caption-editorial mb-3">Quick Actions</p>
+            <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+              เปิด workspace ที่ใช้บ่อยได้ทันที
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              เริ่มจากงานส่วนตัว, เช็กสถานะทีม, หรือกระโดดไปจัดการงานส่งลูกค้าได้จากจุดเดียว
+            </p>
+
+            <div className="mt-5 space-y-3">
+              {primaryActions.map((action) => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="group flex items-start gap-3 rounded-[1.5rem] border border-border bg-background px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.05)]"
+                >
+                  <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
+                    {action.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{action.label}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {action.description}
+                    </p>
+                  </div>
+                  <ArrowRight className="ml-auto mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                </Link>
+              ))}
+            </div>
+          </aside>
+        </section>
+
+        <section className="fade-up space-y-5">
+          <div className={reviewBannerClassName}>
             <p className="text-sm font-semibold">{reviewStatus.title}</p>
             <p className="mt-1 text-sm leading-7">{reviewStatus.body}</p>
             <p className="mt-2 text-xs uppercase tracking-[0.12em] opacity-80">
@@ -447,54 +561,75 @@ export function DashboardView() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <CommandCard
               icon={<ListChecks className="size-4" />}
               label="GTD Stats"
-              title={`${gtdCounts.inbox} inbox · ${gtdCounts.next} next · ${gtdCounts.waiting} waiting`}
-              body={`Stale waiting ${staleWaitingCount} รายการ และ weekly review ตอนนี้ "${reviewStatus.title}"`}
+              metric={`${gtdCounts.next} next action`}
+              title={`${gtdCounts.inbox} inbox · ${gtdCounts.waiting} waiting`}
+              body={`มี waiting ที่ค้าง ${staleWaitingCount} รายการ และ weekly review ตอนนี้อยู่ที่ "${reviewStatus.title}"`}
             />
             <CommandCard
               icon={<ClipboardList className="size-4" />}
               label="Kanban Overview"
-              title={`${trackerWorkspace?.projects.length ?? 0} projects · ${trackerTasks.length} tasks`}
+              metric={`${trackerTasks.length} tasks`}
+              title={`${trackerWorkspace?.projects.length ?? 0} projects · ${openReviewCount} pending review`}
               body={
                 trackerWorkspace
-                  ? `${blockedTaskCount} blocked · ${waitingTaskCount} waiting · ${openReviewCount} pending review`
+                  ? `${blockedTaskCount} blocked · ${waitingTaskCount} waiting · พร้อมเช็กสถานะทั้งทีมได้จากหน้าเดียว`
                   : trackerStatus
               }
             />
             <CommandCard
               icon={<CalendarClock className="size-4" />}
               label="Upcoming"
-              title={`${trackerOverdueCount} overdue · ${trackerUpcomingCount + gtdUpcomingCount} due soon`}
-              body="รวม deadline จาก GTD และ Kanban board เพื่อให้เห็นงานเสี่ยงก่อนเริ่มวัน"
+              metric={`${trackerUpcomingCount + gtdUpcomingCount} due soon`}
+              title={`${trackerOverdueCount} overdue task`}
+              body="รวม deadline จาก GTD และ Kanban เพื่อให้เห็นงานเสี่ยงก่อนเริ่มวัน"
             />
             <CommandCard
               icon={<BrainCircuit className="size-4" />}
               label="AI Insights"
+              metric={focusLabel}
               title="Suggested focus"
               body={aiInsight}
             />
           </div>
         </section>
 
-        <section className="fade-up space-y-6">
-          <div>
-            <p className="caption-editorial mb-2">Quick Launch</p>
-            <h2 className="font-display text-3xl font-medium tracking-tight">
-              5 frameworks ใน workflow เดียว
-            </h2>
+        <section className="fade-up space-y-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="caption-editorial mb-2">Quick Launch</p>
+              <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+                5 frameworks ใน workflow เดียว
+              </h2>
+            </div>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
+              เลือกเปิด workspace ตามลักษณะงาน หรือกระโดดเข้าคู่มือของแต่ละระบบได้ทันที
+              โดยไม่ต้องไล่ดูการ์ดทีละใบเหมือนเดิม
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
-            {manualFrameworkCards.map((framework) => (
+          <div className="overflow-hidden rounded-[1.75rem] border border-border bg-background">
+            {manualFrameworkCards.map((framework, index) => (
               <article
                 key={framework.name}
-                className="rounded-[1.5rem] border border-border bg-background p-5"
+                className={cn(
+                  "grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto] sm:items-center sm:px-6",
+                  index > 0 && "border-t border-border",
+                )}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="caption-editorial text-[0.68rem]">{framework.name}</p>
+                <div>
+                  <p className="caption-editorial mb-1 text-[0.68rem]">{framework.name}</p>
+                  <p className="text-sm font-semibold text-foreground">{framework.role}</p>
+                </div>
+
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {framework.whenToUse}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <span
                     className={cn(
                       "rounded-full border px-3 py-1 text-xs font-medium",
@@ -506,33 +641,44 @@ export function DashboardView() {
                         "border-border bg-background text-muted-foreground",
                     )}
                   >
-                    {framework.status}
+                    {framework.status === "available"
+                      ? "พร้อมใช้"
+                      : framework.status === "partial"
+                        ? "พร้อมบางส่วน"
+                        : "วางแผนไว้"}
                   </span>
-                </div>
-                <p className="mt-3 text-base font-medium text-foreground">{framework.role}</p>
-                <p className="mt-2 text-base leading-7 text-muted-foreground">
-                  {framework.whenToUse}
-                </p>
-                <div className="mt-4">
+
                   {framework.href ? (
                     <Link
                       href={framework.href}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                      className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground hover:bg-secondary"
                     >
                       {framework.actionLabel}
                     </Link>
-                  ) : (
-                    <span className="inline-flex rounded-full border border-dashed border-border px-4 py-2 text-sm text-muted-foreground">
-                      Planned module
-                    </span>
-                  )}
+                  ) : null}
+
+                  {framework.guideHref ? (
+                    <Link
+                      href={framework.guideHref}
+                      className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      {framework.guideActionLabel ?? "Open guide"}
+                    </Link>
+                  ) : null}
                 </div>
               </article>
             ))}
           </div>
         </section>
 
-        <section className="fade-up space-y-6">
+        <section className="fade-up space-y-5">
+          <div>
+            <p className="caption-editorial mb-2">Client Rooms Overview</p>
+            <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+              เห็นงานที่กำลังทำและงานที่ต้อง publish ในมุมเดียว
+            </h2>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
             <MetricSummaryCard
               icon={<FolderOpen className="size-4" />}
@@ -555,12 +701,16 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up space-y-6">
+        <section className="fade-up space-y-5">
           <div>
             <p className="caption-editorial mb-2">Client Room Status</p>
-            <h2 className="font-display text-3xl font-medium tracking-tight">
+            <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
               ติดตามสถานะการเผยแพร่
             </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
+              แยกงาน draft, งานที่มีการเปลี่ยนแปลงหลัง publish และงานที่ live แล้ว
+              เพื่อให้รู้ว่าควรเข้าหน้าไหนก่อน
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
@@ -639,55 +789,69 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up flex flex-wrap items-center gap-3">
-          <FilterSelect
-            label="ประเภท"
-            value={typeFilter}
-            onChange={setTypeFilter}
-            options={getProjectTypes().map((type) => ({ value: type, label: type }))}
-          />
-          <FilterSelect
-            label="เดือน"
-            value={monthFilter}
-            onChange={setMonthFilter}
-            options={availableMonths.map((month) => ({
-              value: String(month),
-              label: MONTH_LABELS[month] || String(month + 1),
-            }))}
-          />
-          <FilterSelect
-            label="ปี"
-            value={yearFilter}
-            onChange={setYearFilter}
-            options={availableYears.map((year) => ({
-              value: String(year),
-              label: String(year),
-            }))}
-          />
-          {hasActiveFilters ? (
-            <button
-              onClick={clearFilters}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-              ล้าง filter
-            </button>
-          ) : null}
-          {showClientRoomLoadingState ? (
-            <SkeletonBlock className="h-4 w-24 rounded-full" />
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              {filteredProjects.length} โปรเจกต์
-            </span>
-          )}
+        <section className="fade-up space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="caption-editorial mb-2">Client Rooms</p>
+              <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+                จัดการและเปิดลิงก์แชร์
+              </h2>
+            </div>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
+              กรองตามประเภท เดือน และปี เพื่อหาโปรเจกต์ที่ต้องแก้ใน CMS หรือพร้อมเปิดลิงก์ลูกค้าได้เร็วขึ้น
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 rounded-[1.5rem] border border-border bg-secondary/30 p-4">
+            <FilterSelect
+              label="ประเภท"
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={getProjectTypes().map((type) => ({ value: type, label: type }))}
+            />
+            <FilterSelect
+              label="เดือน"
+              value={monthFilter}
+              onChange={setMonthFilter}
+              options={availableMonths.map((month) => ({
+                value: String(month),
+                label: MONTH_LABELS[month] || String(month + 1),
+              }))}
+            />
+            <FilterSelect
+              label="ปี"
+              value={yearFilter}
+              onChange={setYearFilter}
+              options={availableYears.map((year) => ({
+                value: String(year),
+                label: String(year),
+              }))}
+            />
+            {hasActiveFilters ? (
+              <button
+                onClick={clearFilters}
+                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+                ล้าง filter
+              </button>
+            ) : null}
+            {showClientRoomLoadingState ? (
+              <SkeletonBlock className="h-4 w-24 rounded-full" />
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                แสดง {filteredProjects.length} โปรเจกต์
+              </span>
+            )}
+          </div>
         </section>
 
         <section>
-          <div className="fade-up mb-6">
+          <div className="fade-up mb-5">
             <p className="caption-editorial mb-2">Client Rooms</p>
-            <h2 className="font-display text-3xl font-medium tracking-tight">
-              จัดการและเปิดลิงก์แชร์
-            </h2>
+            <h3 className="font-display text-xl font-medium tracking-tight text-muted-foreground sm:text-2xl">
+              รายการโปรเจกต์ล่าสุด
+            </h3>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -699,8 +863,8 @@ export function DashboardView() {
             ) : null}
 
             {!showClientRoomLoadingState && filteredProjects.length === 0 ? (
-              <div className="col-span-full rounded-lg border border-border p-12 text-center">
-                <p className="text-lg text-muted-foreground">
+              <div className="col-span-full rounded-[1.5rem] border border-border p-10 text-center sm:p-12">
+                <p className="text-base leading-7 text-muted-foreground">
                   {clientRoomProjects.length === 0
                     ? clientRoomStatus
                     : "ไม่พบโปรเจกต์ที่ตรงกับ filter"}
@@ -731,22 +895,27 @@ export function DashboardView() {
 function CommandCard({
   icon,
   label,
+  metric,
   title,
   body,
 }: {
   icon: ReactNode;
   label: string;
+  metric: string;
   title: string;
   body: string;
 }) {
   return (
-    <article className="rounded-[1.75rem] border border-border bg-background p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+    <article className="rounded-[1.5rem] border border-border bg-background p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-6">
       <div className="flex items-center gap-2 text-muted-foreground">
         {icon}
         <span className="caption-editorial text-xs">{label}</span>
       </div>
-      <h2 className="mt-3 font-display text-3xl font-medium tracking-tight">{title}</h2>
-      <p className="mt-3 text-base leading-7 text-muted-foreground">{body}</p>
+      <p className="mt-4 font-display text-[1.35rem] font-medium tracking-tight text-foreground sm:text-[1.6rem]">
+        {metric}
+      </p>
+      <h2 className="mt-2 text-sm font-semibold text-foreground">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
     </article>
   );
 }
@@ -763,13 +932,13 @@ function MetricSummaryCard({
   body: string;
 }) {
   return (
-    <article className="fade-up rounded-lg border border-border p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+    <article className="fade-up rounded-[1.5rem] border border-border bg-background p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-6">
       <div className="mb-3 flex items-center gap-2 text-muted-foreground">
         {icon}
         <span className="caption-editorial text-xs">{label}</span>
       </div>
-      <p className="font-display text-4xl font-medium">{value}</p>
-      <p className="mt-2 text-base text-muted-foreground">{body}</p>
+      <p className="font-display text-3xl font-medium tracking-tight sm:text-[2rem]">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
     </article>
   );
 }
@@ -843,11 +1012,11 @@ function ProjectCard({
   return (
     <div
       className={cn(
-        "fade-up group rounded-lg border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
+        "fade-up group rounded-[1.5rem] border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
         delay,
       )}
     >
-      <div className="p-6">
+      <div className="p-5 sm:p-6">
         <div className="overflow-hidden rounded-2xl border border-border bg-secondary/30">
           {project.thumbnailUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -865,7 +1034,7 @@ function ProjectCard({
           )}
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="mt-5 mb-4 flex flex-wrap items-center gap-2">
           <span className="caption-editorial text-xs">{project.slug}</span>
           <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
             {project.projectType}
@@ -882,26 +1051,26 @@ function ProjectCard({
           </span>
         </div>
 
-        <h3 className="mt-5 font-display text-2xl font-medium tracking-tight">
+        <h3 className="font-display text-xl font-medium tracking-tight sm:text-[1.45rem]">
           {project.title}
         </h3>
-        <p className="mt-1 text-base text-muted-foreground">
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {project.clientName} · {project.location || "ยังไม่ระบุที่ตั้ง"} · อัปเดต{" "}
           {formatPortalDate(project.updatedAt)}
         </p>
 
-        <p className="mt-4 line-clamp-2 text-base leading-relaxed text-muted-foreground">
+        <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted-foreground">
           {project.overview}
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <span className="text-base text-muted-foreground">
+          <span className="text-sm leading-6 text-muted-foreground">
             {project.documentCount} files · {project.publishedAt ? "published" : "draft only"}
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/client-rooms?projectId=${project.id}`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-foreground px-4 text-sm font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
             >
               แก้ไขใน CMS
               <ArrowRight className="size-3.5" />
@@ -911,7 +1080,7 @@ function ProjectCard({
                 href={sharePath}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
               >
                 เปิดลิงก์ลูกค้า
               </Link>
