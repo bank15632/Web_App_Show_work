@@ -37,7 +37,7 @@ function isE2EBypassRequest(request: NextRequest) {
   );
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isE2EBypassRequest(request)) {
