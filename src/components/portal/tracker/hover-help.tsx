@@ -51,6 +51,8 @@ export function HoverHelp({
     <div
       ref={rootRef}
       className={cn("relative inline-flex", className)}
+      onPointerEnter={() => setOpen(true)}
+      onPointerLeave={() => setOpen(false)}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -58,6 +60,12 @@ export function HoverHelp({
         type="button"
         aria-label={buttonLabel ?? label}
         aria-expanded={open}
+        onFocus={() => setOpen(true)}
+        onBlur={(event) => {
+          if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
+            setOpen(false);
+          }
+        }}
         className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:text-foreground focus-visible:border-foreground focus-visible:text-foreground focus-visible:outline-none"
         onClick={() => setOpen((value) => !value)}
       >
@@ -66,7 +74,7 @@ export function HoverHelp({
       <div
         role="tooltip"
         className={cn(
-          "absolute right-0 top-full z-30 mt-2 w-72 rounded-[1rem] border border-border bg-background px-4 py-3 text-left shadow-[0_18px_50px_rgba(0,0,0,0.12)]",
+          "absolute right-0 top-full z-[80] mt-2 w-72 max-w-[calc(100vw-1rem)] rounded-[1rem] border border-border bg-background px-4 py-3 text-left shadow-[0_18px_50px_rgba(0,0,0,0.12)]",
           open ? "block" : "hidden",
           panelClassName,
         )}

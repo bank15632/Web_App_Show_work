@@ -371,6 +371,7 @@ export function TodoListView() {
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const workingRef = useRef(false);
   const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches,
   );
@@ -450,6 +451,11 @@ export function TodoListView() {
     action: () => Promise<{ workspace?: TrackerWorkspaceData }>,
     successMessage?: string,
   ) {
+    if (workingRef.current) {
+      return;
+    }
+
+    workingRef.current = true;
     setWorking(true);
     try {
       const data = await action();
@@ -468,6 +474,7 @@ export function TodoListView() {
         error instanceof Error ? error.message : "Tracker request failed",
       );
     } finally {
+      workingRef.current = false;
       setWorking(false);
     }
   }
@@ -656,6 +663,7 @@ export function TodoListView() {
   if (!workspace || !activeProject) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
+        <WorkspaceMutationOverlay open={working} />
         <div className="max-w-xl text-center">
           <p className="caption-editorial">Tracker</p>
           <h1 className="mt-2 font-display text-4xl font-medium">No project workspace</h1>
@@ -739,6 +747,7 @@ export function TodoListView() {
 
   return (
     <div className="min-h-screen bg-background">
+      <WorkspaceMutationOverlay open={working} />
       <div
         className={cn(
           "grid min-h-screen transition-[grid-template-columns] duration-300",
@@ -1567,6 +1576,28 @@ function DialogFrame({
           </button>
         </div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceMutationOverlay({ open }: { open: boolean }) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/55 px-4 backdrop-blur-[2px]">
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex items-center gap-3 rounded-[1.5rem] border border-border bg-background px-5 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.14)]"
+      >
+        <span className="size-4 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground" />
+        <div>
+          <p className="text-sm font-medium text-foreground">Updating tracker...</p>
+          <p className="text-xs text-muted-foreground">Please wait so actions are not submitted twice.</p>
+        </div>
       </div>
     </div>
   );
