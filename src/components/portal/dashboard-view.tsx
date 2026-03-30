@@ -143,7 +143,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 min-w-[9.5rem] appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-sm font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+        className="h-10 min-w-[8.8rem] appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-[0.92rem] font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
       >
         <option value="all">{label}: ทั้งหมด</option>
         {options.map((option) => (
@@ -414,7 +414,7 @@ export function DashboardView() {
   ];
 
   const reviewBannerClassName = cn(
-    "rounded-[1.5rem] border px-5 py-4 sm:px-6",
+    "rounded-[1.5rem] border px-4 py-3.5 sm:px-5",
     reviewStatus.tone === "good" &&
       "border-emerald-200 bg-emerald-50 text-emerald-800",
     reviewStatus.tone === "warning" &&
@@ -426,28 +426,28 @@ export function DashboardView() {
   return (
     <div ref={containerRef} className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:gap-6 lg:px-10">
+        <div className="flex flex-col gap-3 px-4 py-3.5 sm:px-6 lg:flex-row lg:items-center lg:gap-5 lg:px-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={120}
             height={60}
-            className="h-8 w-auto shrink-0 sm:h-10"
+            className="h-7 w-auto shrink-0 sm:h-8"
           />
           <div className="min-w-0 lg:mr-auto">
-            <p className="font-display text-base font-semibold tracking-tight sm:text-lg">
+            <p className="font-display text-[0.98rem] font-semibold tracking-tight sm:text-[1.08rem]">
               AEC Workflow Platform
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-[0.92rem] text-muted-foreground">
               Dashboard รวมงานส่วนตัว งานทีม และ client rooms
             </p>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:gap-3 lg:justify-end">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:gap-2.5 lg:justify-end">
             <Link
               href="/aec-workflow"
               aria-label="User Manual"
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-3.5"
             >
               <BookOpenText className="size-4" />
               <span className="hidden sm:inline">User Manual</span>
@@ -455,7 +455,7 @@ export function DashboardView() {
             <Link
               href="/gtd"
               aria-label="GTD Workspace"
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-border px-3 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-3.5"
             >
               <ListChecks className="size-4" />
               <span className="hidden sm:inline">GTD Workspace</span>
@@ -463,7 +463,7 @@ export function DashboardView() {
             <Link
               href="/todos"
               aria-label="Kanban Board"
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-border px-3 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-3.5"
             >
               <ListTodo className="size-4" />
               <span className="hidden sm:inline">Kanban Board</span>
@@ -471,7 +471,7 @@ export function DashboardView() {
             <Link
               href="/settings"
               aria-label="Settings & Export"
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-border px-3 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-3.5"
             >
               <Settings2 className="size-4" />
               <span className="hidden md:inline">Settings & Export</span>
@@ -479,7 +479,7 @@ export function DashboardView() {
             <Link
               href="/client-rooms"
               aria-label="Client Rooms CMS"
-              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4"
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-border px-3 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-3.5"
             >
               <FolderOpen className="size-4" />
               <span className="hidden md:inline">Client Rooms CMS</span>
@@ -488,31 +488,31 @@ export function DashboardView() {
         </div>
       </header>
 
-      <main className="space-y-10 px-4 py-6 sm:space-y-12 sm:px-6 sm:py-8 lg:space-y-14 lg:px-10 lg:py-10">
-        <section className="fade-up grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
-          <div className="overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,rgba(26,26,26,0.06),transparent_32%),linear-gradient(180deg,rgba(248,248,248,0.7),rgba(255,255,255,1))] p-6 sm:p-8">
+      <main className="space-y-8 px-4 py-5 sm:space-y-10 sm:px-6 sm:py-7 lg:space-y-12 lg:px-10 lg:py-8">
+        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.95fr)]">
+          <div className="overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,rgba(26,26,26,0.06),transparent_32%),linear-gradient(180deg,rgba(248,248,248,0.7),rgba(255,255,255,1))] p-5 sm:p-6">
             <div className="max-w-3xl">
-              <p className="caption-editorial mb-3">Owner Dashboard</p>
-              <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl lg:text-[2.85rem]">
+              <p className="caption-editorial mb-2">Owner Dashboard</p>
+              <h1 className="font-display text-[2rem] font-medium tracking-tight sm:text-[2.35rem] lg:text-[2.65rem]">
                 เห็นงานสำคัญเร็วขึ้น และเข้าแต่ละระบบได้โดยไม่ต้องไล่หาเมนู
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              <p className="mt-3 max-w-2xl text-[0.96rem] leading-6 text-muted-foreground">
                 รวม GTD, Kanban, deadline และ client rooms ไว้ในลำดับที่สแกนง่ายกว่าเดิม
                 เพื่อให้รู้ทันทีว่าต้องเริ่มจากอะไรและควรเข้า workspace ไหนต่อ
               </p>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
               {workspaceHighlights.map((highlight) => (
                 <div
                   key={highlight.label}
-                  className="rounded-[1.5rem] border border-border/80 bg-background/80 p-4 sm:p-5"
+                  className="rounded-[1.35rem] border border-border/80 bg-background/80 p-3.5 sm:p-4"
                 >
                   <p className="caption-editorial text-[0.68rem]">{highlight.label}</p>
-                  <p className="mt-2 text-base font-semibold tracking-tight text-foreground">
+                  <p className="mt-2 text-[1.02rem] font-semibold tracking-tight text-foreground">
                     {highlight.value}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  <p className="mt-1.5 text-[0.92rem] leading-6 text-muted-foreground">
                     {highlight.detail}
                   </p>
                 </div>
@@ -520,28 +520,28 @@ export function DashboardView() {
             </div>
           </div>
 
-          <aside className="rounded-[2rem] border border-border bg-secondary/45 p-5 sm:p-6">
-            <p className="caption-editorial mb-3">Quick Actions</p>
-            <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+          <aside className="rounded-[2rem] border border-border bg-secondary/45 p-4 sm:p-5">
+            <p className="caption-editorial mb-2.5">Quick Actions</p>
+            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
               เปิด workspace ที่ใช้บ่อยได้ทันที
             </h2>
-            <p className="mt-3 text-sm leading-7 text-muted-foreground">
+            <p className="mt-2.5 text-[0.94rem] leading-6 text-muted-foreground">
               เริ่มจากงานส่วนตัว, เช็กสถานะทีม, หรือกระโดดไปจัดการงานส่งลูกค้าได้จากจุดเดียว
             </p>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 space-y-2.5">
               {primaryActions.map((action) => (
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="group flex items-start gap-3 rounded-[1.5rem] border border-border bg-background px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.05)]"
+                  className="group flex items-start gap-3 rounded-[1.35rem] border border-border bg-background px-3.5 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.05)]"
                 >
-                  <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
+                  <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
                     {action.icon}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{action.label}</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    <p className="text-[0.98rem] font-semibold text-foreground">{action.label}</p>
+                    <p className="mt-1 text-[0.92rem] leading-6 text-muted-foreground">
                       {action.description}
                     </p>
                   </div>
@@ -552,10 +552,10 @@ export function DashboardView() {
           </aside>
         </section>
 
-        <section className="fade-up space-y-5">
+        <section className="fade-up space-y-4">
           <div className={reviewBannerClassName}>
             <p className="text-sm font-semibold">{reviewStatus.title}</p>
-            <p className="mt-1 text-sm leading-7">{reviewStatus.body}</p>
+            <p className="mt-1 text-[0.94rem] leading-6">{reviewStatus.body}</p>
             <p className="mt-2 text-xs uppercase tracking-[0.12em] opacity-80">
               {reviewStatus.action}
             </p>
@@ -597,42 +597,38 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up space-y-5">
+        <section className="fade-up space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="caption-editorial mb-2">Quick Launch</p>
-              <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+              <h2 className="font-display text-[1.75rem] font-medium tracking-tight sm:text-[2rem]">
                 5 frameworks ใน workflow เดียว
               </h2>
             </div>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
-              เลือกเปิด workspace ตามลักษณะงาน หรือกระโดดเข้าคู่มือของแต่ละระบบได้ทันที
-              โดยไม่ต้องไล่ดูการ์ดทีละใบเหมือนเดิม
+            <p className="max-w-2xl text-[0.94rem] leading-6 text-muted-foreground">
+              มองเห็นแต่ละ framework แยกเป็นการ์ดชัดเจน เลือกเข้า workspace หรือคู่มือของแต่ละระบบได้เร็วขึ้น
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-[1.75rem] border border-border bg-background">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {manualFrameworkCards.map((framework, index) => (
               <article
                 key={framework.name}
                 className={cn(
-                  "grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto] sm:items-center sm:px-6",
-                  index > 0 && "border-t border-border",
+                  "rounded-[1.5rem] border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(0,0,0,0.04)] sm:p-5",
+                  index % 2 === 1 && "delay-100",
                 )}
               >
-                <div>
-                  <p className="caption-editorial mb-1 text-[0.68rem]">{framework.name}</p>
-                  <p className="text-sm font-semibold text-foreground">{framework.role}</p>
-                </div>
-
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {framework.whenToUse}
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="caption-editorial mb-1 text-[0.68rem]">{framework.name}</p>
+                    <p className="text-[0.98rem] font-semibold text-foreground">
+                      {framework.role}
+                    </p>
+                  </div>
                   <span
                     className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium",
+                      "shrink-0 rounded-full border px-2.5 py-1 text-[0.74rem] font-medium",
                       framework.status === "available" &&
                         "border-emerald-200 bg-emerald-50 text-emerald-700",
                       framework.status === "partial" &&
@@ -647,11 +643,17 @@ export function DashboardView() {
                         ? "พร้อมบางส่วน"
                         : "วางแผนไว้"}
                   </span>
+                </div>
 
+                <p className="mt-3 text-[0.92rem] leading-6 text-muted-foreground">
+                  {framework.whenToUse}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
                   {framework.href ? (
                     <Link
                       href={framework.href}
-                      className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:border-foreground hover:bg-secondary"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3.5 text-[0.92rem] font-medium text-foreground transition-colors hover:border-foreground hover:bg-secondary"
                     >
                       {framework.actionLabel}
                     </Link>
@@ -660,7 +662,7 @@ export function DashboardView() {
                   {framework.guideHref ? (
                     <Link
                       href={framework.guideHref}
-                      className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       {framework.guideActionLabel ?? "Open guide"}
                     </Link>
@@ -671,10 +673,10 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up space-y-5">
+        <section className="fade-up space-y-4">
           <div>
             <p className="caption-editorial mb-2">Client Rooms Overview</p>
-            <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
               เห็นงานที่กำลังทำและงานที่ต้อง publish ในมุมเดียว
             </h2>
           </div>
@@ -701,13 +703,13 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up space-y-5">
+        <section className="fade-up space-y-4">
           <div>
             <p className="caption-editorial mb-2">Client Room Status</p>
-            <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
               ติดตามสถานะการเผยแพร่
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-[0.94rem] leading-6 text-muted-foreground">
               แยกงาน draft, งานที่มีการเปลี่ยนแปลงหลัง publish และงานที่ live แล้ว
               เพื่อให้รู้ว่าควรเข้าหน้าไหนก่อน
             </p>
@@ -718,7 +720,7 @@ export function DashboardView() {
               <div
                 key={status}
                 className={cn(
-                  "fade-up rounded-lg border p-5",
+                  "fade-up rounded-[1.35rem] border p-4 sm:p-5",
                   index === 1 && "delay-100",
                   index === 2 && "delay-200",
                   clientRoomColumnStyles[status],
@@ -760,7 +762,7 @@ export function DashboardView() {
                       key={project.id}
                       href={`/client-rooms?projectId=${project.id}`}
                       className={cn(
-                        "block rounded-lg border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
+                        "block rounded-[1.2rem] border bg-background p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-4",
                         clientRoomCardStyles[status],
                       )}
                     >
@@ -772,13 +774,13 @@ export function DashboardView() {
                           {project.projectType}
                         </span>
                       </div>
-                      <p className="mt-2 font-display text-base font-medium leading-tight">
+                      <p className="mt-2 font-display text-[1rem] font-medium leading-tight">
                         {project.title}
                       </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 text-[0.9rem] text-muted-foreground">
                         {project.clientName}
                       </p>
-                      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+                      <p className="mt-2 text-[0.88rem] leading-5 text-muted-foreground">
                         {getClientRoomStatusBody(project)}
                       </p>
                     </Link>
@@ -789,20 +791,20 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up space-y-4">
+        <section className="fade-up space-y-3.5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="caption-editorial mb-2">Client Rooms</p>
-              <h2 className="font-display text-2xl font-medium tracking-tight sm:text-[2rem]">
+              <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
                 จัดการและเปิดลิงก์แชร์
               </h2>
             </div>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
+            <p className="max-w-2xl text-[0.94rem] leading-6 text-muted-foreground">
               กรองตามประเภท เดือน และปี เพื่อหาโปรเจกต์ที่ต้องแก้ใน CMS หรือพร้อมเปิดลิงก์ลูกค้าได้เร็วขึ้น
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-[1.5rem] border border-border bg-secondary/30 p-4">
+          <div className="flex flex-wrap items-center gap-2.5 rounded-[1.5rem] border border-border bg-secondary/30 p-3.5">
             <FilterSelect
               label="ประเภท"
               value={typeFilter}
@@ -830,7 +832,7 @@ export function DashboardView() {
             {hasActiveFilters ? (
               <button
                 onClick={clearFilters}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-background px-4 text-[0.92rem] font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
               >
                 <X className="size-3.5" />
                 ล้าง filter
@@ -839,7 +841,7 @@ export function DashboardView() {
             {showClientRoomLoadingState ? (
               <SkeletonBlock className="h-4 w-24 rounded-full" />
             ) : (
-              <span className="text-sm text-muted-foreground">
+              <span className="text-[0.92rem] text-muted-foreground">
                 แสดง {filteredProjects.length} โปรเจกต์
               </span>
             )}
@@ -906,16 +908,16 @@ function CommandCard({
   body: string;
 }) {
   return (
-    <article className="rounded-[1.5rem] border border-border bg-background p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-6">
+    <article className="rounded-[1.4rem] border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-5">
       <div className="flex items-center gap-2 text-muted-foreground">
         {icon}
         <span className="caption-editorial text-xs">{label}</span>
       </div>
-      <p className="mt-4 font-display text-[1.35rem] font-medium tracking-tight text-foreground sm:text-[1.6rem]">
+      <p className="mt-3 font-display text-[1.18rem] font-medium tracking-tight text-foreground sm:text-[1.35rem]">
         {metric}
       </p>
-      <h2 className="mt-2 text-sm font-semibold text-foreground">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+      <h2 className="mt-1.5 text-[0.92rem] font-semibold text-foreground">{title}</h2>
+      <p className="mt-1.5 text-[0.9rem] leading-5 text-muted-foreground">{body}</p>
     </article>
   );
 }
@@ -932,13 +934,13 @@ function MetricSummaryCard({
   body: string;
 }) {
   return (
-    <article className="fade-up rounded-[1.5rem] border border-border bg-background p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-6">
+    <article className="fade-up rounded-[1.4rem] border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-5">
       <div className="mb-3 flex items-center gap-2 text-muted-foreground">
         {icon}
         <span className="caption-editorial text-xs">{label}</span>
       </div>
-      <p className="font-display text-3xl font-medium tracking-tight sm:text-[2rem]">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+      <p className="font-display text-[1.85rem] font-medium tracking-tight sm:text-[1.95rem]">{value}</p>
+      <p className="mt-2 text-[0.9rem] leading-5 text-muted-foreground">{body}</p>
     </article>
   );
 }
@@ -1012,11 +1014,11 @@ function ProjectCard({
   return (
     <div
       className={cn(
-        "fade-up group rounded-[1.5rem] border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
+        "fade-up group rounded-[1.4rem] border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
         delay,
       )}
     >
-      <div className="p-5 sm:p-6">
+      <div className="p-4 sm:p-5">
         <div className="overflow-hidden rounded-2xl border border-border bg-secondary/30">
           {project.thumbnailUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1034,7 +1036,7 @@ function ProjectCard({
           )}
         </div>
 
-        <div className="mt-5 mb-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 mb-3 flex flex-wrap items-center gap-2">
           <span className="caption-editorial text-xs">{project.slug}</span>
           <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
             {project.projectType}
@@ -1051,26 +1053,26 @@ function ProjectCard({
           </span>
         </div>
 
-        <h3 className="font-display text-xl font-medium tracking-tight sm:text-[1.45rem]">
+        <h3 className="font-display text-[1.1rem] font-medium tracking-tight sm:text-[1.25rem]">
           {project.title}
         </h3>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        <p className="mt-1 text-[0.9rem] leading-5 text-muted-foreground">
           {project.clientName} · {project.location || "ยังไม่ระบุที่ตั้ง"} · อัปเดต{" "}
           {formatPortalDate(project.updatedAt)}
         </p>
 
-        <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted-foreground">
+        <p className="mt-3 line-clamp-2 text-[0.9rem] leading-5 text-muted-foreground">
           {project.overview}
         </p>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <span className="text-sm leading-6 text-muted-foreground">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3.5">
+          <span className="text-[0.9rem] leading-5 text-muted-foreground">
             {project.documentCount} files · {project.publishedAt ? "published" : "draft only"}
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/client-rooms?projectId=${project.id}`}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-foreground px-4 text-sm font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4 text-[0.92rem] font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
             >
               แก้ไขใน CMS
               <ArrowRight className="size-3.5" />
@@ -1080,7 +1082,7 @@ function ProjectCard({
                 href={sharePath}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
               >
                 เปิดลิงก์ลูกค้า
               </Link>
