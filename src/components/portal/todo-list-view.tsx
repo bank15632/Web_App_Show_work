@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Copy,
   ListChecks,
+  Undo2,
 } from "lucide-react";
 
 import { DomainTabs } from "@/components/portal/tracker/domain-tabs";
@@ -44,6 +45,7 @@ import type {
   TrackerTaskRecord,
   TrackerWorkspaceData,
 } from "@/lib/tracker/types";
+import { createGtdItemRequest } from "@/lib/gtd/client";
 import { cn } from "@/lib/utils";
 
 type DialogState = null | "task" | "decision" | "project";
@@ -607,6 +609,47 @@ export function TodoListView() {
     }
   }
 
+  async function handleSendBackToGtd(task: TrackerTaskRecord) {
+    const confirmed = window.confirm(
+      `Send "${task.title}" back to GTD inbox and remove from Kanban?`,
+    );
+    if (!confirmed) return;
+
+    // Delete from Kanban first, then create in GTD.
+    // This order avoids duplicates: if Kanban delete fails the task
+    // stays only in Kanban; if GTD create fails we surface the error
+    // but won't have a duplicate entry.
+    const didDelete = await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>(
+          `/api/tracker/tasks/${task.id}`,
+          { method: "DELETE" },
+        ),
+    );
+
+    if (!didDelete) return;
+
+    try {
+      await createGtdItemRequest({
+        text: task.title,
+        bucket: "inbox",
+        context: "",
+        priority: task.priority,
+        dueDate: task.dueDate,
+        note: task.description || task.nextAction || "",
+      });
+      setStatusMessage(`"${task.title}" sent back to GTD inbox.`);
+    } catch (error) {
+      setStatusMessage(
+        `Task removed from Kanban but failed to create GTD item: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      );
+    }
+
+    setEditingTask(null);
+  }
+
   function openCreateTask() {
     if (!activeProject) return;
     setTaskDraft(createEmptyTaskDraft(activeProject.phase));
@@ -820,7 +863,14 @@ export function TodoListView() {
           />
 
           <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-end">
-            <DomainTabs activeTab={domainTab} onChange={setDomainTab} />
+            <DomainTabs
+              activeTab={domainTab}
+              counts={{
+                tasks: activeProject.tasks.length,
+                decisions: activeProject.decisions.length,
+              }}
+              onChange={setDomainTab}
+            />
           </div>
 
           {statusMessage ? (
@@ -1016,28 +1066,41 @@ export function TodoListView() {
                 })
               }
             />
-            <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  void withWorkspaceMutation(
-                    () =>
-                      requestJson<{ workspace: TrackerWorkspaceData }>(
-                        `/api/tracker/tasks/${editingTask.id}`,
-                        {
-                          method: "DELETE",
-                        },
-                      ),
-                    "Task deleted.",
-                    () => {
-                      setEditingTask(null);
-                    },
-                  );
-                }}
-                className="rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
-              >
-                Delete
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void withWorkspaceMutation(
+                      () =>
+                        requestJson<{ workspace: TrackerWorkspaceData }>(
+                          `/api/tracker/tasks/${editingTask.id}`,
+                          {
+                            method: "DELETE",
+                          },
+                        ),
+                      "Task deleted.",
+                      () => {
+                        setEditingTask(null);
+                      },
+                    );
+                  }}
+                  className="rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  disabled={working}
+                  onClick={() => {
+                    void handleSendBackToGtd(editingTask);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
+                >
+                  <Undo2 className="size-3.5" />
+                  Send to GTD
+                </button>
+              </div>
               <DialogActions onCancel={() => setEditingTask(null)} working={working} />
             </div>
           </form>

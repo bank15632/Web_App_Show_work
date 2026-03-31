@@ -469,7 +469,7 @@ export function GtdWorkspace() {
       async () => {
         setIsSendingToKanban(true);
         try {
-          const taskResponse = await createTrackerTaskRequest(project.id, {
+          await createTrackerTaskRequest(project.id, {
             phase: project.phase,
             taskType: kanbanDraft.taskType,
             title: selectedItem.text,
@@ -483,15 +483,11 @@ export function GtdWorkspace() {
             humanVerified: true,
           });
 
-          const gtdResponse = await updateGtdItemRequest(selectedItem.id, {
-            linkedProjectId: project.id,
-            linkedTaskId: taskResponse.task.id,
-          });
-
-          applyWorkspace(gtdResponse.workspace);
-          setSelectedItemId(selectedItem.id);
+          const deleteResponse = await deleteGtdItemRequest(selectedItem.id);
+          applyWorkspace(deleteResponse.workspace);
+          setSelectedItemId(null);
           setIsKanbanDialogOpen(false);
-          setStatusMessage(`Sent to Kanban project "${project.name}".`);
+          setStatusMessage(`Sent to Kanban project "${project.name}" and removed from GTD.`);
         } catch (error) {
           setStatusMessage(
             error instanceof Error ? error.message : "Failed to send item to Kanban.",
@@ -750,35 +746,48 @@ export function GtdWorkspace() {
               </div>
             ) : null}
 
-            {filteredItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedItemId(item.id)}
-                disabled={Boolean(pendingAction?.itemId)}
-                className={cn(
-                  "w-full rounded-[1.6rem] border bg-background p-5 text-left transition-all",
-                  item.id === resolvedSelectedItemId ? "border-foreground shadow-[0_18px_40px_rgba(0,0,0,0.06)]" : "border-border hover:border-foreground/40",
-                  pendingAction?.itemId && "cursor-not-allowed opacity-70",
-                )}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="caption-editorial text-[0.68rem]">{bucketLabels[item.bucket]}</span>
-                      {item.context ? <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">@{item.context}</span> : null}
-                      <span className={priorityClassName(item.priority)}>{item.priority}</span>
+            {filteredItems.map((item) => {
+              const hasNoDeadline = !item.dueDate && !item.done;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedItemId(item.id)}
+                  disabled={Boolean(pendingAction?.itemId)}
+                  className={cn(
+                    "w-full rounded-[1.6rem] border p-5 text-left transition-all",
+                    item.id === resolvedSelectedItemId
+                      ? "border-foreground shadow-[0_18px_40px_rgba(0,0,0,0.06)]"
+                      : hasNoDeadline
+                        ? "border-violet-200 bg-violet-50/40 hover:border-violet-400"
+                        : "border-border bg-background hover:border-foreground/40",
+                    !hasNoDeadline && item.id !== resolvedSelectedItemId && "bg-background",
+                    pendingAction?.itemId && "cursor-not-allowed opacity-70",
+                  )}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="caption-editorial text-[0.68rem]">{bucketLabels[item.bucket]}</span>
+                        {item.context ? <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">@{item.context}</span> : null}
+                        <span className={priorityClassName(item.priority)}>{item.priority}</span>
+                        {hasNoDeadline ? (
+                          <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-medium text-violet-600">
+                            No deadline
+                          </span>
+                        ) : null}
+                      </div>
+                      <h2 className={cn("mt-3 text-lg font-semibold text-pretty", item.done && "text-muted-foreground line-through")}>{item.text}</h2>
+                      {item.note ? <p className="mt-2 line-clamp-2 text-sm leading-7 text-muted-foreground">{item.note}</p> : null}
                     </div>
-                    <h2 className={cn("mt-3 text-lg font-semibold text-pretty", item.done && "text-muted-foreground line-through")}>{item.text}</h2>
-                    {item.note ? <p className="mt-2 line-clamp-2 text-sm leading-7 text-muted-foreground">{item.note}</p> : null}
+                    <div className="text-right text-xs text-muted-foreground">
+                      {item.dueDate ? <p>Due {formatShortDate(item.dueDate)}</p> : <p className="text-violet-500 font-medium">No due date</p>}
+                      <p className="mt-1">{formatRelativeAge(item.updatedAt, referenceTime)}</p>
+                    </div>
                   </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    {item.dueDate ? <p>Due {formatShortDate(item.dueDate)}</p> : <p>No due date</p>}
-                    <p className="mt-1">{formatRelativeAge(item.updatedAt, referenceTime)}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           <div className="space-y-6">

@@ -25,7 +25,7 @@ test("gtd can send an inbox item to kanban", async ({ page }) => {
   await createInKanbanButton.scrollIntoViewIfNeeded();
   await createInKanbanButton.click();
 
-  await expect(page.getByText(/Sent to Kanban project/)).toBeVisible();
-  await expect(page.getByText("Linked to Kanban.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open in Kanban" })).toBeVisible();
+  await expect(page.getByText(/Sent to Kanban project.*removed from GTD/)).toBeVisible();
+  // Item is deleted from GTD after sending to Kanban, so it should no longer appear
+  await expect(page.getByRole("heading", { name: itemTitle })).not.toBeVisible();
 });

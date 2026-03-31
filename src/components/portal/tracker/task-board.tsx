@@ -22,6 +22,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   GripVertical,
   List,
   Plus,
@@ -36,7 +38,6 @@ import {
   phaseLabels,
   taskStatusLabels,
   taskStatusTone,
-  taskTypeLabels,
   trackerTaskStatuses,
 } from "@/lib/tracker/constants";
 import {
@@ -51,6 +52,16 @@ import type {
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 import { isTaskOverdue } from "@/lib/tracker/views";
+
+function getOverdueDays(task: TrackerTaskRecord) {
+  if (!task.dueDate || task.status === "done") return 0;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(task.dueDate);
+  due.setHours(0, 0, 0, 0);
+  const diff = now.getTime() - due.getTime();
+  return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
+}
 
 type ViewMode = "board" | "list";
 
@@ -310,114 +321,110 @@ export function TaskBoard({
     await commitBoard(nextBoard);
   }
 
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+
   return (
     <section className="space-y-4">
       {checklistSections.length > 0 ? (
-        <section className="rounded-[1.9rem] border border-border bg-stone-50/70 p-4 sm:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
+        <section className="rounded-[1.9rem] border border-border bg-stone-50/70">
+          <button
+            type="button"
+            onClick={() => setIsChecklistOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 p-4 text-left sm:p-5"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              {isChecklistOpen ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />}
               <p className="caption-editorial text-[0.68rem]">Phase Checklist</p>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h3 className="font-display text-[1.35rem] font-medium tracking-tight sm:text-[1.55rem]">
-                  {phaseLabels[phase]} readiness
-                </h3>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 sm:text-xs">
-                  {checklistStats.completedItems}/{checklistStats.totalItems} complete
-                </span>
-              </div>
-              <p className="mt-2 text-[12px] leading-5 text-muted-foreground sm:text-[13px] sm:leading-6">
-                เช็ก deliverables สำคัญของแต่ละ phase ให้ครบก่อนปล่อย drawing set
-                หรือส่งต่องานในทีม โดยเฉพาะหมวด construction documents ที่ต้องเห็นว่า
-                floor plan, electrical, ceiling, elevations, sections และ isometric พร้อมแล้วหรือยัง
-              </p>
+              <span className="font-display text-base font-medium tracking-tight sm:text-lg">
+                {phaseLabels[phase]} readiness
+              </span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700 sm:text-xs">
+                {checklistStats.completionRate}%
+              </span>
             </div>
-            <div className="min-w-full rounded-[1.35rem] border border-border bg-background px-4 py-3 sm:min-w-[15rem]">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  Completion
-                </span>
-                <span className="text-[13px] font-medium text-foreground sm:text-sm">
-                  {checklistStats.completionRate}%
-                </span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+            <div className="flex items-center gap-3">
+              <span className="hidden text-[13px] text-muted-foreground sm:inline">
+                {checklistStats.completedItems}/{checklistStats.totalItems} complete
+              </span>
+              <div className="h-2 w-20 overflow-hidden rounded-full bg-secondary sm:w-28">
                 <div
                   className="h-full rounded-full bg-foreground transition-all"
                   style={{ width: `${checklistStats.completionRate}%` }}
                 />
               </div>
-              <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
-                ใช้เป็นเช็กลิสต์ก่อน review ภายใน หรือก่อนออกชุดแบบ revision ถัดไป
-              </p>
             </div>
-          </div>
+          </button>
 
-          {hiddenChecklistItems.length > 0 ? (
-            <div className="mt-4 rounded-[1.35rem] border border-border bg-background p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[13px] font-medium text-foreground sm:text-sm">
-                    Hidden default items
-                  </p>
-                  <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-                    รายการมาตรฐานที่ถูกซ่อนจาก checklist ของโปรเจ็กต์นี้ สามารถกด restore กลับมาได้ทุกเมื่อ
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowHiddenItems((value) => !value)}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-[13px]"
-                >
-                  <RotateCcw className="size-3.5" />
-                  {showHiddenItems
-                    ? "Hide restore list"
-                    : `Restore hidden items (${hiddenChecklistItems.length})`}
-                </button>
-              </div>
-
-              {showHiddenItems ? (
-                <div className="mt-4 grid gap-2 lg:grid-cols-2">
-                  {hiddenChecklistItems.map((item) => (
+          {isChecklistOpen ? (
+            <div className="border-t border-border p-4 sm:p-5">
+              {hiddenChecklistItems.length > 0 ? (
+                <div className="mb-4 rounded-[1.35rem] border border-border bg-background p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[13px] font-medium text-foreground sm:text-sm">
+                        Hidden default items
+                      </p>
+                      <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                        รายการมาตรฐานที่ถูกซ่อนจาก checklist ของโปรเจ็กต์นี้ สามารถกด restore กลับมาได้ทุกเมื่อ
+                      </p>
+                    </div>
                     <button
-                      key={`${item.phase}:${item.itemKey}`}
                       type="button"
-                      disabled={checklistBusy}
-                      onClick={() => {
-                        void onRestoreHiddenChecklistItem(item.itemKey);
-                      }}
-                      className="flex items-start justify-between gap-3 rounded-[1rem] border border-border px-3 py-3 text-left transition-colors hover:border-foreground/30 disabled:opacity-60"
+                      onClick={() => setShowHiddenItems((value) => !value)}
+                      className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:text-[13px]"
                     >
-                      <span className="min-w-0">
-                        <span className="block text-[13px] font-medium text-foreground sm:text-sm">
-                          {item.label}
-                        </span>
-                        <span className="mt-1 block text-[12px] leading-5 text-muted-foreground">
-                          {item.sectionTitle}
-                          {item.description ? ` • ${item.description}` : ""}
-                        </span>
-                      </span>
-                      <span className="shrink-0 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
-                        Restore
-                      </span>
+                      <RotateCcw className="size-3.5" />
+                      {showHiddenItems
+                        ? "Hide restore list"
+                        : `Restore hidden items (${hiddenChecklistItems.length})`}
                     </button>
-                  ))}
+                  </div>
+
+                  {showHiddenItems ? (
+                    <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                      {hiddenChecklistItems.map((item) => (
+                        <button
+                          key={`${item.phase}:${item.itemKey}`}
+                          type="button"
+                          disabled={checklistBusy}
+                          onClick={() => {
+                            void onRestoreHiddenChecklistItem(item.itemKey);
+                          }}
+                          className="flex items-start justify-between gap-3 rounded-[1rem] border border-border px-3 py-3 text-left transition-colors hover:border-foreground/30 disabled:opacity-60"
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-medium text-foreground sm:text-sm">
+                              {item.label}
+                            </span>
+                            <span className="mt-1 block text-[12px] leading-5 text-muted-foreground">
+                              {item.sectionTitle}
+                              {item.description ? ` • ${item.description}` : ""}
+                            </span>
+                          </span>
+                          <span className="shrink-0 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
+                            Restore
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
+
+              <div className="grid gap-3 xl:grid-cols-3">
+                {checklistSections.map((section) => (
+                  <ChecklistSectionCard
+                    key={section.key}
+                    section={section}
+                    busy={checklistBusy}
+                    onToggleChecklist={onToggleChecklist}
+                    onAddChecklistItem={onAddChecklistItem}
+                    onRemoveChecklistItem={onRemoveChecklistItem}
+                  />
+                ))}
+              </div>
             </div>
           ) : null}
-
-          <div className="mt-5 grid gap-3 xl:grid-cols-3">
-            {checklistSections.map((section) => (
-              <ChecklistSectionCard
-                key={section.key}
-                section={section}
-                busy={checklistBusy}
-                onToggleChecklist={onToggleChecklist}
-                onAddChecklistItem={onAddChecklistItem}
-                onRemoveChecklistItem={onRemoveChecklistItem}
-              />
-            ))}
-          </div>
         </section>
       ) : null}
 
@@ -700,49 +707,50 @@ function ChecklistItemButton({
   );
 }
 
-function TaskSubtaskPreview({
+function TaskSubtaskDropdown({
   task,
-  compact = false,
 }: {
   task: TrackerTaskRecord;
-  compact?: boolean;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const progress = getSubtaskProgress(task);
 
   if (progress.total === 0) {
     return null;
   }
 
-  const visibleSubtasks = task.subtasks.slice(0, compact ? 2 : 3);
-
   return (
-    <div className="mt-3 space-y-1.5">
-      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-        <span className="font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Sub-Tasks
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className="flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {isOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+        <span className="font-semibold uppercase tracking-[0.18em]">Sub-Tasks</span>
+        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium">
+          {progress.completed}/{progress.total}
         </span>
-        <span className="rounded-full border border-border px-2 py-0.5 font-medium">
-          {progress.completed}/{progress.total} complete
-        </span>
-      </div>
-      {visibleSubtasks.map((subtask) => (
-        <div key={subtask.id} className="flex items-start gap-2 text-[11px] leading-5 text-muted-foreground">
-          <span
-            className={cn(
-              "mt-1 inline-flex size-2.5 shrink-0 rounded-full border",
-              subtask.completed ? "border-emerald-500 bg-emerald-500" : "border-border bg-transparent",
-            )}
-          />
-          <span className={cn("line-clamp-1", subtask.completed && "line-through opacity-70")}>
-            {subtask.title}
-          </span>
+      </button>
+      {isOpen ? (
+        <div className="mt-1.5 space-y-1 pl-4">
+          {task.subtasks.map((subtask) => (
+            <div key={subtask.id} className="flex items-start gap-2 text-[11px] leading-5 text-muted-foreground">
+              <span
+                className={cn(
+                  "mt-1 inline-flex size-2.5 shrink-0 rounded-full border",
+                  subtask.completed ? "border-emerald-500 bg-emerald-500" : "border-border bg-transparent",
+                )}
+              />
+              <span className={cn("line-clamp-1", subtask.completed && "line-through opacity-70")}>
+                {subtask.title}
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
-      {task.subtasks.length > visibleSubtasks.length ? (
-        <p className="text-[11px] text-muted-foreground">
-          +{task.subtasks.length - visibleSubtasks.length} more sub-task
-          {task.subtasks.length - visibleSubtasks.length === 1 ? "" : "s"}
-        </p>
       ) : null}
     </div>
   );
@@ -839,60 +847,67 @@ function TaskCard({
 }) {
   const dragHandleProps = handleProps ?? {};
   const progress = getSubtaskProgress(task);
+  const overdueDays = getOverdueDays(task);
+  const hasNoDeadline = !task.dueDate && task.status !== "done";
 
   return (
     <article
-      className={`rounded-[1.4rem] border bg-stone-50/50 p-4 transition-all sm:p-5 ${
-        dragging ? "border-foreground shadow-[0_16px_40px_rgba(0,0,0,0.12)]" : "border-border hover:border-foreground/30"
-      }`}
+      className={cn(
+        "rounded-[1.4rem] border p-3 transition-all sm:p-4",
+        dragging
+          ? "border-foreground bg-stone-50/50 shadow-[0_16px_40px_rgba(0,0,0,0.12)]"
+          : hasNoDeadline
+            ? "border-violet-200 bg-violet-50/50 hover:border-violet-400"
+            : "border-border bg-stone-50/50 hover:border-foreground/30",
+      )}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <button
           type="button"
-          className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground sm:size-9"
+          className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
           {...dragHandleProps}
         >
-          <GripVertical className="size-4" />
+          <GripVertical className="size-3.5" />
         </button>
         <div className="min-w-0 flex-1">
           <button type="button" onClick={onEdit} className="w-full text-left">
-            <h4 className="text-pretty text-sm font-semibold leading-6 text-foreground sm:text-base sm:leading-7">
+            <h4 className="text-pretty text-sm font-semibold leading-5 text-foreground">
               {task.title}
             </h4>
           </button>
-          {task.description ? (
-            <p className="mt-2 text-pretty text-[13px] leading-6 text-muted-foreground sm:text-sm sm:leading-7">
-              {task.description}
-            </p>
-          ) : null}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium sm:text-xs ${priorityTone[task.priority]}`}
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-medium sm:text-[11px] ${priorityTone[task.priority]}`}
             >
               {priorityLabels[task.priority]}
             </span>
-            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground sm:text-xs">
-              {taskTypeLabels[task.taskType]}
-            </span>
             {progress.total > 0 ? (
-              <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground sm:text-xs">
-                {progress.completed}/{progress.total} sub-tasks
+              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground sm:text-[11px]">
+                {progress.completed}/{progress.total}
               </span>
             ) : null}
             {task.dueDate ? (
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] sm:text-xs ${
-                  isTaskOverdue(task)
-                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                    : "border-border text-muted-foreground"
-                }`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] sm:text-[11px]",
+                  overdueDays > 0
+                    ? "border-rose-200 bg-rose-50 font-medium text-rose-700"
+                    : "border-border text-muted-foreground",
+                )}
               >
                 <CalendarDays className="size-3" />
                 {formatDate(task.dueDate)}
+                {overdueDays > 0 ? (
+                  <span className="font-semibold">({overdueDays}d late)</span>
+                ) : null}
               </span>
-            ) : null}
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 sm:text-[11px]">
+                No deadline
+              </span>
+            )}
           </div>
-          <TaskSubtaskPreview task={task} compact />
+          <TaskSubtaskDropdown task={task} />
         </div>
       </div>
     </article>
@@ -907,20 +922,22 @@ function TaskRow({
   onEdit: () => void;
 }) {
   const progress = getSubtaskProgress(task);
+  const overdueDays = getOverdueDays(task);
+  const hasNoDeadline = !task.dueDate && task.status !== "done";
 
   return (
     <button
       type="button"
       onClick={onEdit}
-      className="flex w-full flex-col gap-3 rounded-[1.5rem] border border-border bg-background px-5 py-4 text-left transition-all hover:border-foreground/30"
+      className={cn(
+        "flex w-full flex-col gap-2 rounded-[1.5rem] border bg-background px-5 py-3 text-left transition-all",
+        hasNoDeadline
+          ? "border-violet-200 bg-violet-50/50 hover:border-violet-400"
+          : "border-border hover:border-foreground/30",
+      )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[13px] font-medium sm:text-sm">{task.title}</p>
-          {task.description ? (
-            <p className="mt-1 text-[13px] text-muted-foreground sm:text-sm">{task.description}</p>
-          ) : null}
-        </div>
+        <p className="text-[13px] font-medium sm:text-sm">{task.title}</p>
         <span
           className={`rounded-full border px-3 py-1 text-[11px] font-medium sm:text-xs ${taskStatusTone[task.status]}`}
         >
@@ -933,19 +950,26 @@ function TaskRow({
         >
           {priorityLabels[task.priority]}
         </span>
-        <span className="rounded-full border border-border px-2.5 py-1 text-[0.7rem] text-muted-foreground">
-          {taskTypeLabels[task.taskType]}
-        </span>
         {progress.total > 0 ? (
           <span className="rounded-full border border-border px-2.5 py-1 text-[0.7rem] text-muted-foreground">
-            {progress.completed}/{progress.total} sub-tasks
+            {progress.completed}/{progress.total}
           </span>
         ) : null}
         {task.dueDate ? (
-          <span className="text-xs text-muted-foreground">{formatDate(task.dueDate)}</span>
-        ) : null}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-xs",
+              overdueDays > 0 ? "font-medium text-rose-600" : "text-muted-foreground",
+            )}
+          >
+            <CalendarDays className="size-3" />
+            {formatDate(task.dueDate)}
+            {overdueDays > 0 ? ` (${overdueDays}d late)` : ""}
+          </span>
+        ) : (
+          <span className="text-[0.7rem] font-medium text-violet-600">No deadline</span>
+        )}
       </div>
-      <TaskSubtaskPreview task={task} compact />
     </button>
   );
 }

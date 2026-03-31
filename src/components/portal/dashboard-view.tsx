@@ -573,7 +573,7 @@ export function DashboardView() {
               icon={<ClipboardList className="size-4" />}
               label="Kanban Overview"
               metric={`${trackerTasks.length} tasks`}
-              title={`${trackerWorkspace?.projects.length ?? 0} projects · ${openReviewCount} in review queue`}
+              title={`${trackerWorkspace?.projects.length ?? 0} projects`}
               body={
                 trackerWorkspace
                   ? `${blockedTaskCount} blocked · ${waitingTaskCount} waiting · พร้อมเช็กสถานะทั้งทีมได้จากหน้าเดียว`
