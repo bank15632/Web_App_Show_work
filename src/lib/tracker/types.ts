@@ -77,6 +77,7 @@ export interface TrackerTaskRecord {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  lateDays: number | null;
   subtasks: TrackerSubtaskRecord[];
 }
 

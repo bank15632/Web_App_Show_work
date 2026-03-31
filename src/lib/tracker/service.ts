@@ -85,6 +85,7 @@ interface TaskRow {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  late_days: number | null;
 }
 
 interface TaskSubtaskRow {
@@ -207,6 +208,16 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function calculateLateDays(dueDate: string | null | undefined): number | null {
+  if (!dueDate) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const diff = now.getTime() - due.getTime();
+  return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
+}
+
 function createId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -316,6 +327,7 @@ function mapTaskRow(row: TaskRow): TrackerTaskRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
+    lateDays: row.late_days,
     subtasks: [],
   };
 }
@@ -484,6 +496,13 @@ async function ensureUniqueProjectSlug(
 
 async function initializeTracker(db: D1Database) {
   await execSqlBatch(db, trackerMigrationSql);
+
+  // Add late_days column for existing databases (ALTER TABLE has no IF NOT EXISTS)
+  try {
+    await db.prepare("ALTER TABLE tasks ADD COLUMN late_days INTEGER").run();
+  } catch {
+    // Column already exists — safe to ignore
+  }
 }
 
 export async function ensureTrackerReady(env: TrackerEnv) {
@@ -1126,6 +1145,8 @@ export async function createTask(
     parsed.sortOrder ?? (await getNextSortOrder(env.DB, projectId, parsed.status));
   const completedAt =
     parsed.status === "done" ? input.dueDate ?? createdAt : null;
+  const lateDays =
+    parsed.status === "done" ? calculateLateDays(parsed.dueDate) : null;
   const taskId = createId("task");
 
   await runStatement(
@@ -1133,8 +1154,8 @@ export async function createTask(
     `INSERT INTO tasks (
       id, project_id, phase, task_type, title, description, status, priority, assignee,
       due_date, location, revision, source_type, source_ref, source_artifact_id, next_action,
-      blocker, human_verified, sort_order, created_from_review_id, created_at, updated_at, completed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      blocker, human_verified, sort_order, created_from_review_id, created_at, updated_at, completed_at, late_days
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     taskId,
     projectId,
     parsed.phase,
@@ -1158,6 +1179,7 @@ export async function createTask(
     createdAt,
     createdAt,
     completedAt,
+    lateDays,
   );
 
   await runStatement(
@@ -1239,6 +1261,10 @@ export async function updateTask(
   const updatedAt = nowIso();
   const completedAt =
     parsed.status === "done" ? existing.completedAt ?? updatedAt : null;
+  const lateDays =
+    parsed.status === "done"
+      ? existing.lateDays ?? calculateLateDays(parsed.dueDate)
+      : null;
 
   await runStatement(
     env.DB,
@@ -1246,7 +1272,7 @@ export async function updateTask(
       phase = ?, task_type = ?, title = ?, description = ?, status = ?, priority = ?,
       assignee = ?, due_date = ?, location = ?, revision = ?, source_type = ?, source_ref = ?,
       source_artifact_id = ?, next_action = ?, blocker = ?, human_verified = ?, sort_order = ?,
-      updated_at = ?, completed_at = ?
+      updated_at = ?, completed_at = ?, late_days = ?
     WHERE id = ?`,
     parsed.phase,
     parsed.taskType,
@@ -1267,6 +1293,7 @@ export async function updateTask(
     parsed.sortOrder ?? 0,
     updatedAt,
     completedAt,
+    lateDays,
     taskId,
   );
 
@@ -1580,20 +1607,41 @@ export async function reorderTasks(
 ) {
   await ensureTrackerReady(env);
   const updatedAt = nowIso();
-  const statements = tasks.map((item) =>
-    env.DB
+
+  // Fetch due dates for tasks moving to "done" so we can record late_days
+  const doneTasks = tasks.filter((t) => t.status === "done");
+  const dueDateMap = new Map<string, string | null>();
+  if (doneTasks.length > 0) {
+    const rows = await queryAll<{ id: string; due_date: string | null }>(
+      env.DB,
+      `SELECT id, due_date FROM tasks WHERE project_id = ? AND id IN (${doneTasks.map(() => "?").join(",")})`,
+      projectId,
+      ...doneTasks.map((t) => t.taskId),
+    );
+    for (const row of rows) {
+      dueDateMap.set(row.id, row.due_date);
+    }
+  }
+
+  const statements = tasks.map((item) => {
+    const isDone = item.status === "done";
+    const lateDays = isDone
+      ? calculateLateDays(dueDateMap.get(item.taskId) ?? null)
+      : null;
+    return env.DB
       .prepare(
-        "UPDATE tasks SET status = ?, sort_order = ?, updated_at = ?, completed_at = ? WHERE id = ? AND project_id = ?",
+        "UPDATE tasks SET status = ?, sort_order = ?, updated_at = ?, completed_at = ?, late_days = ? WHERE id = ? AND project_id = ?",
       )
       .bind(
         item.status,
         item.sortOrder,
         updatedAt,
-        item.status === "done" ? updatedAt : null,
+        isDone ? updatedAt : null,
+        lateDays,
         item.taskId,
         projectId,
-      ),
-  );
+      );
+  });
 
   if (statements.length > 0) {
     await env.DB.batch(statements);
