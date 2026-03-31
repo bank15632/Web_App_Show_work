@@ -93,6 +93,7 @@ export function GtdWorkspace() {
     taskType: "design",
   });
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [showNoDeadlineAlert, setShowNoDeadlineAlert] = useState(false);
   const actionLockRef = useRef(false);
   const activeButtonKeyRef = useRef<string | null>(null);
   const queuedActionKeysRef = useRef(new Set<string>());
@@ -135,6 +136,17 @@ export function GtdWorkspace() {
   useEffect(() => {
     void loadTrackerProjects({ silent: true });
   }, []);
+
+  const noDeadlineItems = useMemo(
+    () => items.filter((item) => !item.dueDate && !item.done),
+    [items],
+  );
+
+  useEffect(() => {
+    if (!isLoading && noDeadlineItems.length > 0) {
+      setShowNoDeadlineAlert(true);
+    }
+  }, [isLoading]);
 
   const counts = getBucketCounts(items);
   const archivedCount = items.filter((item) => item.done).length;
@@ -567,6 +579,63 @@ export function GtdWorkspace() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7f3ed_100%)]">
+      {showNoDeadlineAlert && noDeadlineItems.length > 0 ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={() => setShowNoDeadlineAlert(false)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-background p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-violet-600">
+                  No Deadline Warning
+                </p>
+                <h3 className="mt-1 font-display text-2xl font-medium tracking-tight">
+                  {noDeadlineItems.length} item{noDeadlineItems.length === 1 ? "" : "s"} without deadline
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Item เหล่านี้ยังไม่มีกำหนดส่ง ควรตั้ง deadline เพื่อติดตามได้ชัดเจน
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNoDeadlineAlert(false)}
+                className="shrink-0 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 space-y-2">
+              {noDeadlineItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setShowNoDeadlineAlert(false);
+                    setActiveListMode("active");
+                    setActiveBucket(item.bucket);
+                    setSelectedItemId(item.id);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-violet-200 bg-violet-50/50 px-4 py-3 text-left transition-colors hover:border-violet-400"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{item.text}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {bucketLabels[item.bucket]} · {item.priority}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-medium text-violet-600">
+                    Set deadline
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-4 sm:flex-wrap sm:gap-3 sm:px-6 sm:py-5 lg:px-10">
           <Link href="/aec-workflow" aria-label="Back to AEC workflow" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">

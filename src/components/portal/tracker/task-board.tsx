@@ -219,6 +219,17 @@ export function TaskBoard({
   const [board, setBoard] = useState<BoardState>(() => buildBoardState(tasks));
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
+  const [showNoDeadlineAlert, setShowNoDeadlineAlert] = useState(false);
+  const noDeadlineTasks = useMemo(
+    () => tasks.filter((t) => !t.dueDate && t.status !== "done"),
+    [tasks],
+  );
+
+  useEffect(() => {
+    if (noDeadlineTasks.length > 0) {
+      setShowNoDeadlineAlert(true);
+    }
+  }, []);
   const sensors = useSensors(useSensor(PointerSensor));
   const checklistSections = useMemo(
     () => buildChecklistSections(phase, checklistItems),
@@ -325,6 +336,13 @@ export function TaskBoard({
 
   return (
     <section className="space-y-4">
+      {showNoDeadlineAlert && noDeadlineTasks.length > 0 ? (
+        <NoDeadlineAlert
+          tasks={noDeadlineTasks}
+          onClose={() => setShowNoDeadlineAlert(false)}
+          onEditTask={onEditTask}
+        />
+      ) : null}
       {checklistSections.length > 0 ? (
         <section className="rounded-[1.9rem] border border-border bg-stone-50/70">
           <button
@@ -499,6 +517,72 @@ export function TaskBoard({
         </DndContext>
       )}
     </section>
+  );
+}
+
+function NoDeadlineAlert({
+  tasks,
+  onClose,
+  onEditTask,
+}: {
+  tasks: TrackerTaskRecord[];
+  onClose: () => void;
+  onEditTask: (task: TrackerTaskRecord) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-background p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-violet-600">
+              No Deadline Warning
+            </p>
+            <h3 className="mt-1 font-display text-2xl font-medium tracking-tight">
+              {tasks.length} task{tasks.length === 1 ? "" : "s"} without deadline
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Task เหล่านี้ยังไม่มีกำหนดส่ง ควรตั้ง deadline เพื่อติดตามได้ชัดเจน
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {tasks.map((task) => (
+            <button
+              key={task.id}
+              type="button"
+              onClick={() => {
+                onEditTask(task);
+                onClose();
+              }}
+              className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-violet-200 bg-violet-50/50 px-4 py-3 text-left transition-colors hover:border-violet-400"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{task.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {priorityLabels[task.priority]} · {taskStatusLabels[task.status]}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-medium text-violet-600">
+                Set deadline
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -846,7 +930,6 @@ function TaskCard({
   handleProps?: ButtonHTMLAttributes<HTMLButtonElement>;
 }) {
   const dragHandleProps = handleProps ?? {};
-  const progress = getSubtaskProgress(task);
   const overdueDays = getOverdueDays(task);
   const hasNoDeadline = !task.dueDate && task.status !== "done";
 
@@ -881,11 +964,6 @@ function TaskCard({
             >
               {priorityLabels[task.priority]}
             </span>
-            {progress.total > 0 ? (
-              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground sm:text-[11px]">
-                {progress.completed}/{progress.total}
-              </span>
-            ) : null}
             {task.dueDate ? (
               <span
                 className={cn(
@@ -921,7 +999,6 @@ function TaskRow({
   task: TrackerTaskRecord;
   onEdit: () => void;
 }) {
-  const progress = getSubtaskProgress(task);
   const overdueDays = getOverdueDays(task);
   const hasNoDeadline = !task.dueDate && task.status !== "done";
 
@@ -950,11 +1027,6 @@ function TaskRow({
         >
           {priorityLabels[task.priority]}
         </span>
-        {progress.total > 0 ? (
-          <span className="rounded-full border border-border px-2.5 py-1 text-[0.7rem] text-muted-foreground">
-            {progress.completed}/{progress.total}
-          </span>
-        ) : null}
         {task.dueDate ? (
           <span
             className={cn(
