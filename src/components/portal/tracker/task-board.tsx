@@ -984,6 +984,16 @@ function TaskCard({
                 No deadline
               </span>
             )}
+            {task.status === "done" && task.lateDays != null && task.lateDays > 0 ? (
+              <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 sm:text-[11px]">
+                Done {task.lateDays}d late
+              </span>
+            ) : null}
+            {task.status === "done" && task.lateDays != null && task.lateDays === 0 ? (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 sm:text-[11px]">
+                On time
+              </span>
+            ) : null}
           </div>
           <TaskSubtaskDropdown task={task} />
         </div>
@@ -1041,6 +1051,14 @@ function TaskRow({
         ) : (
           <span className="text-[0.7rem] font-medium text-violet-600">No deadline</span>
         )}
+        {task.status === "done" && task.lateDays != null && task.lateDays > 0 ? (
+          <span className="text-[0.7rem] font-semibold text-rose-600">
+            Done {task.lateDays}d late
+          </span>
+        ) : null}
+        {task.status === "done" && task.lateDays != null && task.lateDays === 0 ? (
+          <span className="text-[0.7rem] font-medium text-emerald-600">On time</span>
+        ) : null}
       </div>
     </button>
   );
