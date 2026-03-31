@@ -20,29 +20,45 @@ const helperBody = domainTabs
 
 export function DomainTabs({
   activeTab,
+  counts,
   onChange,
 }: {
   activeTab: TrackerDomainTab;
+  counts?: Partial<Record<TrackerDomainTab, number>>;
   onChange: (tab: TrackerDomainTab) => void;
 }) {
   return (
     <div className="relative z-10 flex min-w-0 items-start gap-2">
       <div className="-mx-1 min-w-0 flex-1 overflow-x-auto pb-1">
         <div className="inline-flex min-w-max items-center gap-2 rounded-full border border-border bg-background p-1 px-1">
-          {domainTabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => onChange(tab)}
-              className={`shrink-0 rounded-full px-4 py-2 text-[13px] transition-colors sm:text-sm ${
-                activeTab === tab
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {labels[tab]}
-            </button>
-          ))}
+          {domainTabs.map((tab) => {
+            const count = counts?.[tab];
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => onChange(tab)}
+                className={`shrink-0 rounded-full px-4 py-2 text-[13px] transition-colors sm:text-sm ${
+                  activeTab === tab
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {labels[tab]}
+                {count !== undefined ? (
+                  <span
+                    className={`ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                      activeTab === tab
+                        ? "bg-background/20 text-background"
+                        : "bg-secondary text-foreground"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       </div>
       <HoverHelp
