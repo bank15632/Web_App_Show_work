@@ -615,6 +615,20 @@ export function TodoListView() {
     );
     if (!confirmed) return;
 
+    // Delete from Kanban first, then create in GTD.
+    // This order avoids duplicates: if Kanban delete fails the task
+    // stays only in Kanban; if GTD create fails we surface the error
+    // but won't have a duplicate entry.
+    const didDelete = await withWorkspaceMutation(
+      () =>
+        requestJson<{ workspace: TrackerWorkspaceData }>(
+          `/api/tracker/tasks/${task.id}`,
+          { method: "DELETE" },
+        ),
+    );
+
+    if (!didDelete) return;
+
     try {
       await createGtdItemRequest({
         text: task.title,
@@ -624,24 +638,16 @@ export function TodoListView() {
         dueDate: task.dueDate,
         note: task.description || task.nextAction || "",
       });
+      setStatusMessage(`"${task.title}" sent back to GTD inbox.`);
     } catch (error) {
       setStatusMessage(
-        error instanceof Error ? error.message : "Failed to create GTD item.",
+        `Task removed from Kanban but failed to create GTD item: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
       );
-      return;
     }
 
-    await withWorkspaceMutation(
-      () =>
-        requestJson<{ workspace: TrackerWorkspaceData }>(
-          `/api/tracker/tasks/${task.id}`,
-          { method: "DELETE" },
-        ),
-      `"${task.title}" sent back to GTD inbox.`,
-      () => {
-        setEditingTask(null);
-      },
-    );
+    setEditingTask(null);
   }
 
   function openCreateTask() {
