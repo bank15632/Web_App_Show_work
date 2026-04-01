@@ -8,6 +8,7 @@ import {
   BookOpenText,
   CalendarDays,
   Check,
+  ChevronDown,
   ClipboardCheck,
   Copy,
   Inbox,
@@ -95,6 +96,7 @@ export function GtdWorkspace() {
   });
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [showNoDeadlineAlert, setShowNoDeadlineAlert] = useState(false);
+  const [mobileReviewOpen, setMobileReviewOpen] = useState(false);
   const actionLockRef = useRef(false);
   const activeButtonKeyRef = useRef<string | null>(null);
   const queuedActionKeysRef = useRef(new Set<string>());
@@ -1287,6 +1289,140 @@ export function GtdWorkspace() {
               </p>
             </section>
           </div>
+
+          {/* Mobile Weekly Review – collapsible dropdown, visible below xl */}
+          <section className="col-span-full rounded-[2rem] border border-border bg-background p-5 xl:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileReviewOpen((prev) => !prev)}
+              className="flex w-full items-center justify-between gap-3"
+            >
+              <div className="flex items-center gap-3">
+                <p className="caption-editorial">Weekly Review</p>
+                <span className="text-sm font-medium text-muted-foreground">{completedReviewSteps}/{reviewSteps.length}</span>
+              </div>
+              <ChevronDown className={cn("size-5 text-muted-foreground transition-transform duration-200", mobileReviewOpen && "rotate-180")} />
+            </button>
+
+            {mobileReviewOpen ? (
+              <div className="mt-5 space-y-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  {reviewPendingAction ? <LoadingPill label={reviewPendingAction.label} /> : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void updateReviewState(
+                        { reset: true },
+                        "Weekly review reset.",
+                        "Resetting weekly review...",
+                        "review-reset",
+                      );
+                    }}
+                    disabled={isWorkspaceActionPending}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPendingButton("review-reset") ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                    {isPendingButton("review-reset") ? "Resetting..." : "Reset"}
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {reviewSteps.map((step) => (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => {
+                        void updateReviewState({
+                          steps: { [step.id]: !review.steps[step.id] },
+                        }, undefined, `Updating "${step.title}"...`, `review-step:${step.id}`);
+                      }}
+                      disabled={isWorkspaceActionPending}
+                      className={cn(
+                        "w-full rounded-[1.25rem] border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-70",
+                        review.steps[step.id] ? "border-emerald-200 bg-emerald-50" : "border-border bg-secondary/30 hover:border-foreground/40",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={cn("mt-0.5 inline-flex size-6 items-center justify-center rounded-full border text-xs", review.steps[step.id] ? "border-emerald-300 bg-emerald-100 text-emerald-700" : "border-border text-muted-foreground")}>
+                          {isPendingButton(`review-step:${step.id}`) ? <LoaderCircle className="size-3.5 animate-spin" /> : review.steps[step.id] ? <Check className="size-3.5" /> : null}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium">{step.title}</p>
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.body}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={review.focus}
+                  onChange={(event) =>
+                    setReview((prev) => ({ ...prev, focus: event.target.value }))
+                  }
+                  onBlur={() => {
+                    void updateReviewState(
+                      { focus: review.focus },
+                      undefined,
+                      "Saving weekly focus...",
+                      "review-focus",
+                    );
+                  }}
+                  placeholder="Weekly focus: เป้าหมายหลักของสัปดาห์นี้"
+                  disabled={isWorkspaceActionPending}
+                  className="h-11 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <textarea
+                  value={review.notes}
+                  onChange={(event) =>
+                    setReview((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                  onBlur={() => {
+                    void updateReviewState(
+                      { notes: review.notes },
+                      undefined,
+                      "Saving review notes...",
+                      "review-notes",
+                    );
+                  }}
+                  placeholder="Review notes, bottlenecks, or commitments..."
+                  rows={4}
+                  disabled={isWorkspaceActionPending}
+                  className="w-full rounded-[1.25rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void updateReviewState(
+                        { lastCompletedAt: new Date().toISOString() },
+                        "Weekly review marked complete.",
+                        "Marking weekly review complete...",
+                        "review-complete",
+                      );
+                    }}
+                    disabled={isWorkspaceActionPending}
+                    className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPendingButton("review-complete") ? <LoaderCircle className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
+                    {isPendingButton("review-complete") ? "Saving..." : "Complete review"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void copyWeeklyReviewBrief();
+                    }}
+                    disabled={isWorkspaceActionPending}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPendingButton("copy-brief") ? <LoaderCircle className="size-4 animate-spin" /> : <Copy className="size-4" />}
+                    {isPendingButton("copy-brief") ? "Copying..." : "Copy brief"}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {review.lastCompletedAt ? `Last completed ${formatShortDate(review.lastCompletedAt)}` : "No weekly review completed yet"}
+                </p>
+              </div>
+            ) : null}
+          </section>
         </section>
       </main>
 
