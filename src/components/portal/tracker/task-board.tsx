@@ -51,7 +51,7 @@ import type {
   TrackerTaskRecord,
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
-import { isTaskOverdue } from "@/lib/tracker/views";
+import { isTaskOverdue, isTaskDueToday } from "@/lib/tracker/views";
 
 function getOverdueDays(task: TrackerTaskRecord) {
   if (!task.dueDate || task.status === "done") return 0;
@@ -61,6 +61,15 @@ function getOverdueDays(task: TrackerTaskRecord) {
   due.setHours(0, 0, 0, 0);
   const diff = now.getTime() - due.getTime();
   return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
+}
+
+function isDueTodayTask(task: TrackerTaskRecord) {
+  if (!task.dueDate || task.status === "done") return false;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(task.dueDate);
+  due.setHours(0, 0, 0, 0);
+  return now.getTime() === due.getTime();
 }
 
 type ViewMode = "board" | "list";
@@ -220,8 +229,17 @@ export function TaskBoard({
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
   const [showNoDeadlineAlert, setShowNoDeadlineAlert] = useState(false);
+  const [showDeadlineAlert, setShowDeadlineAlert] = useState(true);
   const noDeadlineTasks = useMemo(
     () => tasks.filter((t) => !t.dueDate && t.status !== "done"),
+    [tasks],
+  );
+  const overdueTasks = useMemo(
+    () => tasks.filter((t) => isTaskOverdue(t)),
+    [tasks],
+  );
+  const dueTodayTasks = useMemo(
+    () => tasks.filter((t) => isTaskDueToday(t)),
     [tasks],
   );
   const prevNoDeadlineCount = useRef(noDeadlineTasks.length);
@@ -342,6 +360,14 @@ export function TaskBoard({
         <NoDeadlineAlert
           tasks={noDeadlineTasks}
           onClose={() => setShowNoDeadlineAlert(false)}
+          onEditTask={onEditTask}
+        />
+      ) : null}
+      {showDeadlineAlert && (overdueTasks.length > 0 || dueTodayTasks.length > 0) ? (
+        <DeadlineAlert
+          overdueTasks={overdueTasks}
+          dueTodayTasks={dueTodayTasks}
+          onClose={() => setShowDeadlineAlert(false)}
           onEditTask={onEditTask}
         />
       ) : null}
@@ -584,6 +610,114 @@ function NoDeadlineAlert({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DeadlineAlert({
+  overdueTasks,
+  dueTodayTasks,
+  onClose,
+  onEditTask,
+}: {
+  overdueTasks: TrackerTaskRecord[];
+  dueTodayTasks: TrackerTaskRecord[];
+  onClose: () => void;
+  onEditTask: (task: TrackerTaskRecord) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {overdueTasks.length > 0 ? (
+        <div className="rounded-[1.9rem] border border-rose-300 bg-rose-50/80 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-rose-600">
+                เลยกำหนด Deadline
+              </p>
+              <h3 className="mt-1 font-display text-xl font-medium tracking-tight text-rose-800">
+                {overdueTasks.length} งาน{overdueTasks.length === 1 ? "" : ""} เลยกำหนดส่งแล้ว
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-full border border-rose-300 px-4 py-2 text-sm text-rose-600 transition-colors hover:border-rose-500 hover:text-rose-700"
+            >
+              ปิด
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {overdueTasks.map((task) => {
+              const days = getOverdueDays(task);
+              return (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => {
+                    onEditTask(task);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-rose-200 bg-white/70 px-4 py-3 text-left transition-colors hover:border-rose-400"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{task.title}</p>
+                    <p className="mt-0.5 text-xs text-rose-600">
+                      กำหนด {formatDate(task.dueDate)} · เลยมา {days} วัน
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700">
+                    {days}d late
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+      {dueTodayTasks.length > 0 ? (
+        <div className="rounded-[1.9rem] border border-amber-300 bg-amber-50/80 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-amber-600">
+                ครบกำหนดวันนี้
+              </p>
+              <h3 className="mt-1 font-display text-xl font-medium tracking-tight text-amber-800">
+                {dueTodayTasks.length} งาน{dueTodayTasks.length === 1 ? "" : ""} ครบกำหนดวันนี้
+              </h3>
+            </div>
+            {overdueTasks.length === 0 ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="shrink-0 rounded-full border border-amber-300 px-4 py-2 text-sm text-amber-600 transition-colors hover:border-amber-500 hover:text-amber-700"
+              >
+                ปิด
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-3 space-y-2">
+            {dueTodayTasks.map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                onClick={() => {
+                  onEditTask(task);
+                }}
+                className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-amber-200 bg-white/70 px-4 py-3 text-left transition-colors hover:border-amber-400"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{task.title}</p>
+                  <p className="mt-0.5 text-xs text-amber-600">
+                    {priorityLabels[task.priority]} · {taskStatusLabels[task.status]}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                  Due today
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -933,6 +1067,7 @@ function TaskCard({
 }) {
   const dragHandleProps = handleProps ?? {};
   const overdueDays = getOverdueDays(task);
+  const dueToday = isDueTodayTask(task);
   const hasNoDeadline = !task.dueDate && task.status !== "done";
 
   return (
@@ -941,9 +1076,13 @@ function TaskCard({
         "rounded-[1.4rem] border p-3 transition-all sm:p-4",
         dragging
           ? "border-foreground bg-stone-50/50 shadow-[0_16px_40px_rgba(0,0,0,0.12)]"
-          : hasNoDeadline
-            ? "border-violet-200 bg-violet-50/50 hover:border-violet-400"
-            : "border-border bg-stone-50/50 hover:border-foreground/30",
+          : overdueDays > 0
+            ? "border-rose-300 bg-rose-50/60 hover:border-rose-500"
+            : dueToday
+              ? "border-amber-300 bg-amber-50/60 hover:border-amber-500"
+              : hasNoDeadline
+                ? "border-violet-200 bg-violet-50/50 hover:border-violet-400"
+                : "border-border bg-stone-50/50 hover:border-foreground/30",
       )}
     >
       <div className="flex items-start gap-3">
@@ -972,13 +1111,18 @@ function TaskCard({
                   "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] sm:text-[11px]",
                   overdueDays > 0
                     ? "border-rose-200 bg-rose-50 font-medium text-rose-700"
-                    : "border-border text-muted-foreground",
+                    : dueToday
+                      ? "border-amber-200 bg-amber-50 font-medium text-amber-700"
+                      : "border-border text-muted-foreground",
                 )}
               >
                 <CalendarDays className="size-3" />
                 {formatDate(task.dueDate)}
                 {overdueDays > 0 ? (
                   <span className="font-semibold">({overdueDays}d late)</span>
+                ) : null}
+                {dueToday ? (
+                  <span className="font-semibold">วันนี้</span>
                 ) : null}
               </span>
             ) : (
@@ -1012,6 +1156,7 @@ function TaskRow({
   onEdit: () => void;
 }) {
   const overdueDays = getOverdueDays(task);
+  const dueToday = isDueTodayTask(task);
   const hasNoDeadline = !task.dueDate && task.status !== "done";
 
   return (
@@ -1020,9 +1165,13 @@ function TaskRow({
       onClick={onEdit}
       className={cn(
         "flex w-full flex-col gap-2 rounded-[1.5rem] border bg-background px-5 py-3 text-left transition-all",
-        hasNoDeadline
-          ? "border-violet-200 bg-violet-50/50 hover:border-violet-400"
-          : "border-border hover:border-foreground/30",
+        overdueDays > 0
+          ? "border-rose-300 bg-rose-50/50 hover:border-rose-500"
+          : dueToday
+            ? "border-amber-300 bg-amber-50/50 hover:border-amber-500"
+            : hasNoDeadline
+              ? "border-violet-200 bg-violet-50/50 hover:border-violet-400"
+              : "border-border hover:border-foreground/30",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1043,12 +1192,17 @@ function TaskRow({
           <span
             className={cn(
               "inline-flex items-center gap-1 text-xs",
-              overdueDays > 0 ? "font-medium text-rose-600" : "text-muted-foreground",
+              overdueDays > 0
+                ? "font-medium text-rose-600"
+                : dueToday
+                  ? "font-medium text-amber-600"
+                  : "text-muted-foreground",
             )}
           >
             <CalendarDays className="size-3" />
             {formatDate(task.dueDate)}
             {overdueDays > 0 ? ` (${overdueDays}d late)` : ""}
+            {dueToday ? " (วันนี้)" : ""}
           </span>
         ) : (
           <span className="text-[0.7rem] font-medium text-violet-600">No deadline</span>
