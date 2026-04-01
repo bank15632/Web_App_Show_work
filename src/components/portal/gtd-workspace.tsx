@@ -142,12 +142,14 @@ export function GtdWorkspace() {
     () => items.filter((item) => !item.dueDate && !item.done),
     [items],
   );
+  const prevNoDeadlineCount = useRef(noDeadlineItems.length);
 
   useEffect(() => {
-    if (!isLoading && noDeadlineItems.length > 0) {
+    if (!isLoading && noDeadlineItems.length > 0 && noDeadlineItems.length > prevNoDeadlineCount.current) {
       setShowNoDeadlineAlert(true);
     }
-  }, [isLoading]);
+    prevNoDeadlineCount.current = noDeadlineItems.length;
+  }, [isLoading, noDeadlineItems.length]);
 
   const counts = getBucketCounts(items);
   const archivedCount = items.filter((item) => item.done).length;
