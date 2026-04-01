@@ -96,6 +96,7 @@ export function GtdWorkspace() {
   });
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [showNoDeadlineAlert, setShowNoDeadlineAlert] = useState(false);
+  const [showDeadlineAlert, setShowDeadlineAlert] = useState(true);
   const [mobileReviewOpen, setMobileReviewOpen] = useState(false);
   const actionLockRef = useRef(false);
   const activeButtonKeyRef = useRef<string | null>(null);
@@ -157,6 +158,22 @@ export function GtdWorkspace() {
   const archivedCount = items.filter((item) => item.done).length;
   const doneThisWeek = items.filter((item) => Boolean(item.doneAt && referenceTime - new Date(item.doneAt).getTime() < 604800000)).length;
   const overdueCount = items.filter((item) => Boolean(item.dueDate && !item.done && new Date(item.dueDate).getTime() < referenceTime)).length;
+  const overdueItems = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return items.filter((item) => Boolean(item.dueDate && !item.done && new Date(item.dueDate).getTime() < todayStart.getTime()));
+  }, [items]);
+  const dueTodayItems = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = todayStart.getTime();
+    return items.filter((item) => {
+      if (!item.dueDate || item.done) return false;
+      const due = new Date(item.dueDate);
+      due.setHours(0, 0, 0, 0);
+      return due.getTime() === todayEnd;
+    });
+  }, [items]);
   const staleWaitingCount = items.filter((item) => item.bucket === "waiting" && !item.done && referenceTime - new Date(item.updatedAt).getTime() > 432000000).length;
   const filteredItems = useMemo(
     () => {
@@ -641,6 +658,106 @@ export function GtdWorkspace() {
           </div>
         </div>
       ) : null}
+      {showDeadlineAlert && (overdueItems.length > 0 || dueTodayItems.length > 0) ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8"
+          onClick={() => setShowDeadlineAlert(false)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-background p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-rose-600">
+                  Deadline Alert
+                </p>
+                <h3 className="mt-1 font-display text-2xl font-medium tracking-tight">
+                  แจ้งเตือนกำหนดส่ง
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeadlineAlert(false)}
+                className="shrink-0 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            {overdueItems.length > 0 ? (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-rose-600">
+                  เลยกำหนด ({overdueItems.length} รายการ)
+                </p>
+                <div className="mt-2 space-y-2">
+                  {overdueItems.map((item) => {
+                    const due = new Date(item.dueDate!);
+                    due.setHours(0, 0, 0, 0);
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+                    const lateDays = Math.ceil((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setShowDeadlineAlert(false);
+                          setActiveListMode("active");
+                          setActiveBucket(item.bucket);
+                          setSelectedItemId(item.id);
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-rose-200 bg-rose-50/50 px-4 py-3 text-left transition-colors hover:border-rose-400"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{item.text}</p>
+                          <p className="mt-0.5 text-xs text-rose-600">
+                            กำหนด {formatShortDate(item.dueDate!)} · เลยมา {lateDays} วัน
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700">
+                          {lateDays}d late
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            {dueTodayItems.length > 0 ? (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-amber-600">
+                  ครบกำหนดวันนี้ ({dueTodayItems.length} รายการ)
+                </p>
+                <div className="mt-2 space-y-2">
+                  {dueTodayItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setShowDeadlineAlert(false);
+                        setActiveListMode("active");
+                        setActiveBucket(item.bucket);
+                        setSelectedItemId(item.id);
+                      }}
+                      className="flex w-full items-center justify-between gap-3 rounded-[1.25rem] border border-amber-200 bg-amber-50/50 px-4 py-3 text-left transition-colors hover:border-amber-400"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{item.text}</p>
+                        <p className="mt-0.5 text-xs text-amber-600">
+                          {bucketLabels[item.bucket]} · {item.priority}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                        Due today
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-4 sm:flex-wrap sm:gap-3 sm:px-6 sm:py-5 lg:px-10">
           <Link href="/aec-workflow" aria-label="Back to AEC workflow" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-4">
@@ -822,6 +939,9 @@ export function GtdWorkspace() {
 
             {filteredItems.map((item) => {
               const hasNoDeadline = !item.dueDate && !item.done;
+              const isOverdue = Boolean(item.dueDate && !item.done && (() => { const d = new Date(item.dueDate!); d.setHours(0,0,0,0); const n = new Date(); n.setHours(0,0,0,0); return d.getTime() < n.getTime(); })());
+              const isDueToday = Boolean(item.dueDate && !item.done && (() => { const d = new Date(item.dueDate!); d.setHours(0,0,0,0); const n = new Date(); n.setHours(0,0,0,0); return d.getTime() === n.getTime(); })());
+              const overdueDays = isOverdue && item.dueDate ? (() => { const d = new Date(item.dueDate); d.setHours(0,0,0,0); const n = new Date(); n.setHours(0,0,0,0); return Math.ceil((n.getTime() - d.getTime()) / (1000*60*60*24)); })() : 0;
               return (
                 <button
                   key={item.id}
@@ -832,10 +952,14 @@ export function GtdWorkspace() {
                     "w-full rounded-[1.6rem] border p-5 text-left transition-all",
                     item.id === resolvedSelectedItemId
                       ? "border-foreground shadow-[0_18px_40px_rgba(0,0,0,0.06)]"
-                      : hasNoDeadline
-                        ? "border-violet-200 bg-violet-50/40 hover:border-violet-400"
-                        : "border-border bg-background hover:border-foreground/40",
-                    !hasNoDeadline && item.id !== resolvedSelectedItemId && "bg-background",
+                      : isOverdue
+                        ? "border-rose-300 bg-rose-50/50 hover:border-rose-500"
+                        : isDueToday
+                          ? "border-amber-300 bg-amber-50/50 hover:border-amber-500"
+                          : hasNoDeadline
+                            ? "border-violet-200 bg-violet-50/40 hover:border-violet-400"
+                            : "border-border bg-background hover:border-foreground/40",
+                    !hasNoDeadline && !isOverdue && !isDueToday && item.id !== resolvedSelectedItemId && "bg-background",
                     pendingAction?.itemId && "cursor-not-allowed opacity-70",
                   )}
                 >
@@ -845,7 +969,15 @@ export function GtdWorkspace() {
                         <span className="caption-editorial text-[0.68rem]">{bucketLabels[item.bucket]}</span>
                         {item.context ? <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">@{item.context}</span> : null}
                         <span className={priorityClassName(item.priority)}>{item.priority}</span>
-                        {hasNoDeadline ? (
+                        {isOverdue ? (
+                          <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-semibold text-rose-700">
+                            เลย {overdueDays}d
+                          </span>
+                        ) : isDueToday ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                            ครบกำหนดวันนี้
+                          </span>
+                        ) : hasNoDeadline ? (
                           <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-medium text-violet-600">
                             No deadline
                           </span>
@@ -854,9 +986,17 @@ export function GtdWorkspace() {
                       <h2 className={cn("mt-3 text-lg font-semibold text-pretty", item.done && "text-muted-foreground line-through")}>{item.text}</h2>
                       {item.note ? <p className="mt-2 line-clamp-2 text-sm leading-7 text-muted-foreground">{item.note}</p> : null}
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      {item.dueDate ? <p>Due {formatShortDate(item.dueDate)}</p> : <p className="text-violet-500 font-medium">No due date</p>}
-                      <p className="mt-1">{formatRelativeAge(item.updatedAt, referenceTime)}</p>
+                    <div className={cn("text-right text-xs", isOverdue ? "text-rose-600 font-medium" : isDueToday ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+                      {item.dueDate ? (
+                        <p>
+                          Due {formatShortDate(item.dueDate)}
+                          {isOverdue ? ` (${overdueDays}d late)` : ""}
+                          {isDueToday ? " (วันนี้)" : ""}
+                        </p>
+                      ) : (
+                        <p className="text-violet-500 font-medium">No due date</p>
+                      )}
+                      <p className="mt-1 text-muted-foreground">{formatRelativeAge(item.updatedAt, referenceTime)}</p>
                     </div>
                   </div>
                 </button>
