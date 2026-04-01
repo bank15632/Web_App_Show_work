@@ -62,9 +62,8 @@ export function AecWorkflowView() {
               AEC Workflow Platform
             </h1>
             <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
-              คู่มือการใช้งานฉบับสมบูรณ์สำหรับสถาปนิกและทีม AEC
-              ที่ต้องคุมงานส่วนตัว, project board, weekly review และ export
-              ใน workflow เดียว
+              คู่มือการใช้งานฉบับสมบูรณ์สำหรับสถาปนิก, creator และทีมที่ต้องคุมงานส่วนตัว,
+              project board, weekly review และ export ใน workflow เดียว
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {["GTD", "Kanban", "Lean", "CPM", "AI Assistant"].map((item) => (
@@ -101,8 +100,8 @@ export function AecWorkflowView() {
               หน้าจอหลักควรเห็นอะไรบ้าง
             </h2>
             <p className="mt-3 text-sm leading-7 text-muted-foreground">
-              ตามคู่มือ dashboard ต้องสรุปภาพรวมทั้งระบบในหน้าเดียว:
-              GTD stats, Kanban overview, upcoming และ AI insights
+              ตามคู่มือ dashboard ควรสรุปงานค้าง, deadline health, pipeline breakdown
+              และ project mix ในหน้าเดียว เพื่อให้ตัดสินใจได้ว่าจะเริ่มจากอะไร
             </p>
           </div>
 

@@ -124,20 +124,20 @@ export const manualFrameworkCards: ManualFrameworkCard[] = [
 
 export const manualDashboardPanels: ManualDashboardPanel[] = [
   {
-    title: "GTD Stats",
-    body: "จำนวน inbox, next actions, waiting for และ freshness ของ weekly review",
+    title: "Outstanding Tasks",
+    body: "จำนวนงานค้างรวมจาก GTD และ Kanban พร้อมภาพรวมว่า backlog กระจุกอยู่ในระบบใดมากกว่า",
   },
   {
-    title: "Kanban Overview",
-    body: "สถานะรวมทุกโปรเจกต์, bottleneck indicator และงานที่ยังติดค้าง",
+    title: "Deadline Health",
+    body: "แยกงาน overdue, due today, next 7 days และ no deadline เพื่อจัดลำดับความเสี่ยงให้เร็วขึ้น",
   },
   {
-    title: "Upcoming",
-    body: "calendar items, overdue tasks และ deadline ที่กำลังจะถึง",
+    title: "Pipeline Breakdown",
+    body: "ดูว่างานค้างอยู่ bucket ไหนของ GTD และ status ไหนของ Kanban เพื่อหาคอขวดของ flow",
   },
   {
-    title: "AI Insights",
-    body: "สรุปสั้น ๆ ว่าสัปดาห์นี้ควรโฟกัสอะไรและงานไหนควรหยิบก่อน",
+    title: "Project Mix",
+    body: "กระจาย workload ตาม project type เพื่อให้รองรับงานอย่าง website, anime, content และงานส่วนตัวอื่น ๆ ได้ดีขึ้น",
   },
 ];
 

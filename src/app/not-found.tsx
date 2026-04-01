@@ -24,7 +24,7 @@ export default function NotFound() {
             กลับหน้า overview
           </Link>
           <Link href="/studio" className={outlineLinkClass}>
-            เข้า owner dashboard
+            เข้า workflow dashboard
           </Link>
         </CardContent>
       </Card>

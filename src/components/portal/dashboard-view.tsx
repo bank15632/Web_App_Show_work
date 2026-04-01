@@ -3,74 +3,95 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowRight,
+  BarChart3,
   BookOpenText,
-  BrainCircuit,
-  CalendarClock,
-  ClipboardList,
-  FileText,
-  FolderOpen,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FolderKanban,
+  Layers3,
   ListChecks,
-  ListFilter,
   ListTodo,
   Settings2,
-  X,
 } from "lucide-react";
 
-import { manualFrameworkCards } from "@/lib/aec-user-manual";
-import { buildClientRoomSharePath, type ClientRoomProjectSummary } from "@/lib/client-rooms/types";
+import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
-  getBucketCounts,
+  bucketLabels,
+  bucketOrder,
   getWeeklyReviewStatus,
   type GtdItem,
 } from "@/lib/gtd-system";
-import { fetchGtdWorkspace } from "@/lib/gtd/client";
-import {
-  formatPortalDate,
-  getProjectTypes,
-} from "@/lib/portal-data";
+import { taskStatusLabels } from "@/lib/tracker/constants";
 import type { TrackerTaskRecord, TrackerWorkspaceData } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 
-const MONTH_LABELS: Record<number, string> = {
-  0: "ม.ค.",
-  1: "ก.พ.",
-  2: "มี.ค.",
-  3: "เม.ย.",
-  4: "พ.ค.",
-  5: "มิ.ย.",
-  6: "ก.ค.",
-  7: "ส.ค.",
-  8: "ก.ย.",
-  9: "ต.ค.",
-  10: "พ.ย.",
-  11: "ธ.ค.",
+const DAY_MS = 86_400_000;
+
+type SourceStateTone = "loading" | "ready" | "error";
+type DashboardTaskSystem = "GTD" | "Kanban";
+type DeadlineTone = "overdue" | "today" | "soon";
+
+type SourceState = {
+  tone: SourceStateTone;
+  message: string;
 };
 
-type ClientRoomStatus = "draft" | "dirty" | "live";
-
-const clientRoomColumnStyles: Record<ClientRoomStatus, string> = {
-  draft: "border-amber-200 bg-amber-50",
-  dirty: "border-blue-200 bg-blue-50",
-  live: "border-emerald-200 bg-emerald-50",
+type TrackerTaskWithProject = TrackerTaskRecord & {
+  projectName: string;
+  projectType: string;
 };
 
-const clientRoomHeaderStyles: Record<ClientRoomStatus, string> = {
-  draft: "text-amber-700",
-  dirty: "text-blue-700",
-  live: "text-emerald-700",
+type DistributionItem = {
+  label: string;
+  value: number;
+  colorClassName: string;
+  hint?: string;
 };
 
-const clientRoomDotStyles: Record<ClientRoomStatus, string> = {
-  draft: "bg-amber-500",
-  dirty: "bg-blue-500",
-  live: "bg-emerald-500",
+type TrendPoint = {
+  label: string;
+  fullLabel: string;
+  gtd: number;
+  kanban: number;
+  total: number;
 };
 
-const clientRoomCardStyles: Record<ClientRoomStatus, string> = {
-  draft: "border-amber-200/70 hover:border-amber-300",
-  dirty: "border-blue-200/70 hover:border-blue-300",
-  live: "border-emerald-200/70 hover:border-emerald-300",
+type AttentionItem = {
+  id: string;
+  system: DashboardTaskSystem;
+  title: string;
+  context: string;
+  dueDate: string;
+  dueLabel: string;
+  tone: DeadlineTone;
+  href: string;
+};
+
+const deadlineToneClassNames: Record<DeadlineTone, string> = {
+  overdue: "border-rose-200 bg-rose-50 text-rose-700",
+  today: "border-amber-200 bg-amber-50 text-amber-700",
+  soon: "border-sky-200 bg-sky-50 text-sky-700",
+};
+
+const bucketColorClassNames: Record<string, string> = {
+  inbox: "bg-zinc-900",
+  next: "bg-zinc-700",
+  projects: "bg-zinc-600",
+  waiting: "bg-amber-400",
+  calendar: "bg-sky-400",
+  someday: "bg-stone-400",
+  reference: "bg-emerald-400",
+};
+
+const kanbanStatusColorClassNames: Record<string, string> = {
+  todo: "bg-zinc-800",
+  doing: "bg-sky-500",
+  waiting: "bg-amber-400",
+  blocked: "bg-rose-500",
+  done: "bg-emerald-500",
 };
 
 function useScrollAnimation() {
@@ -127,48 +148,19 @@ function useScrollAnimation() {
   return ref;
 }
 
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 min-w-[8.8rem] appearance-none rounded-full border border-border bg-background pl-4 pr-10 text-[0.92rem] font-medium text-foreground transition-all duration-300 ease-out hover:border-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-      >
-        <option value="all">{label}: ทั้งหมด</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ListFilter className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-    </div>
-  );
-}
-
 export function DashboardView() {
   const containerRef = useScrollAnimation();
 
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [monthFilter, setMonthFilter] = useState("all");
-  const [yearFilter, setYearFilter] = useState("all");
-  const [clientRoomProjects, setClientRoomProjects] = useState<ClientRoomProjectSummary[]>([]);
-  const [isClientRoomsLoading, setIsClientRoomsLoading] = useState(true);
-  const [clientRoomStatus, setClientRoomStatus] = useState("กำลังดึงข้อมูล client rooms...");
   const [gtdItems, setGtdItems] = useState<GtdItem[]>([]);
   const [trackerWorkspace, setTrackerWorkspace] = useState<TrackerWorkspaceData | null>(null);
-  const [trackerStatus, setTrackerStatus] = useState("กำลังดึงข้อมูล Kanban board...");
+  const [gtdState, setGtdState] = useState<SourceState>({
+    tone: "loading",
+    message: "กำลังดึงข้อมูล GTD workspace...",
+  });
+  const [trackerState, setTrackerState] = useState<SourceState>({
+    tone: "loading",
+    message: "กำลังดึงข้อมูล Kanban board...",
+  });
   const [reviewStatus, setReviewStatus] = useState(getWeeklyReviewStatus(null));
   const [referenceTime, setReferenceTime] = useState(() => Date.now());
 
@@ -176,12 +168,12 @@ export function DashboardView() {
     let ignore = false;
 
     async function loadWorkspace() {
-      setIsClientRoomsLoading(true);
+      setGtdState({ tone: "loading", message: "กำลังดึงข้อมูล GTD workspace..." });
+      setTrackerState({ tone: "loading", message: "กำลังดึงข้อมูล Kanban board..." });
 
-      const [gtdResult, trackerResult, clientRoomResult] = await Promise.allSettled([
+      const [gtdResult, trackerResult] = await Promise.allSettled([
         fetchGtdWorkspace(),
         getTrackerWorkspace(),
-        getClientRoomProjects(),
       ]);
 
       if (ignore) return;
@@ -189,37 +181,39 @@ export function DashboardView() {
       if (gtdResult.status === "fulfilled") {
         setGtdItems(gtdResult.value.items);
         setReviewStatus(getWeeklyReviewStatus(gtdResult.value.review.lastCompletedAt));
+        setGtdState({
+          tone: "ready",
+          message: "GTD workspace พร้อมใช้งาน",
+        });
+      } else {
+        setGtdItems([]);
+        setReviewStatus(getWeeklyReviewStatus(null));
+        setGtdState({
+          tone: "error",
+          message:
+            gtdResult.reason instanceof Error
+              ? gtdResult.reason.message
+              : "GTD workspace unavailable.",
+        });
       }
 
       if (trackerResult.status === "fulfilled") {
         setTrackerWorkspace(trackerResult.value);
-        setTrackerStatus("Kanban board พร้อมใช้งาน");
+        setTrackerState({
+          tone: "ready",
+          message: "Kanban board พร้อมใช้งาน",
+        });
       } else {
         setTrackerWorkspace(null);
-        setTrackerStatus(
-          trackerResult.reason instanceof Error
-            ? trackerResult.reason.message
-            : "Kanban board unavailable.",
-        );
+        setTrackerState({
+          tone: "error",
+          message:
+            trackerResult.reason instanceof Error
+              ? trackerResult.reason.message
+              : "Kanban board unavailable.",
+        });
       }
 
-      if (clientRoomResult.status === "fulfilled") {
-        setClientRoomProjects(clientRoomResult.value);
-        setClientRoomStatus(
-          clientRoomResult.value.length > 0
-            ? "Client room CMS พร้อมใช้งาน"
-            : "ยังไม่มี client room ในระบบ",
-        );
-      } else {
-        setClientRoomProjects([]);
-        setClientRoomStatus(
-          clientRoomResult.reason instanceof Error
-            ? clientRoomResult.reason.message
-            : "Client room CMS unavailable.",
-        );
-      }
-
-      setIsClientRoomsLoading(false);
       setReferenceTime(Date.now());
     }
 
@@ -237,194 +231,308 @@ export function DashboardView() {
     };
   }, []);
 
-  const availableYears = useMemo(
-    () =>
-      [...new Set(clientRoomProjects.map((project) => new Date(project.updatedAt).getFullYear()))].sort(
-        (a, b) => b - a,
-      ),
-    [clientRoomProjects],
-  );
-
-  const availableMonths = useMemo(
-    () =>
-      [...new Set(clientRoomProjects.map((project) => new Date(project.updatedAt).getMonth()))].sort(
-        (a, b) => a - b,
-      ),
-    [clientRoomProjects],
-  );
-
-  const filteredProjects = useMemo(
-    () =>
-      clientRoomProjects.filter((project) => {
-        if (typeFilter !== "all" && project.projectType !== typeFilter) return false;
-        const date = new Date(project.updatedAt);
-        if (monthFilter !== "all" && String(date.getMonth()) !== monthFilter) return false;
-        if (yearFilter !== "all" && String(date.getFullYear()) !== yearFilter) return false;
-        return true;
-      }),
-    [clientRoomProjects, monthFilter, typeFilter, yearFilter],
-  );
-
-  const hasActiveFilters =
-    typeFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
-  const showClientRoomLoadingState =
-    isClientRoomsLoading && clientRoomProjects.length === 0;
-
-  const clearFilters = () => {
-    setTypeFilter("all");
-    setMonthFilter("all");
-    setYearFilter("all");
-  };
-
-  const activeProjects = clientRoomProjects.length;
-  const totalDocuments = clientRoomProjects.reduce(
-    (count, project) => count + project.documentCount,
-    0,
-  );
-  const pendingPublishes = clientRoomProjects.filter(
-    (project) => getClientRoomStatus(project) !== "live",
-  ).length;
-
-  const clientRoomGroups = useMemo(() => {
-    const groups: Record<ClientRoomStatus, ClientRoomProjectSummary[]> = {
-      draft: [],
-      dirty: [],
-      live: [],
-    };
-
-    for (const project of clientRoomProjects) {
-      groups[getClientRoomStatus(project)].push(project);
-    }
-
-    return groups;
-  }, [clientRoomProjects]);
-
-  const gtdCounts = useMemo(() => getBucketCounts(gtdItems), [gtdItems]);
-  const staleWaitingCount = useMemo(
-    () =>
-      gtdItems.filter(
-        (item) =>
-          item.bucket === "waiting" &&
-          !item.done &&
-          referenceTime - new Date(item.updatedAt).getTime() > 432000000,
-      ).length,
-    [gtdItems, referenceTime],
-  );
-  const gtdUpcomingCount = useMemo(
-    () =>
-      gtdItems.filter(
-        (item) =>
-          Boolean(item.dueDate) &&
-          !item.done &&
-          isDateWithinDays(item.dueDate as string, 7, referenceTime),
-      ).length,
-    [gtdItems, referenceTime],
-  );
-
-  const trackerTasks = useMemo(
-    () => trackerWorkspace?.projects.flatMap((project) => project.tasks) ?? [],
+  const todayStart = useMemo(() => getDayStart(referenceTime), [referenceTime]);
+  const sevenDayWindowEnd = todayStart + DAY_MS * 7;
+  const trackerProjects = useMemo(
+    () => trackerWorkspace?.projects ?? [],
     [trackerWorkspace],
   );
-  const blockedTaskCount = trackerTasks.filter((task) => task.status === "blocked").length;
-  const waitingTaskCount = trackerTasks.filter((task) => task.status === "waiting").length;
-  const trackerOverdueCount = trackerTasks.filter((task) => isTrackerTaskOverdue(task, referenceTime)).length;
-  const trackerUpcomingCount = trackerTasks.filter((task) => isTrackerTaskUpcoming(task, referenceTime)).length;
+
+  const trackerTasks = useMemo<TrackerTaskWithProject[]>(
+    () =>
+      trackerProjects.flatMap((project) =>
+        project.tasks.map((task) => ({
+          ...task,
+          projectName: project.name,
+          projectType: project.projectType.trim() || "General",
+        })),
+      ),
+    [trackerProjects],
+  );
+
+  const trackerProjectTypeById = useMemo(
+    () =>
+      new Map(
+        trackerProjects.map((project) => [
+          project.id,
+          project.projectType.trim() || "General",
+        ]),
+      ),
+    [trackerProjects],
+  );
+
+  const openGtdItems = useMemo(
+    () => gtdItems.filter((item) => !item.done),
+    [gtdItems],
+  );
+  const openTrackerTasks = useMemo(
+    () => trackerTasks.filter((task) => task.status !== "done"),
+    [trackerTasks],
+  );
+
+  const openGtdCount = openGtdItems.length;
+  const openTrackerCount = openTrackerTasks.length;
+  const combinedOpenCount = openGtdCount + openTrackerCount;
+
+  const blockedTaskCount = openTrackerTasks.filter((task) => task.status === "blocked").length;
+  const waitingTaskCount = openTrackerTasks.filter((task) => task.status === "waiting").length;
+  const staleWaitingCount = openGtdItems.filter(
+    (item) =>
+      item.bucket === "waiting" &&
+      referenceTime - new Date(item.updatedAt).getTime() > DAY_MS * 5,
+  ).length;
   const openReviewCount =
     trackerWorkspace?.reviewItems.filter((item) => item.status === "pending").length ?? 0;
 
-  const aiInsight = useMemo(() => {
-    if (reviewStatus.tone === "danger") return reviewStatus.action;
-    if (reviewStatus.tone === "warning")
-      return "กันเวลา Weekly Review ภายใน 24 ชั่วโมงเพื่อ reset focus ของสัปดาห์";
-    if (blockedTaskCount > 0)
-      return `มี ${blockedTaskCount} blocked task ที่ควร unblock ก่อนรับงานใหม่`;
-    if (staleWaitingCount > 0)
-      return `มี ${staleWaitingCount} waiting item ที่ควร follow up เพื่อกันงานตกหล่น`;
-    if (trackerUpcomingCount + gtdUpcomingCount > 0)
-      return `มี ${trackerUpcomingCount + gtdUpcomingCount} deadline ภายใน 7 วัน ควรปิดงานเสี่ยงก่อน`;
-    return "Flow ตอนนี้นิ่ง ใช้เวลาใน platform สั้น ๆ แล้วกลับไป deep work ตาม routine";
-  }, [
-    blockedTaskCount,
-    gtdUpcomingCount,
-    reviewStatus.action,
-    reviewStatus.tone,
-    staleWaitingCount,
-    trackerUpcomingCount,
-  ]);
+  const gtdOverdueCount = openGtdItems.filter((item) => isOverdue(item.dueDate, todayStart)).length;
+  const gtdDueTodayCount = openGtdItems.filter((item) => isDueToday(item.dueDate, todayStart)).length;
+  const gtdDueSoonCount = openGtdItems.filter((item) =>
+    isDueBetween(item.dueDate, todayStart + DAY_MS, sevenDayWindowEnd),
+  ).length;
+  const gtdNoDeadlineCount = openGtdItems.filter((item) => !item.dueDate).length;
 
-  const focusLabel =
-    reviewStatus.tone === "danger"
-      ? "ทำ Weekly Review ก่อน"
-      : reviewStatus.tone === "warning"
-        ? "ปิด Weekly Review วันนี้"
-        : blockedTaskCount > 0
-          ? "เคลียร์ blocked task"
-          : "พร้อมกลับไป deep work";
+  const trackerOverdueCount = openTrackerTasks.filter((task) =>
+    isOverdue(task.dueDate, todayStart),
+  ).length;
+  const trackerDueTodayCount = openTrackerTasks.filter((task) =>
+    isDueToday(task.dueDate, todayStart),
+  ).length;
+  const trackerDueSoonCount = openTrackerTasks.filter((task) =>
+    isDueBetween(task.dueDate, todayStart + DAY_MS, sevenDayWindowEnd),
+  ).length;
+  const trackerNoDeadlineCount = openTrackerTasks.filter((task) => !task.dueDate).length;
 
-  const followUpCount = staleWaitingCount + blockedTaskCount;
+  const combinedOverdueCount = gtdOverdueCount + trackerOverdueCount;
+  const combinedDueTodayCount = gtdDueTodayCount + trackerDueTodayCount;
+  const combinedDueSoonCount = gtdDueSoonCount + trackerDueSoonCount;
+  const combinedNoDeadlineCount = gtdNoDeadlineCount + trackerNoDeadlineCount;
 
-  const primaryActions: Array<{
-    href: string;
-    label: string;
-    description: string;
-    icon: ReactNode;
-  }> = [
-    {
-      href: "/gtd",
-      label: "เปิด GTD Workspace",
-      description: "เคลียร์ inbox และเลือก next action ของวัน",
-      icon: <ListChecks className="size-4" />,
-    },
-    {
-      href: "/todos",
-      label: "เช็ก Kanban Board",
-      description: "ดู blocked, waiting และรายการที่ค้างใน Review Queue ของทีม",
-      icon: <ListTodo className="size-4" />,
-    },
-    {
-      href: "/client-rooms",
-      label: "จัดการ Client Rooms",
-      description: "อัปเดต CMS และเช็กลิงก์ที่พร้อมส่งลูกค้า",
-      icon: <FolderOpen className="size-4" />,
-    },
+  const gtdCounts = useMemo(() => {
+    return bucketOrder.map((bucket) => ({
+      label: bucketLabels[bucket],
+      value: openGtdItems.filter((item) => item.bucket === bucket).length,
+      colorClassName: bucketColorClassNames[bucket],
+      hint: bucket === "waiting" ? "ติดตามงานค้าง" : undefined,
+    }));
+  }, [openGtdItems]);
+
+  const kanbanStatusCounts = useMemo<DistributionItem[]>(
+    () =>
+      (["todo", "doing", "waiting", "blocked", "done"] as const).map((status) => ({
+        label: taskStatusLabels[status],
+        value: trackerTasks.filter((task) => task.status === status).length,
+        colorClassName: kanbanStatusColorClassNames[status],
+        hint:
+          status === "blocked"
+            ? "ติด blocker"
+            : status === "waiting"
+              ? "รอ input หรือ approval"
+              : undefined,
+      })),
+    [trackerTasks],
+  );
+
+  const deadlineSegments = useMemo<DistributionItem[]>(
+    () => [
+      {
+        label: "Overdue",
+        value: combinedOverdueCount,
+        colorClassName: "bg-rose-500",
+      },
+      {
+        label: "Due today",
+        value: combinedDueTodayCount,
+        colorClassName: "bg-amber-400",
+      },
+      {
+        label: "Next 7 days",
+        value: combinedDueSoonCount,
+        colorClassName: "bg-sky-400",
+      },
+      {
+        label: "No deadline",
+        value: combinedNoDeadlineCount,
+        colorClassName: "bg-stone-300",
+      },
+    ],
+    [
+      combinedDueSoonCount,
+      combinedDueTodayCount,
+      combinedNoDeadlineCount,
+      combinedOverdueCount,
+    ],
+  );
+
+  const workloadSegments = useMemo<DistributionItem[]>(
+    () => [
+      {
+        label: "GTD",
+        value: openGtdCount,
+        colorClassName: "bg-zinc-900",
+      },
+      {
+        label: "Kanban",
+        value: openTrackerCount,
+        colorClassName: "bg-zinc-400",
+      },
+    ],
+    [openGtdCount, openTrackerCount],
+  );
+
+  const projectMix = useMemo<DistributionItem[]>(() => {
+    const counts = new Map<string, number>();
+
+    for (const task of openTrackerTasks) {
+      counts.set(task.projectType, (counts.get(task.projectType) ?? 0) + 1);
+    }
+
+    for (const item of openGtdItems) {
+      const label = item.linkedProjectId
+        ? trackerProjectTypeById.get(item.linkedProjectId) ?? "Personal / Misc"
+        : "Personal / Misc";
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, value], index) => ({
+        label,
+        value,
+        colorClassName:
+          index === 0
+            ? "bg-zinc-900"
+            : index === 1
+              ? "bg-zinc-700"
+              : index === 2
+                ? "bg-sky-400"
+                : index === 3
+                  ? "bg-amber-400"
+                  : "bg-stone-400",
+      }));
+  }, [openGtdItems, openTrackerTasks, trackerProjectTypeById]);
+
+  const completionTrend = useMemo<TrendPoint[]>(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const dayStart = todayStart - DAY_MS * (6 - index);
+      const nextDay = dayStart + DAY_MS;
+
+      const gtd = gtdItems.filter((item) =>
+        isTimestampInRange(item.doneAt, dayStart, nextDay),
+      ).length;
+      const kanban = trackerTasks.filter((task) =>
+        isTimestampInRange(task.completedAt, dayStart, nextDay),
+      ).length;
+
+      return {
+        label: formatShortDay(dayStart),
+        fullLabel: formatDateLabel(dayStart),
+        gtd,
+        kanban,
+        total: gtd + kanban,
+      };
+    });
+  }, [gtdItems, todayStart, trackerTasks]);
+
+  const riskItems = useMemo<AttentionItem[]>(() => {
+    const items: AttentionItem[] = [];
+
+    for (const item of openGtdItems) {
+      const tone = getDeadlineTone(item.dueDate, todayStart, sevenDayWindowEnd);
+      if (!tone) continue;
+
+      items.push({
+        id: item.id,
+        system: "GTD",
+        title: item.text,
+        context: bucketLabels[item.bucket],
+        dueDate: item.dueDate ?? "",
+        dueLabel: tone === "overdue" ? "เลย deadline" : tone === "today" ? "ครบกำหนดวันนี้" : "กำลังจะถึง",
+        tone,
+        href: "/gtd",
+      });
+    }
+
+    for (const task of openTrackerTasks) {
+      const tone = getDeadlineTone(task.dueDate, todayStart, sevenDayWindowEnd);
+      if (!tone) continue;
+
+      items.push({
+        id: task.id,
+        system: "Kanban",
+        title: task.title,
+        context: `${task.projectName} · ${taskStatusLabels[task.status]}`,
+        dueDate: task.dueDate ?? "",
+        dueLabel: tone === "overdue" ? "เลย deadline" : tone === "today" ? "ครบกำหนดวันนี้" : "กำลังจะถึง",
+        tone,
+        href: "/todos",
+      });
+    }
+
+    return items
+      .sort((a, b) => compareAttentionItems(a, b))
+      .slice(0, 8);
+  }, [openGtdItems, openTrackerTasks, sevenDayWindowEnd, todayStart]);
+
+  const sourceStatuses = [
+    { label: "GTD", state: gtdState },
+    { label: "Kanban", state: trackerState },
   ];
 
-  const workspaceHighlights = [
-    {
-      label: "โฟกัสหลัก",
-      value: focusLabel,
-      detail: aiInsight,
-    },
-    {
-      label: "งานที่ต้องตาม",
-      value: `${followUpCount} รายการ`,
-      detail:
-        followUpCount > 0
-          ? "รวม waiting ที่ค้างกับ blocked task ที่ควรตามต่อ"
-          : "ยังไม่มีรายการที่ต้องเร่งติดตาม",
-    },
-    {
-      label: "Client room ค้างส่ง",
-      value: `${pendingPublishes} โปรเจกต์`,
-      detail:
-        pendingPublishes > 0
-          ? "มี draft ที่ยังไม่ publish หรือมีข้อมูลใหม่กว่าลิงก์ลูกค้า"
-          : "ลิงก์ลูกค้าทันสมัยและพร้อมแชร์",
-    },
-  ];
+  const lastSyncLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat("th-TH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(referenceTime),
+    [referenceTime],
+  );
 
-  const reviewBannerClassName = cn(
-    "rounded-[1.5rem] border px-4 py-3.5 sm:px-5",
-    reviewStatus.tone === "good" &&
-      "border-emerald-200 bg-emerald-50 text-emerald-800",
-    reviewStatus.tone === "warning" &&
-      "border-amber-200 bg-amber-50 text-amber-800",
-    reviewStatus.tone === "danger" &&
-      "border-rose-200 bg-rose-50 text-rose-800",
+  const focusHeadline = useMemo(() => {
+    if (combinedOverdueCount > 0) {
+      return `เคลียร์ ${combinedOverdueCount} งานที่เลย deadline ก่อน`;
+    }
+
+    if (combinedDueTodayCount > 0) {
+      return `มี ${combinedDueTodayCount} งานที่ต้องปิดภายในวันนี้`;
+    }
+
+    if (blockedTaskCount + staleWaitingCount > 0) {
+      return `ตาม ${blockedTaskCount + staleWaitingCount} งานที่ติด blocker หรือรอการ follow-up`;
+    }
+
+    return "ภาพรวมงานยังนิ่ง สามารถกลับไปโฟกัส deep work ได้";
+  }, [blockedTaskCount, combinedDueTodayCount, combinedOverdueCount, staleWaitingCount]);
+
+  const focusBody = useMemo(() => {
+    if (combinedOverdueCount > 0) {
+      return "เริ่มจากรายการ overdue ก่อน แล้วค่อยจัดลำดับงานที่ครบกำหนดวันนี้และภายใน 7 วัน";
+    }
+
+    if (combinedDueTodayCount > 0) {
+      return "งานที่ครบกำหนดวันนี้ควรถูกดึงขึ้นมาปิดก่อนงานที่ยังไม่มี deadline ชัด";
+    }
+
+    if (blockedTaskCount + staleWaitingCount > 0) {
+      return "ลดงานค้างที่รอคนอื่นหรือรอข้อมูล จะช่วยให้ flow ของ GTD และ Kanban สะอาดขึ้นเร็วที่สุด";
+    }
+
+    return "ตอนนี้ workload ค่อนข้างสมดุล ใช้ dashboard เป็นจุดเช็กสั้น ๆ แล้วกลับไปลงมือทำงานจริง";
+  }, [blockedTaskCount, combinedDueTodayCount, combinedOverdueCount, staleWaitingCount]);
+
+  const completionTotal = completionTrend.reduce((sum, point) => sum + point.total, 0);
+  const reviewToneClassName = cn(
+    "rounded-full border px-3 py-2 text-sm font-medium",
+    reviewStatus.tone === "good" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+    reviewStatus.tone === "warning" && "border-amber-200 bg-amber-50 text-amber-700",
+    reviewStatus.tone === "danger" && "border-rose-200 bg-rose-50 text-rose-700",
   );
 
   return (
-    <div ref={containerRef} className="min-h-screen">
+    <div
+      ref={containerRef}
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#fbf7f1_42%,#ffffff_100%)]"
+    >
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
         <div className="flex flex-col gap-3 px-4 py-3.5 sm:px-6 lg:flex-row lg:items-center lg:gap-5 lg:px-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -440,7 +548,7 @@ export function DashboardView() {
               AEC Workflow Platform
             </p>
             <p className="mt-0.5 text-[0.92rem] text-muted-foreground">
-              Dashboard รวมงานส่วนตัว งานทีม และ client rooms
+              Dashboard ใหม่สำหรับคุม GTD, Kanban และ deadline ในมุมเดียว
             </p>
           </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:gap-2.5 lg:justify-end">
@@ -476,417 +584,211 @@ export function DashboardView() {
               <Settings2 className="size-4" />
               <span className="hidden md:inline">Settings & Export</span>
             </Link>
-            <Link
-              href="/client-rooms"
-              aria-label="Client Rooms CMS"
-              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-border px-3 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground sm:px-3.5"
-            >
-              <FolderOpen className="size-4" />
-              <span className="hidden md:inline">Client Rooms CMS</span>
-            </Link>
           </div>
         </div>
       </header>
 
-      <main className="space-y-8 px-4 py-5 sm:space-y-10 sm:px-6 sm:py-7 lg:space-y-12 lg:px-10 lg:py-8">
-        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.95fr)]">
-          <div className="overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,rgba(26,26,26,0.06),transparent_32%),linear-gradient(180deg,rgba(248,248,248,0.7),rgba(255,255,255,1))] p-5 sm:p-6">
-            <div className="max-w-3xl">
-              <p className="caption-editorial mb-2">Owner Dashboard</p>
-              <h1 className="font-display text-[2rem] font-medium tracking-tight sm:text-[2.35rem] lg:text-[2.65rem]">
-                เห็นงานสำคัญเร็วขึ้น และเข้าแต่ละระบบได้โดยไม่ต้องไล่หาเมนู
-              </h1>
-              <p className="mt-3 max-w-2xl text-[0.96rem] leading-6 text-muted-foreground">
-                รวม GTD, Kanban, deadline และ client rooms ไว้ในลำดับที่สแกนง่ายกว่าเดิม
-                เพื่อให้รู้ทันทีว่าต้องเริ่มจากอะไรและควรเข้า workspace ไหนต่อ
-              </p>
-            </div>
-
-            <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
-              {workspaceHighlights.map((highlight) => (
-                <div
-                  key={highlight.label}
-                  className="rounded-[1.35rem] border border-border/80 bg-background/80 p-3.5 sm:p-4"
-                >
-                  <p className="caption-editorial text-[0.68rem]">{highlight.label}</p>
-                  <p className="mt-2 text-[1.02rem] font-semibold tracking-tight text-foreground">
-                    {highlight.value}
-                  </p>
-                  <p className="mt-1.5 text-[0.92rem] leading-6 text-muted-foreground">
-                    {highlight.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <aside className="rounded-[2rem] border border-border bg-secondary/45 p-4 sm:p-5">
-            <p className="caption-editorial mb-2.5">Quick Actions</p>
-            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
-              เปิด workspace ที่ใช้บ่อยได้ทันที
-            </h2>
-            <p className="mt-2.5 text-[0.94rem] leading-6 text-muted-foreground">
-              เริ่มจากงานส่วนตัว, เช็กสถานะทีม, หรือกระโดดไปจัดการงานส่งลูกค้าได้จากจุดเดียว
-            </p>
-
-            <div className="mt-4 space-y-2.5">
-              {primaryActions.map((action) => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className="group flex items-start gap-3 rounded-[1.35rem] border border-border bg-background px-3.5 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.05)]"
-                >
-                  <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
-                    {action.icon}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[0.98rem] font-semibold text-foreground">{action.label}</p>
-                    <p className="mt-1 text-[0.92rem] leading-6 text-muted-foreground">
-                      {action.description}
-                    </p>
-                  </div>
-                  <ArrowRight className="ml-auto mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-foreground" />
-                </Link>
-              ))}
-            </div>
-          </aside>
-        </section>
-
-        <section className="fade-up space-y-4">
-          <div className={reviewBannerClassName}>
-            <p className="text-sm font-semibold">{reviewStatus.title}</p>
-            <p className="mt-1 text-[0.94rem] leading-6">{reviewStatus.body}</p>
-            <p className="mt-2 text-xs uppercase tracking-[0.12em] opacity-80">
-              {reviewStatus.action}
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <CommandCard
-              icon={<ListChecks className="size-4" />}
-              label="GTD Stats"
-              metric={`${gtdCounts.next} next action`}
-              title={`${gtdCounts.inbox} inbox · ${gtdCounts.waiting} waiting`}
-              body={`มี waiting ที่ค้าง ${staleWaitingCount} รายการ และ weekly review ตอนนี้อยู่ที่ "${reviewStatus.title}"`}
-            />
-            <CommandCard
-              icon={<ClipboardList className="size-4" />}
-              label="Kanban Overview"
-              metric={`${trackerTasks.length} tasks`}
-              title={`${trackerWorkspace?.projects.length ?? 0} projects`}
-              body={
-                trackerWorkspace
-                  ? `${blockedTaskCount} blocked · ${waitingTaskCount} waiting · พร้อมเช็กสถานะทั้งทีมได้จากหน้าเดียว`
-                  : trackerStatus
-              }
-            />
-            <CommandCard
-              icon={<CalendarClock className="size-4" />}
-              label="Upcoming"
-              metric={`${trackerUpcomingCount + gtdUpcomingCount} due soon`}
-              title={`${trackerOverdueCount} overdue task`}
-              body="รวม deadline จาก GTD และ Kanban เพื่อให้เห็นงานเสี่ยงก่อนเริ่มวัน"
-            />
-            <CommandCard
-              icon={<BrainCircuit className="size-4" />}
-              label="AI Insights"
-              metric={focusLabel}
-              title="Suggested focus"
-              body={aiInsight}
-            />
-          </div>
-        </section>
-
-        <section className="fade-up space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="caption-editorial mb-2">Quick Launch</p>
-              <h2 className="font-display text-[1.75rem] font-medium tracking-tight sm:text-[2rem]">
-                5 frameworks ใน workflow เดียว
-              </h2>
-            </div>
-            <p className="max-w-2xl text-[0.94rem] leading-6 text-muted-foreground">
-              มองเห็นแต่ละ framework แยกเป็นการ์ดชัดเจน เลือกเข้า workspace หรือคู่มือของแต่ละระบบได้เร็วขึ้น
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {manualFrameworkCards.map((framework, index) => (
-              <article
-                key={framework.name}
-                className={cn(
-                  "rounded-[1.5rem] border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(0,0,0,0.04)] sm:p-5",
-                  index % 2 === 1 && "delay-100",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="caption-editorial mb-1 text-[0.68rem]">{framework.name}</p>
-                    <p className="text-[0.98rem] font-semibold text-foreground">
-                      {framework.role}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full border px-2.5 py-1 text-[0.74rem] font-medium",
-                      framework.status === "available" &&
-                        "border-emerald-200 bg-emerald-50 text-emerald-700",
-                      framework.status === "partial" &&
-                        "border-amber-200 bg-amber-50 text-amber-700",
-                      framework.status === "planned" &&
-                        "border-border bg-background text-muted-foreground",
-                    )}
-                  >
-                    {framework.status === "available"
-                      ? "พร้อมใช้"
-                      : framework.status === "partial"
-                        ? "พร้อมบางส่วน"
-                        : "วางแผนไว้"}
-                  </span>
-                </div>
-
-                <p className="mt-3 text-[0.92rem] leading-6 text-muted-foreground">
-                  {framework.whenToUse}
+      <main className="space-y-5 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-7 lg:px-10 lg:py-8">
+        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.92fr)]">
+          <div className="overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,rgba(26,26,26,0.08),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(252,248,242,0.9))] p-5 sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="caption-editorial mb-2">Task Control Tower</p>
+                <h1 className="font-display text-[2rem] font-medium tracking-tight sm:text-[2.35rem] lg:text-[2.7rem]">
+                  เห็นงานค้าง GTD และ Kanban พร้อม deadline ที่ต้องจัดการก่อน
+                </h1>
+                <p className="mt-3 max-w-2xl text-[0.96rem] leading-6 text-muted-foreground">
+                  หน้านี้ตัดส่วน overview แบบเดิมออก แล้วโฟกัสที่ตัวเลขงานค้างจริง งานที่เลย
+                  deadline งานที่ครบกำหนดวันนี้ และ workload ที่กระจายอยู่ในระบบทั้งสอง
                 </p>
+              </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {framework.href ? (
-                    <Link
-                      href={framework.href}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3.5 text-[0.92rem] font-medium text-foreground transition-colors hover:border-foreground hover:bg-secondary"
-                    >
-                      {framework.actionLabel}
-                    </Link>
-                  ) : null}
-
-                  {framework.guideHref ? (
-                    <Link
-                      href={framework.guideHref}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {framework.guideActionLabel ?? "Open guide"}
-                    </Link>
-                  ) : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="fade-up space-y-4">
-          <div>
-            <p className="caption-editorial mb-2">Client Rooms Overview</p>
-            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
-              เห็นงานที่กำลังทำและงานที่ต้อง publish ในมุมเดียว
-            </h2>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
-            <MetricSummaryCard
-              icon={<FolderOpen className="size-4" />}
-              label="Active Projects"
-              value={showClientRoomLoadingState ? <MetricValueSkeleton /> : activeProjects}
-              body="จำนวน client rooms ที่ถูกสร้างใน CMS ปัจจุบัน"
-            />
-            <MetricSummaryCard
-              icon={<FileText className="size-4" />}
-              label="Documents"
-              value={showClientRoomLoadingState ? <MetricValueSkeleton /> : totalDocuments}
-              body="จำนวนเอกสาร draft ทั้งหมดที่ถูกใส่ไว้ใน CMS"
-            />
-            <MetricSummaryCard
-              icon={<ClipboardList className="size-4" />}
-              label="Need Publish"
-              value={showClientRoomLoadingState ? <MetricValueSkeleton /> : pendingPublishes}
-              body="draft ที่ยังไม่เคย publish หรือมีข้อมูลใหม่กว่าลิงก์ลูกค้า"
-            />
-          </div>
-        </section>
-
-        <section className="fade-up space-y-4">
-          <div>
-            <p className="caption-editorial mb-2">Client Room Status</p>
-            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
-              ติดตามสถานะการเผยแพร่
-            </h2>
-            <p className="mt-2 max-w-2xl text-[0.94rem] leading-6 text-muted-foreground">
-              แยกงาน draft, งานที่มีการเปลี่ยนแปลงหลัง publish และงานที่ live แล้ว
-              เพื่อให้รู้ว่าควรเข้าหน้าไหนก่อน
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
-            {(["draft", "dirty", "live"] as ClientRoomStatus[]).map((status, index) => (
-              <div
-                key={status}
-                className={cn(
-                  "fade-up rounded-[1.35rem] border p-4 sm:p-5",
-                  index === 1 && "delay-100",
-                  index === 2 && "delay-200",
-                  clientRoomColumnStyles[status],
-                )}
-              >
-                <div className="mb-5 flex items-center gap-2.5">
-                  <span className={cn("size-2 rounded-full", clientRoomDotStyles[status])} />
-                  <h3
-                    className={cn(
-                      "text-sm font-semibold uppercase tracking-widest",
-                      clientRoomHeaderStyles[status],
-                    )}
-                  >
-                    {getClientRoomStatusLabel(status)}
-                  </h3>
-                  {showClientRoomLoadingState ? (
-                    <SkeletonBlock className="ml-auto h-3 w-8 rounded-full" />
-                  ) : (
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {clientRoomGroups[status].length}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  {showClientRoomLoadingState ? (
-                    <>
-                      <ClientRoomStatusCardSkeleton />
-                      <ClientRoomStatusCardSkeleton />
-                    </>
-                  ) : clientRoomGroups[status].length === 0 ? (
-                    <p className="py-6 text-center text-xs text-muted-foreground">
-                      ไม่มีงาน
-                    </p>
-                  ) : null}
-
-                  {clientRoomGroups[status].map((project) => (
-                    <Link
-                      key={project.id}
-                      href={`/client-rooms?projectId=${project.id}`}
-                      className={cn(
-                        "block rounded-[1.2rem] border bg-background p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-4",
-                        clientRoomCardStyles[status],
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {project.slug}
-                        </span>
-                        <span className="caption-editorial text-[0.7rem]">
-                          {project.projectType}
-                        </span>
-                      </div>
-                      <p className="mt-2 font-display text-[1rem] font-medium leading-tight">
-                        {project.title}
-                      </p>
-                      <p className="mt-1 text-[0.9rem] text-muted-foreground">
-                        {project.clientName}
-                      </p>
-                      <p className="mt-2 text-[0.88rem] leading-5 text-muted-foreground">
-                        {getClientRoomStatusBody(project)}
-                      </p>
-                    </Link>
+              <div className="rounded-[1.4rem] border border-border/80 bg-background/90 p-4 sm:min-w-[16rem]">
+                <p className="caption-editorial text-[0.68rem]">Last sync</p>
+                <p className="mt-2 text-[0.94rem] font-medium text-foreground">{lastSyncLabel}</p>
+                <div className="mt-3 space-y-2">
+                  {sourceStatuses.map((source) => (
+                    <SourceStatusBadge key={source.label} label={source.label} state={source.state} />
                   ))}
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <KpiCard
+                icon={<Layers3 className="size-4" />}
+                label="Outstanding"
+                value={combinedOpenCount}
+                detail={`${openGtdCount} GTD · ${openTrackerCount} Kanban`}
+              />
+              <KpiCard
+                icon={<AlertTriangle className="size-4" />}
+                label="Overdue"
+                value={combinedOverdueCount}
+                detail="งานที่เลย deadline แล้ว"
+                tone={combinedOverdueCount > 0 ? "alert" : "neutral"}
+              />
+              <KpiCard
+                icon={<CalendarDays className="size-4" />}
+                label="Due Today"
+                value={combinedDueTodayCount}
+                detail="งานที่ต้องปิดภายในวันนี้"
+                tone={combinedDueTodayCount > 0 ? "warning" : "neutral"}
+              />
+              <KpiCard
+                icon={<Clock3 className="size-4" />}
+                label="Next 7 Days"
+                value={combinedDueSoonCount}
+                detail="งานที่จะเริ่มกดดันในสัปดาห์นี้"
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+              <section className="rounded-[1.5rem] border border-border bg-background/80 p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="caption-editorial text-[0.68rem]">Priority Now</p>
+                    <h2 className="mt-2 font-display text-[1.3rem] font-medium tracking-tight sm:text-[1.5rem]">
+                      {focusHeadline}
+                    </h2>
+                  </div>
+                  <span className={reviewToneClassName}>{reviewStatus.title}</span>
+                </div>
+                <p className="mt-3 text-[0.94rem] leading-6 text-muted-foreground">{focusBody}</p>
+
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground">Deadline Health</p>
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                      overdue / today / next 7 days
+                    </p>
+                  </div>
+                  <SegmentedBar items={deadlineSegments} emptyLabel="ยังไม่มี deadline ให้ติดตาม" />
+                </div>
+              </section>
+
+              <aside className="rounded-[1.5rem] border border-border bg-[#faf7f2] p-4 sm:p-5">
+                <p className="caption-editorial text-[0.68rem]">Operational Signals</p>
+                <h2 className="mt-2 font-display text-[1.3rem] font-medium tracking-tight sm:text-[1.5rem]">
+                  สถานะที่ควรเช็กก่อนเริ่มงาน
+                </h2>
+
+                <div className="mt-4 space-y-3">
+                  <SignalCard
+                    label="Weekly Review"
+                    value={reviewStatus.title}
+                    detail={reviewStatus.action}
+                  />
+                  <SignalCard
+                    label="Kanban Friction"
+                    value={`${blockedTaskCount} blocked · ${waitingTaskCount} waiting`}
+                    detail="ใช้ตัวเลขนี้ดูว่าบอร์ดมีงานติดค้างจาก dependency มากแค่ไหน"
+                  />
+                  <SignalCard
+                    label="Follow-up Queue"
+                    value={`${staleWaitingCount} stale waiting · ${openReviewCount} review`}
+                    detail="เหมาะกับงานติดตามคน งานรอข้อมูล และ review ที่ยังไม่อนุมัติ"
+                  />
+                </div>
+
+                <div className="mt-5 rounded-[1.2rem] border border-border/80 bg-background/80 p-3.5">
+                  <p className="text-sm font-semibold text-foreground">Workload split</p>
+                  <p className="mt-1 text-[0.92rem] leading-6 text-muted-foreground">
+                    ดูว่างานค้างกระจุกอยู่ที่ GTD หรือ Kanban มากกว่า เพื่อเลือก workspace ให้ตรงก่อน
+                  </p>
+                  <div className="mt-3">
+                    <SegmentedBar items={workloadSegments} emptyLabel="ยังไม่มีงานค้างในระบบ" compact />
+                  </div>
+                </div>
+              </aside>
+            </div>
           </div>
         </section>
 
-        <section className="fade-up space-y-3.5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="caption-editorial mb-2">Client Rooms</p>
-              <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[1.95rem]">
-                จัดการและเปิดลิงก์แชร์
-              </h2>
+        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+          <DashboardPanel
+            icon={<BarChart3 className="size-4" />}
+            eyebrow="Pipeline Breakdown"
+            title="ดูว่างานค้างกระจายอยู่ตรงไหนของแต่ละระบบ"
+            body="GTD ช่วยบอกว่าความคิดและ commitment ค้างอยู่ bucket ไหน ส่วน Kanban บอกว่าทีมติดอยู่ที่สถานะใด"
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DistributionList
+                title="GTD Buckets"
+                items={gtdCounts.filter((item) => item.value > 0)}
+                emptyLabel={gtdState.message}
+              />
+              <DistributionList
+                title="Kanban Status"
+                items={kanbanStatusCounts.filter((item) => item.value > 0)}
+                emptyLabel={trackerState.message}
+              />
             </div>
-            <p className="max-w-2xl text-[0.94rem] leading-6 text-muted-foreground">
-              กรองตามประเภท เดือน และปี เพื่อหาโปรเจกต์ที่ต้องแก้ใน CMS หรือพร้อมเปิดลิงก์ลูกค้าได้เร็วขึ้น
+          </DashboardPanel>
+
+          <DashboardPanel
+            icon={<FolderKanban className="size-4" />}
+            eyebrow="Project Mix"
+            title="รองรับงานหลายประเภท ไม่ได้จำกัดแค่งานสถาปัตยกรรม"
+            body="หากเพิ่ม project type เป็น Website, Anime, YouTube Content หรือหมวดอื่น ๆ dashboard จะกระจาย workload ตามประเภทงานให้เองทันที"
+          >
+            <DistributionList
+              title="Top project types"
+              items={projectMix}
+              emptyLabel="ยังไม่มี project type ให้กระจายผลวิเคราะห์"
+            />
+          </DashboardPanel>
+        </section>
+
+        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
+          <DashboardPanel
+            icon={<CheckCircle2 className="size-4" />}
+            eyebrow="Completion Trend"
+            title="กราฟงานที่ปิดไปในรอบ 7 วันล่าสุด"
+            body="ใช้ดูจังหวะการปิดงานของ GTD และ Kanban ว่ามีแรงส่งจริงหรือกำลังสะสม backlog เพิ่มขึ้น"
+          >
+            <CompletionTrendCard
+              items={completionTrend}
+              totalCompleted={completionTotal}
+              emptyLabel="ยังไม่มีประวัติงานที่ปิดใน 7 วันที่ผ่านมา"
+            />
+          </DashboardPanel>
+
+          <DashboardPanel
+            icon={<AlertTriangle className="size-4" />}
+            eyebrow="Risk Radar"
+            title="รายการที่เสี่ยงหลุด deadline มากที่สุด"
+            body="รวมงานจาก GTD และ Kanban ไว้ในลิสต์เดียว เพื่อให้คุณหยิบงานที่เสี่ยงก่อนกลับไป deep work"
+          >
+            <AttentionList items={riskItems} />
+          </DashboardPanel>
+        </section>
+
+        <section className="fade-up rounded-[2rem] border border-border bg-background p-5 sm:p-6">
+          <div className="max-w-3xl">
+            <p className="caption-editorial mb-2">Suggested Next Improvements</p>
+            <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[2rem]">
+              ถ้าจะใช้กับ Website, Anime, Content หรือโปรเจกต์ส่วนตัว ควรเพิ่มอะไรต่อ
+            </h2>
+            <p className="mt-3 text-[0.95rem] leading-6 text-muted-foreground">
+              โครง GTD + Kanban ตอนนี้ใช้ต่อได้เลย แต่ถ้าจะให้เหมาะกับงาน creative หรือ digital
+              project มากขึ้น แนะนำให้เพิ่ม template และ metadata ตามลักษณะงานจริง
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 rounded-[1.5rem] border border-border bg-secondary/30 p-3.5">
-            <FilterSelect
-              label="ประเภท"
-              value={typeFilter}
-              onChange={setTypeFilter}
-              options={getProjectTypes().map((type) => ({ value: type, label: type }))}
+          <div className="mt-5 grid gap-3 lg:grid-cols-3">
+            <RecommendationCard
+              title="Custom project types"
+              body="ตั้ง project type ให้สะท้อนงานจริง เช่น Website, Anime, YouTube Content, Marketing, Admin เพื่อให้ dashboard วิเคราะห์ workload ตามหมวดงานได้แม่นขึ้น"
             />
-            <FilterSelect
-              label="เดือน"
-              value={monthFilter}
-              onChange={setMonthFilter}
-              options={availableMonths.map((month) => ({
-                value: String(month),
-                label: MONTH_LABELS[month] || String(month + 1),
-              }))}
+            <RecommendationCard
+              title="Pipeline templates"
+              body="งานแต่ละชนิดควรมีสถานะไม่เหมือนกัน เช่น script → storyboard → edit → publish หรือ brief → design → build → QA → launch"
             />
-            <FilterSelect
-              label="ปี"
-              value={yearFilter}
-              onChange={setYearFilter}
-              options={availableYears.map((year) => ({
-                value: String(year),
-                label: String(year),
-              }))}
+            <RecommendationCard
+              title="Creative contexts"
+              body="GTD จะทรงพลังขึ้นถ้ามี context หรือ tag สำหรับงานอย่าง writing, recording, editing, rendering, review และ publishing"
             />
-            {hasActiveFilters ? (
-              <button
-                onClick={clearFilters}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-background px-4 text-[0.92rem] font-medium text-muted-foreground transition-all duration-300 hover:border-foreground hover:text-foreground"
-              >
-                <X className="size-3.5" />
-                ล้าง filter
-              </button>
-            ) : null}
-            {showClientRoomLoadingState ? (
-              <SkeletonBlock className="h-4 w-24 rounded-full" />
-            ) : (
-              <span className="text-[0.92rem] text-muted-foreground">
-                แสดง {filteredProjects.length} โปรเจกต์
-              </span>
-            )}
-          </div>
-        </section>
-
-        <section>
-          <div className="fade-up mb-5">
-            <p className="caption-editorial mb-2">Client Rooms</p>
-            <h3 className="font-display text-xl font-medium tracking-tight text-muted-foreground sm:text-2xl">
-              รายการโปรเจกต์ล่าสุด
-            </h3>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {showClientRoomLoadingState ? (
-              <>
-                <ProjectCardSkeleton />
-                <ProjectCardSkeleton delay="delay-100" />
-              </>
-            ) : null}
-
-            {!showClientRoomLoadingState && filteredProjects.length === 0 ? (
-              <div className="col-span-full rounded-[1.5rem] border border-border p-10 text-center sm:p-12">
-                <p className="text-base leading-7 text-muted-foreground">
-                  {clientRoomProjects.length === 0
-                    ? clientRoomStatus
-                    : "ไม่พบโปรเจกต์ที่ตรงกับ filter"}
-                </p>
-                <button
-                  onClick={clearFilters}
-                  className="mt-3 text-sm font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
-                >
-                  ล้าง filter ทั้งหมด
-                </button>
-              </div>
-            ) : null}
-
-            {filteredProjects.map((project, index) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                delay={index % 2 === 0 ? "" : "delay-100"}
-              />
-            ))}
           </div>
         </section>
       </main>
@@ -894,256 +796,428 @@ export function DashboardView() {
   );
 }
 
-function CommandCard({
+function KpiCard({
   icon,
   label,
-  metric,
-  title,
-  body,
+  value,
+  detail,
+  tone = "neutral",
 }: {
   icon: ReactNode;
   label: string;
-  metric: string;
+  value: number;
+  detail: string;
+  tone?: "neutral" | "warning" | "alert";
+}) {
+  return (
+    <article
+      className={cn(
+        "rounded-[1.35rem] border p-4",
+        tone === "neutral" && "border-border bg-background/80",
+        tone === "warning" && "border-amber-200 bg-amber-50/80",
+        tone === "alert" && "border-rose-200 bg-rose-50/80",
+      )}
+    >
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="caption-editorial text-[0.68rem]">{label}</span>
+      </div>
+      <p className="mt-3 font-display text-[2rem] font-medium tracking-tight text-foreground">
+        {value}
+      </p>
+      <p className="mt-1 text-[0.9rem] leading-6 text-muted-foreground">{detail}</p>
+    </article>
+  );
+}
+
+function DashboardPanel({
+  icon,
+  eyebrow,
+  title,
+  body,
+  children,
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  body: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[1.8rem] border border-border bg-background p-5 sm:p-6">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="caption-editorial text-[0.68rem]">{eyebrow}</span>
+      </div>
+      <h2 className="mt-3 font-display text-[1.45rem] font-medium tracking-tight sm:text-[1.65rem]">
+        {title}
+      </h2>
+      <p className="mt-2 max-w-3xl text-[0.94rem] leading-6 text-muted-foreground">{body}</p>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function SignalCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-[1.2rem] border border-border/80 bg-background/80 p-3.5">
+      <p className="caption-editorial text-[0.68rem]">{label}</p>
+      <p className="mt-2 text-[1rem] font-semibold tracking-tight text-foreground">{value}</p>
+      <p className="mt-1.5 text-[0.9rem] leading-6 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function SourceStatusBadge({
+  label,
+  state,
+}: {
+  label: string;
+  state: SourceState;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-full border px-3 py-2 text-[0.88rem]",
+        state.tone === "ready" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+        state.tone === "loading" && "border-stone-200 bg-stone-50 text-stone-700",
+        state.tone === "error" && "border-rose-200 bg-rose-50 text-rose-700",
+      )}
+    >
+      <span className="font-medium">{label}</span>
+      <span className="truncate text-right">{state.message}</span>
+    </div>
+  );
+}
+
+function SegmentedBar({
+  items,
+  emptyLabel,
+  compact = false,
+}: {
+  items: DistributionItem[];
+  emptyLabel: string;
+  compact?: boolean;
+}) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+
+  if (total === 0) {
+    return (
+      <div className="rounded-[1.2rem] border border-dashed border-border bg-secondary/20 px-4 py-5 text-[0.92rem] text-muted-foreground">
+        {emptyLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("space-y-3", compact && "space-y-2.5")}>
+      <div className="flex h-3 overflow-hidden rounded-full bg-secondary">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={item.colorClassName}
+            style={{
+              width: `${(item.value / total) * 100}%`,
+              minWidth: item.value > 0 ? "0.55rem" : "0",
+            }}
+          />
+        ))}
+      </div>
+
+      <div className={cn("grid gap-2 sm:grid-cols-2", compact && "gap-1.5")}>
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/70 px-3 py-2"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={cn("size-2.5 rounded-full", item.colorClassName)} />
+              <span className="truncate text-[0.92rem] text-foreground">{item.label}</span>
+            </div>
+            <span className="text-[0.92rem] font-semibold text-foreground">{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DistributionList({
+  title,
+  items,
+  emptyLabel,
+}: {
+  title: string;
+  items: DistributionItem[];
+  emptyLabel: string;
+}) {
+  const max = Math.max(...items.map((item) => item.value), 0);
+
+  return (
+    <div className="rounded-[1.3rem] border border-border bg-secondary/25 p-4">
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+
+      {items.length === 0 ? (
+        <p className="mt-4 text-[0.92rem] leading-6 text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {items.map((item) => (
+            <div key={item.label} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[0.94rem] font-medium text-foreground">{item.label}</p>
+                  {item.hint ? (
+                    <p className="truncate text-[0.82rem] text-muted-foreground">{item.hint}</p>
+                  ) : null}
+                </div>
+                <span className="text-[0.92rem] font-semibold text-foreground">{item.value}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-background">
+                <div
+                  className={cn("h-full rounded-full", item.colorClassName)}
+                  style={{
+                    width: `${max === 0 ? 0 : (item.value / max) * 100}%`,
+                    minWidth: item.value > 0 ? "0.5rem" : "0",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompletionTrendCard({
+  items,
+  totalCompleted,
+  emptyLabel,
+}: {
+  items: TrendPoint[];
+  totalCompleted: number;
+  emptyLabel: string;
+}) {
+  const max = Math.max(...items.map((item) => item.total), 0);
+
+  return (
+    <div className="rounded-[1.3rem] border border-border bg-secondary/25 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-foreground">7-day completion chart</p>
+        <span className="text-[0.92rem] text-muted-foreground">
+          ปิดงานรวม {totalCompleted} รายการ
+        </span>
+      </div>
+
+      {totalCompleted === 0 ? (
+        <p className="mt-4 text-[0.92rem] leading-6 text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {items.map((item) => (
+            <div key={item.fullLabel} className="grid gap-2 sm:grid-cols-[5.2rem_minmax(0,1fr)_3rem] sm:items-center">
+              <div>
+                <p className="text-[0.9rem] font-medium text-foreground">{item.label}</p>
+                <p className="text-[0.8rem] text-muted-foreground">{item.fullLabel}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="h-3 rounded-full bg-background">
+                  <div
+                    className="flex h-full overflow-hidden rounded-full"
+                    style={{ width: `${max === 0 ? 0 : (item.total / max) * 100}%` }}
+                  >
+                    {item.gtd > 0 ? (
+                      <div
+                        className="bg-zinc-900"
+                        style={{ width: `${(item.gtd / item.total) * 100}%` }}
+                      />
+                    ) : null}
+                    {item.kanban > 0 ? (
+                      <div
+                        className="bg-zinc-400"
+                        style={{ width: `${(item.kanban / item.total) * 100}%` }}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3 text-[0.8rem] text-muted-foreground">
+                  <span>GTD {item.gtd}</span>
+                  <span>Kanban {item.kanban}</span>
+                </div>
+              </div>
+
+              <p className="text-right text-[0.94rem] font-semibold text-foreground">{item.total}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttentionList({ items }: { items: AttentionItem[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-[1.3rem] border border-dashed border-border bg-secondary/20 px-4 py-5 text-[0.92rem] text-muted-foreground">
+        ตอนนี้ยังไม่มีงานที่ overdue หรือใกล้ deadline มากพอจะขึ้น risk radar
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <Link
+          key={`${item.system}-${item.id}`}
+          href={item.href}
+          className="group flex items-start gap-3 rounded-[1.2rem] border border-border bg-secondary/20 px-4 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/40 hover:bg-background"
+        >
+          <span
+            className={cn(
+              "mt-0.5 inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+              deadlineToneClassNames[item.tone],
+            )}
+          >
+            {item.system}
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.95rem] font-semibold text-foreground">{item.title}</p>
+            <p className="mt-1 text-[0.88rem] leading-5 text-muted-foreground">{item.context}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+                  deadlineToneClassNames[item.tone],
+                )}
+              >
+                {item.dueLabel}
+              </span>
+              <span className="text-[0.82rem] text-muted-foreground">
+                {formatDueDate(item.dueDate)}
+              </span>
+            </div>
+          </div>
+
+          <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-foreground" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function RecommendationCard({
+  title,
+  body,
+}: {
   title: string;
   body: string;
 }) {
   return (
-    <article className="rounded-[1.4rem] border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span className="caption-editorial text-xs">{label}</span>
-      </div>
-      <p className="mt-3 font-display text-[1.18rem] font-medium tracking-tight text-foreground sm:text-[1.35rem]">
-        {metric}
-      </p>
-      <h2 className="mt-1.5 text-[0.92rem] font-semibold text-foreground">{title}</h2>
-      <p className="mt-1.5 text-[0.9rem] leading-5 text-muted-foreground">{body}</p>
+    <article className="rounded-[1.4rem] border border-border bg-secondary/25 p-4">
+      <p className="text-[1rem] font-semibold tracking-tight text-foreground">{title}</p>
+      <p className="mt-2 text-[0.92rem] leading-6 text-muted-foreground">{body}</p>
     </article>
   );
 }
 
-function MetricSummaryCard({
-  icon,
-  label,
-  value,
-  body,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: ReactNode;
-  body: string;
-}) {
-  return (
-    <article className="fade-up rounded-[1.4rem] border border-border bg-background p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] sm:p-5">
-      <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span className="caption-editorial text-xs">{label}</span>
-      </div>
-      <p className="font-display text-[1.85rem] font-medium tracking-tight sm:text-[1.95rem]">{value}</p>
-      <p className="mt-2 text-[0.9rem] leading-5 text-muted-foreground">{body}</p>
-    </article>
-  );
-}
-
-function SkeletonBlock({ className }: { className: string }) {
-  return <div aria-hidden className={cn("skeleton-shimmer", className)} />;
-}
-
-function MetricValueSkeleton() {
-  return <SkeletonBlock className="h-10 w-28 rounded-lg" />;
-}
-
-function ClientRoomStatusCardSkeleton() {
-  return (
-    <div className="rounded-lg border border-white/40 bg-background/80 p-4">
-      <div className="flex items-center gap-2">
-        <SkeletonBlock className="h-3 w-28 rounded-full" />
-        <SkeletonBlock className="h-3 w-16 rounded-full" />
-      </div>
-      <SkeletonBlock className="mt-4 h-6 w-3/4 rounded-lg" />
-      <SkeletonBlock className="mt-2 h-3 w-1/2 rounded-full" />
-      <SkeletonBlock className="mt-4 h-3 w-full rounded-full" />
-      <SkeletonBlock className="mt-2 h-3 w-5/6 rounded-full" />
-    </div>
-  );
-}
-
-function ProjectCardSkeleton({ delay = "" }: { delay?: string }) {
-  return (
-    <div
-      className={cn(
-        "fade-up rounded-lg border border-border bg-background p-6",
-        delay,
-      )}
-    >
-      <SkeletonBlock className="mb-5 aspect-[16/9] w-full rounded-2xl" />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <SkeletonBlock className="h-4 w-36 rounded-full" />
-        <SkeletonBlock className="h-6 w-24 rounded-full" />
-        <SkeletonBlock className="h-6 w-16 rounded-full" />
-      </div>
-      <SkeletonBlock className="h-8 w-2/3 rounded-lg" />
-      <SkeletonBlock className="mt-3 h-4 w-5/6 rounded-full" />
-      <SkeletonBlock className="mt-2 h-4 w-3/4 rounded-full" />
-      <SkeletonBlock className="mt-6 h-4 w-full rounded-full" />
-      <SkeletonBlock className="mt-2 h-4 w-4/5 rounded-full" />
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <SkeletonBlock className="h-4 w-32 rounded-full" />
-        <div className="flex flex-wrap items-center gap-2">
-          <SkeletonBlock className="h-10 w-28 rounded-full" />
-          <SkeletonBlock className="h-10 w-28 rounded-full" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProjectCard({
-  project,
-  delay,
-}: {
-  project: ClientRoomProjectSummary;
-  delay: string;
-}) {
-  const status = getClientRoomStatus(project);
-  const sharePath =
-    project.shareToken && project.publishedAt
-      ? buildClientRoomSharePath(project.shareToken)
-      : null;
-
-  return (
-    <div
-      className={cn(
-        "fade-up group rounded-[1.4rem] border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)]",
-        delay,
-      )}
-    >
-      <div className="p-4 sm:p-5">
-        <div className="overflow-hidden rounded-2xl border border-border bg-secondary/30">
-          {project.thumbnailUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={project.thumbnailUrl}
-              alt={project.title}
-              className="aspect-video max-h-56 w-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="flex aspect-video max-h-56 items-center justify-center text-sm text-muted-foreground">
-              ยังไม่มีรูปโปรเจกต์
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 mb-3 flex flex-wrap items-center gap-2">
-          <span className="caption-editorial text-xs">{project.slug}</span>
-          <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium">
-            {project.projectType}
-          </span>
-          <span
-            className={cn(
-              "rounded-full border px-2.5 py-0.5 text-xs font-medium",
-              status === "draft" && "border-amber-200 bg-amber-50 text-amber-700",
-              status === "dirty" && "border-blue-200 bg-blue-50 text-blue-700",
-              status === "live" && "border-emerald-200 bg-emerald-50 text-emerald-700",
-            )}
-          >
-            {getClientRoomStatusLabel(status)}
-          </span>
-        </div>
-
-        <h3 className="font-display text-[1.1rem] font-medium tracking-tight sm:text-[1.25rem]">
-          {project.title}
-        </h3>
-        <p className="mt-1 text-[0.9rem] leading-5 text-muted-foreground">
-          {project.clientName} · {project.location || "ยังไม่ระบุที่ตั้ง"} · อัปเดต{" "}
-          {formatPortalDate(project.updatedAt)}
-        </p>
-
-        <p className="mt-3 line-clamp-2 text-[0.9rem] leading-5 text-muted-foreground">
-          {project.overview}
-        </p>
-
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3.5">
-          <span className="text-[0.9rem] leading-5 text-muted-foreground">
-            {project.documentCount} files · {project.publishedAt ? "published" : "draft only"}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/client-rooms?projectId=${project.id}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4 text-[0.92rem] font-medium text-background transition-all duration-300 hover:bg-transparent hover:text-foreground hover:ring-1 hover:ring-foreground"
-            >
-              แก้ไขใน CMS
-              <ArrowRight className="size-3.5" />
-            </Link>
-            {sharePath ? (
-              <Link
-                href={sharePath}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-[0.92rem] font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-              >
-                เปิดลิงก์ลูกค้า
-              </Link>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function getClientRoomStatus(project: ClientRoomProjectSummary): ClientRoomStatus {
-  if (!project.publishedAt) {
-    return "draft";
-  }
-
-  if (new Date(project.updatedAt).getTime() > new Date(project.publishedAt).getTime()) {
-    return "dirty";
-  }
-
-  return "live";
-}
-
-function getClientRoomStatusLabel(status: ClientRoomStatus) {
-  switch (status) {
-    case "draft":
-      return "Draft Only";
-    case "dirty":
-      return "Unpublished Changes";
-    case "live":
-      return "Live";
-  }
-}
-
-function getClientRoomStatusBody(project: ClientRoomProjectSummary) {
-  const status = getClientRoomStatus(project);
-
-  switch (status) {
-    case "draft":
-      return "ยังไม่เคย publish ลิงก์ลูกค้า";
-    case "dirty":
-      return "มี draft ใหม่กว่าลิงก์ลูกค้า กด publish อีกครั้งเมื่อพร้อม";
-    case "live":
-      return `เผยแพร่ล่าสุด ${project.publishedAt ? formatPortalDate(project.publishedAt) : "-"}`;
-  }
-}
-
-function isDateWithinDays(value: string, days: number, referenceTime: number) {
+function getDayStart(value: number) {
   const date = new Date(value);
-  const diff = date.getTime() - referenceTime;
-  return diff >= 0 && diff <= days * 86400000;
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 }
 
-function isTrackerTaskOverdue(task: TrackerTaskRecord, referenceTime: number) {
-  if (!task.dueDate || task.status === "done") return false;
-  return new Date(task.dueDate).getTime() < referenceTime;
+function getDueDay(value: string | null) {
+  if (!value) return null;
+  const date = parseDateInput(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 }
 
-function isTrackerTaskUpcoming(task: TrackerTaskRecord, referenceTime: number) {
-  if (!task.dueDate || task.status === "done") return false;
-  return isDateWithinDays(task.dueDate, 7, referenceTime);
+function isOverdue(value: string | null, todayStart: number) {
+  const dueDay = getDueDay(value);
+  return dueDay !== null && dueDay < todayStart;
+}
+
+function isDueToday(value: string | null, todayStart: number) {
+  const dueDay = getDueDay(value);
+  return dueDay !== null && dueDay === todayStart;
+}
+
+function isDueBetween(value: string | null, start: number, end: number) {
+  const dueDay = getDueDay(value);
+  return dueDay !== null && dueDay >= start && dueDay <= end;
+}
+
+function isTimestampInRange(value: string | null, start: number, end: number) {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return false;
+  return timestamp >= start && timestamp < end;
+}
+
+function getDeadlineTone(
+  value: string | null,
+  todayStart: number,
+  sevenDayWindowEnd: number,
+): DeadlineTone | null {
+  if (isOverdue(value, todayStart)) return "overdue";
+  if (isDueToday(value, todayStart)) return "today";
+  if (isDueBetween(value, todayStart + DAY_MS, sevenDayWindowEnd)) return "soon";
+  return null;
+}
+
+function compareAttentionItems(a: AttentionItem, b: AttentionItem) {
+  const toneRank: Record<DeadlineTone, number> = {
+    overdue: 0,
+    today: 1,
+    soon: 2,
+  };
+
+  if (toneRank[a.tone] !== toneRank[b.tone]) {
+    return toneRank[a.tone] - toneRank[b.tone];
+  }
+
+  return parseDateInput(a.dueDate).getTime() - parseDateInput(b.dueDate).getTime();
+}
+
+function formatShortDay(value: number) {
+  return new Intl.DateTimeFormat("th-TH", { weekday: "short" }).format(value);
+}
+
+function formatDateLabel(value: number) {
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+  }).format(value);
+}
+
+function formatDueDate(value: string) {
+  const date = parseDateInput(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function parseDateInput(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+
+  return new Date(value);
 }
 
 async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
@@ -1155,18 +1229,4 @@ async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
   }
 
   return data.workspace;
-}
-
-async function getClientRoomProjects(): Promise<ClientRoomProjectSummary[]> {
-  const response = await fetch("/api/client-rooms/projects", { cache: "no-store" });
-  const data = (await response.json()) as {
-    error?: string;
-    projects?: ClientRoomProjectSummary[];
-  };
-
-  if (!response.ok || !data.projects) {
-    throw new Error(data.error || "Client rooms unavailable.");
-  }
-
-  return data.projects;
 }
