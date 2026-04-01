@@ -15,6 +15,7 @@ import {
   LoaderCircle,
   Settings2,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
@@ -141,12 +142,14 @@ export function GtdWorkspace() {
     () => items.filter((item) => !item.dueDate && !item.done),
     [items],
   );
+  const prevNoDeadlineCount = useRef(noDeadlineItems.length);
 
   useEffect(() => {
-    if (!isLoading && noDeadlineItems.length > 0) {
+    if (!isLoading && noDeadlineItems.length > 0 && noDeadlineItems.length > prevNoDeadlineCount.current) {
       setShowNoDeadlineAlert(true);
     }
-  }, [isLoading]);
+    prevNoDeadlineCount.current = noDeadlineItems.length;
+  }, [isLoading, noDeadlineItems.length]);
 
   const counts = getBucketCounts(items);
   const archivedCount = items.filter((item) => item.done).length;
@@ -859,7 +862,96 @@ export function GtdWorkspace() {
             })}
           </div>
 
-          <div className="space-y-6">
+          {/* Mobile popup overlay for Item Detail */}
+          {selectedItem ? (
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 xl:hidden" onClick={() => setSelectedItemId(null)}>
+              <div
+                className="max-h-[85vh] w-full overflow-y-auto rounded-t-[2rem] border border-border bg-background p-5 shadow-xl animate-in slide-in-from-bottom duration-200"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <p className="caption-editorial">Item Detail</p>
+                  <button type="button" onClick={() => setSelectedItemId(null)} className="rounded-full p-2 hover:bg-secondary transition-colors">
+                    <X className="size-5" />
+                  </button>
+                </div>
+                {selectedItemPendingAction ? <div className="mb-3"><LoadingPill label={selectedItemPendingAction.label} /></div> : null}
+                <div className="space-y-4">
+                  {/* Mobile detail form – same as desktop */}
+                  <input
+                    value={itemDraft?.text ?? ""}
+                    onChange={(event) => updateItemDraft({ text: event.target.value })}
+                    onBlur={() => { void saveItemDraft(); }}
+                    disabled={isSelectedItemLocked}
+                    className="h-12 w-full rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <div className="grid gap-3 grid-cols-2">
+                    <select value={itemDraft?.bucket ?? selectedItem.bucket} onChange={(event) => { const bucket = event.target.value as GtdBucket; updateItemDraft({ bucket }); setActiveBucket(bucket); void updateItem(selectedItem.id, { bucket }, undefined, `Moving to ${bucketLabels[bucket]}...`, "item-detail"); }} disabled={isSelectedItemLocked} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60">
+                      {bucketOrder.map((bucket) => <option key={bucket} value={bucket}>{bucketLabels[bucket]}</option>)}
+                    </select>
+                    <select value={itemDraft?.context ?? selectedItem.context} onChange={(event) => { const context = event.target.value as GtdContext; updateItemDraft({ context }); void updateItem(selectedItem.id, { context }, undefined, "Updating context...", "item-detail"); }} disabled={isSelectedItemLocked} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60">
+                      <option value="">No context</option>
+                      {contextOptions.filter((option) => option.value !== "all").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <select value={itemDraft?.priority ?? selectedItem.priority} onChange={(event) => { const priority = event.target.value as GtdPriority; updateItemDraft({ priority }); void updateItem(selectedItem.id, { priority }, undefined, "Updating priority...", "item-detail"); }} disabled={isSelectedItemLocked} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60">
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                    <input type="date" value={itemDraft?.dueDate ?? selectedItem.dueDate ?? ""} onChange={(event) => { const dueDate = event.target.value || null; updateItemDraft({ dueDate }); void updateItem(selectedItem.id, { dueDate }, undefined, "Updating due date...", "item-detail"); }} disabled={isSelectedItemLocked} className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60" />
+                  </div>
+                  <textarea value={itemDraft?.note ?? ""} onChange={(event) => updateItemDraft({ note: event.target.value })} onBlur={() => { void saveItemDraft(); }} rows={4} placeholder="Notes, delegated owner, next step, or meeting context..." disabled={isSelectedItemLocked} className="w-full rounded-[1.4rem] border border-border px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground disabled:cursor-not-allowed disabled:opacity-60" />
+                  {selectedItem.done ? (
+                    <div className="rounded-[1.4rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                      Archived on {formatShortDate(selectedItem.doneAt ?? selectedItem.updatedAt)}. Use Mark active to restore it to {bucketLabels[selectedItem.bucket]}.
+                    </div>
+                  ) : null}
+                  {selectedItem.linkedProjectId && selectedItem.linkedTaskId ? (
+                    <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      <p className="font-medium">Linked to Kanban.</p>
+                      <p className="mt-1">This GTD item is connected to a Kanban task. Open it in Kanban to update board status or execution details.</p>
+                    </div>
+                  ) : null}
+                  {selectedItem.bucket === "inbox" && !selectedItem.done ? (
+                    <div className="rounded-[1.4rem] bg-secondary/50 p-4">
+                      <p className="caption-editorial text-[0.68rem]">Clarify Flow</p>
+                      <div className="mt-3 grid gap-2 grid-cols-2">
+                        <QuickProcessButton label="Next Action" onClick={() => processInboxItem("next")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:next")} />
+                        <QuickProcessButton label="Waiting For" onClick={() => processInboxItem("waiting")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:waiting")} />
+                        <QuickProcessButton label="Calendar" onClick={() => processInboxItem("calendar")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:calendar")} />
+                        <QuickProcessButton label="Someday" onClick={() => processInboxItem("someday")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:someday")} />
+                        <QuickProcessButton label="Reference" onClick={() => processInboxItem("reference")} disabled={isSelectedItemLocked} isPending={isPendingButton("process:reference")} />
+                        <QuickProcessButton label="Done in 2 min" onClick={() => toggleDone(selectedItem, "toggle-quick")} disabled={isSelectedItemLocked} isPending={isPendingButton("toggle-quick")} />
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-3 pb-4">
+                    {!selectedItem.done ? (
+                      <button type="button" onClick={() => { void openKanbanDialog(); }} disabled={isWorkspaceActionPending} className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60">
+                        {isPendingButton("open-kanban") ? (<><LoaderCircle className="size-4 animate-spin" />Loading...</>) : (selectedItem.linkedTaskId ? "Create another Kanban task" : "Send to Kanban")}
+                      </button>
+                    ) : null}
+                    {selectedItem.linkedProjectId && selectedItem.linkedTaskId ? (
+                      <Link href={`/todos?project=${selectedItem.linkedProjectId}&task=${selectedItem.linkedTaskId}`} className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100">
+                        <ArrowUpRight className="size-4" />Open in Kanban
+                      </Link>
+                    ) : null}
+                    <button type="button" onClick={() => toggleDone(selectedItem)} disabled={isWorkspaceActionPending} className={cn("inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60", selectedItem.done ? "border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100" : "bg-emerald-600 text-white hover:bg-emerald-500")}>
+                      {isPendingButton("toggle-item") ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
+                      {isPendingButton("toggle-item") ? (selectedItem.done ? "Restoring..." : "Saving...") : (selectedItem.done ? "Mark active" : "Mark done")}
+                    </button>
+                    <button type="button" onClick={() => { void deleteItem(selectedItem.id); }} disabled={isWorkspaceActionPending} className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+                      {isPendingButton("delete-item") ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                      {isPendingButton("delete-item") ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Desktop detail sidebar */}
+          <div className="hidden xl:block space-y-6">
             <section className="rounded-[2rem] border border-border bg-background p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="caption-editorial">Item Detail</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, FormEvent } from "react";
 import {
   DndContext,
@@ -224,12 +224,14 @@ export function TaskBoard({
     () => tasks.filter((t) => !t.dueDate && t.status !== "done"),
     [tasks],
   );
+  const prevNoDeadlineCount = useRef(noDeadlineTasks.length);
 
   useEffect(() => {
-    if (noDeadlineTasks.length > 0) {
+    if (noDeadlineTasks.length > 0 && noDeadlineTasks.length > prevNoDeadlineCount.current) {
       setShowNoDeadlineAlert(true);
     }
-  }, []);
+    prevNoDeadlineCount.current = noDeadlineTasks.length;
+  }, [noDeadlineTasks.length]);
   const sensors = useSensors(useSensor(PointerSensor));
   const checklistSections = useMemo(
     () => buildChecklistSections(phase, checklistItems),
