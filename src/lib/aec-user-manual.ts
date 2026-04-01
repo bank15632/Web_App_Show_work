@@ -128,16 +128,20 @@ export const manualDashboardPanels: ManualDashboardPanel[] = [
     body: "จำนวนงานค้างรวมจาก GTD และ Kanban พร้อมภาพรวมว่า backlog กระจุกอยู่ในระบบใดมากกว่า",
   },
   {
+    title: "GTD Analytics",
+    body: "กราฟ GTD แยกเฉพาะระบบเพื่อดู bucket ที่ค้างและจังหวะการปิดงานใน 7 วันล่าสุด",
+  },
+  {
+    title: "Kanban Analytics",
+    body: "กราฟ Kanban แยกเฉพาะระบบเพื่อดู bottleneck ของบอร์ดและงานที่ทีมปิดได้จริงในรอบสัปดาห์",
+  },
+  {
+    title: "Client Rooms",
+    body: "ติดตามจำนวนโปรเจกต์ เอกสาร งานที่ต้อง publish และสถานะ draft / dirty / live ได้จากหน้าเดียว",
+  },
+  {
     title: "Deadline Health",
-    body: "แยกงาน overdue, due today, next 7 days และ no deadline เพื่อจัดลำดับความเสี่ยงให้เร็วขึ้น",
-  },
-  {
-    title: "Pipeline Breakdown",
-    body: "ดูว่างานค้างอยู่ bucket ไหนของ GTD และ status ไหนของ Kanban เพื่อหาคอขวดของ flow",
-  },
-  {
-    title: "Project Mix",
-    body: "กระจาย workload ตาม project type เพื่อให้รองรับงานอย่าง website, anime, content และงานส่วนตัวอื่น ๆ ได้ดีขึ้น",
+    body: "แยกงาน overdue, due today และ next 7 days เพื่อจัดลำดับความเสี่ยงให้เร็วขึ้น",
   },
 ];
 

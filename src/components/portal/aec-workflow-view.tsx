@@ -100,8 +100,8 @@ export function AecWorkflowView() {
               หน้าจอหลักควรเห็นอะไรบ้าง
             </h2>
             <p className="mt-3 text-sm leading-7 text-muted-foreground">
-              ตามคู่มือ dashboard ควรสรุปงานค้าง, deadline health, pipeline breakdown
-              และ project mix ในหน้าเดียว เพื่อให้ตัดสินใจได้ว่าจะเริ่มจากอะไร
+              ตามคู่มือ dashboard ควรสรุปงานค้าง, กราฟ GTD, กราฟ Kanban,
+              deadline health และ Client Rooms ในหน้าเดียว เพื่อให้ตัดสินใจได้ว่าจะเริ่มจากอะไร
             </p>
           </div>
 

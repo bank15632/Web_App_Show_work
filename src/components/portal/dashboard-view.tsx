@@ -10,6 +10,8 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  FileText,
+  FolderOpen,
   FolderKanban,
   Layers3,
   ListChecks,
@@ -17,6 +19,7 @@ import {
   Settings2,
 } from "lucide-react";
 
+import { type ClientRoomProjectSummary } from "@/lib/client-rooms/types";
 import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
   bucketLabels,
@@ -24,6 +27,7 @@ import {
   getWeeklyReviewStatus,
   type GtdItem,
 } from "@/lib/gtd-system";
+import { formatPortalDate } from "@/lib/portal-data";
 import { taskStatusLabels } from "@/lib/tracker/constants";
 import type { TrackerTaskRecord, TrackerWorkspaceData } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
@@ -33,6 +37,7 @@ const DAY_MS = 86_400_000;
 type SourceStateTone = "loading" | "ready" | "error";
 type DashboardTaskSystem = "GTD" | "Kanban";
 type DeadlineTone = "overdue" | "today" | "soon";
+type ClientRoomStatus = "draft" | "dirty" | "live";
 
 type SourceState = {
   tone: SourceStateTone;
@@ -57,6 +62,12 @@ type TrendPoint = {
   gtd: number;
   kanban: number;
   total: number;
+};
+
+type DailySeriesPoint = {
+  label: string;
+  fullLabel: string;
+  value: number;
 };
 
 type AttentionItem = {
@@ -153,6 +164,7 @@ export function DashboardView() {
 
   const [gtdItems, setGtdItems] = useState<GtdItem[]>([]);
   const [trackerWorkspace, setTrackerWorkspace] = useState<TrackerWorkspaceData | null>(null);
+  const [clientRoomProjects, setClientRoomProjects] = useState<ClientRoomProjectSummary[]>([]);
   const [gtdState, setGtdState] = useState<SourceState>({
     tone: "loading",
     message: "กำลังดึงข้อมูล GTD workspace...",
@@ -160,6 +172,10 @@ export function DashboardView() {
   const [trackerState, setTrackerState] = useState<SourceState>({
     tone: "loading",
     message: "กำลังดึงข้อมูล Kanban board...",
+  });
+  const [clientRoomState, setClientRoomState] = useState<SourceState>({
+    tone: "loading",
+    message: "กำลังดึงข้อมูล Client Rooms...",
   });
   const [reviewStatus, setReviewStatus] = useState(getWeeklyReviewStatus(null));
   const [referenceTime, setReferenceTime] = useState(() => Date.now());
@@ -170,10 +186,12 @@ export function DashboardView() {
     async function loadWorkspace() {
       setGtdState({ tone: "loading", message: "กำลังดึงข้อมูล GTD workspace..." });
       setTrackerState({ tone: "loading", message: "กำลังดึงข้อมูล Kanban board..." });
+      setClientRoomState({ tone: "loading", message: "กำลังดึงข้อมูล Client Rooms..." });
 
-      const [gtdResult, trackerResult] = await Promise.allSettled([
+      const [gtdResult, trackerResult, clientRoomResult] = await Promise.allSettled([
         fetchGtdWorkspace(),
         getTrackerWorkspace(),
+        getClientRoomProjects(),
       ]);
 
       if (ignore) return;
@@ -211,6 +229,26 @@ export function DashboardView() {
             trackerResult.reason instanceof Error
               ? trackerResult.reason.message
               : "Kanban board unavailable.",
+        });
+      }
+
+      if (clientRoomResult.status === "fulfilled") {
+        setClientRoomProjects(clientRoomResult.value);
+        setClientRoomState({
+          tone: "ready",
+          message:
+            clientRoomResult.value.length > 0
+              ? "Client Rooms พร้อมใช้งาน"
+              : "ยังไม่มี Client Room ในระบบ",
+        });
+      } else {
+        setClientRoomProjects([]);
+        setClientRoomState({
+          tone: "error",
+          message:
+            clientRoomResult.reason instanceof Error
+              ? clientRoomResult.reason.message
+              : "Client Rooms unavailable.",
         });
       }
 
@@ -260,6 +298,19 @@ export function DashboardView() {
       ),
     [trackerProjects],
   );
+  const clientRoomGroups = useMemo(() => {
+    const groups: Record<ClientRoomStatus, ClientRoomProjectSummary[]> = {
+      draft: [],
+      dirty: [],
+      live: [],
+    };
+
+    for (const project of clientRoomProjects) {
+      groups[getClientRoomStatus(project)].push(project);
+    }
+
+    return groups;
+  }, [clientRoomProjects]);
 
   const openGtdItems = useMemo(
     () => gtdItems.filter((item) => !item.done),
@@ -273,6 +324,44 @@ export function DashboardView() {
   const openGtdCount = openGtdItems.length;
   const openTrackerCount = openTrackerTasks.length;
   const combinedOpenCount = openGtdCount + openTrackerCount;
+  const activeClientRooms = clientRoomProjects.length;
+  const clientRoomDocumentCount = clientRoomProjects.reduce(
+    (count, project) => count + project.documentCount,
+    0,
+  );
+  const clientRoomPendingPublishes = clientRoomProjects.filter(
+    (project) => getClientRoomStatus(project) !== "live",
+  ).length;
+  const recentClientRooms = useMemo(
+    () =>
+      [...clientRoomProjects]
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )
+        .slice(0, 4),
+    [clientRoomProjects],
+  );
+  const clientRoomStatusSegments = useMemo<DistributionItem[]>(
+    () => [
+      {
+        label: "Draft",
+        value: clientRoomGroups.draft.length,
+        colorClassName: "bg-amber-400",
+      },
+      {
+        label: "Unpublished Changes",
+        value: clientRoomGroups.dirty.length,
+        colorClassName: "bg-sky-400",
+      },
+      {
+        label: "Live",
+        value: clientRoomGroups.live.length,
+        colorClassName: "bg-emerald-500",
+      },
+    ],
+    [clientRoomGroups],
+  );
 
   const blockedTaskCount = openTrackerTasks.filter((task) => task.status === "blocked").length;
   const waitingTaskCount = openTrackerTasks.filter((task) => task.status === "waiting").length;
@@ -433,6 +522,24 @@ export function DashboardView() {
       };
     });
   }, [gtdItems, todayStart, trackerTasks]);
+  const gtdCompletionTrend = useMemo<DailySeriesPoint[]>(
+    () =>
+      completionTrend.map((point) => ({
+        label: point.label,
+        fullLabel: point.fullLabel,
+        value: point.gtd,
+      })),
+    [completionTrend],
+  );
+  const kanbanCompletionTrend = useMemo<DailySeriesPoint[]>(
+    () =>
+      completionTrend.map((point) => ({
+        label: point.label,
+        fullLabel: point.fullLabel,
+        value: point.kanban,
+      })),
+    [completionTrend],
+  );
 
   const riskItems = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = [];
@@ -477,6 +584,7 @@ export function DashboardView() {
   const sourceStatuses = [
     { label: "GTD", state: gtdState },
     { label: "Kanban", state: trackerState },
+    { label: "Client Rooms", state: clientRoomState },
   ];
 
   const lastSyncLabel = useMemo(
@@ -520,7 +628,8 @@ export function DashboardView() {
     return "ตอนนี้ workload ค่อนข้างสมดุล ใช้ dashboard เป็นจุดเช็กสั้น ๆ แล้วกลับไปลงมือทำงานจริง";
   }, [blockedTaskCount, combinedDueTodayCount, combinedOverdueCount, staleWaitingCount]);
 
-  const completionTotal = completionTrend.reduce((sum, point) => sum + point.total, 0);
+  const gtdCompletionTotal = gtdCompletionTrend.reduce((sum, point) => sum + point.value, 0);
+  const kanbanCompletionTotal = kanbanCompletionTrend.reduce((sum, point) => sum + point.value, 0);
   const reviewToneClassName = cn(
     "rounded-full border px-3 py-2 text-sm font-medium",
     reviewStatus.tone === "good" && "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -705,27 +814,103 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+        <section className="fade-up grid gap-4 xl:grid-cols-3">
           <DashboardPanel
             icon={<BarChart3 className="size-4" />}
-            eyebrow="Pipeline Breakdown"
-            title="ดูว่างานค้างกระจายอยู่ตรงไหนของแต่ละระบบ"
-            body="GTD ช่วยบอกว่าความคิดและ commitment ค้างอยู่ bucket ไหน ส่วน Kanban บอกว่าทีมติดอยู่ที่สถานะใด"
+            eyebrow="GTD Analytics"
+            title="กราฟ GTD แยกชัดจาก Kanban"
+            body="ดูว่างานค้างอยู่ bucket ไหน และใน 7 วันที่ผ่านมา GTD ปิดงานได้ต่อเนื่องแค่ไหน"
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              <DistributionList
-                title="GTD Buckets"
-                items={gtdCounts.filter((item) => item.value > 0)}
-                emptyLabel={gtdState.message}
-              />
-              <DistributionList
-                title="Kanban Status"
-                items={kanbanStatusCounts.filter((item) => item.value > 0)}
-                emptyLabel={trackerState.message}
+            <DistributionList
+              title="Open GTD buckets"
+              items={gtdCounts.filter((item) => item.value > 0)}
+              emptyLabel={gtdState.message}
+            />
+            <div className="mt-4">
+              <DailyTrendCard
+                title="GTD completion · 7 วันล่าสุด"
+                items={gtdCompletionTrend}
+                totalCompleted={gtdCompletionTotal}
+                colorClassName="bg-zinc-900"
+                emptyLabel="ยังไม่มีงาน GTD ที่ปิดใน 7 วันที่ผ่านมา"
               />
             </div>
           </DashboardPanel>
 
+          <DashboardPanel
+            icon={<CheckCircle2 className="size-4" />}
+            eyebrow="Kanban Analytics"
+            title="กราฟ Kanban แยกชัดจาก GTD"
+            body="ดูว่างานทีมติดอยู่ที่ status ไหน และงานที่ปิดจริงในบอร์ดเดินสม่ำเสมอหรือไม่"
+          >
+            <DistributionList
+              title="Open Kanban statuses"
+              items={kanbanStatusCounts.filter((item) => item.value > 0)}
+              emptyLabel={trackerState.message}
+            />
+            <div className="mt-4">
+              <DailyTrendCard
+                title="Kanban completion · 7 วันล่าสุด"
+                items={kanbanCompletionTrend}
+                totalCompleted={kanbanCompletionTotal}
+                colorClassName="bg-sky-500"
+                emptyLabel="ยังไม่มีงาน Kanban ที่ปิดใน 7 วันที่ผ่านมา"
+              />
+            </div>
+          </DashboardPanel>
+
+          <DashboardPanel
+            icon={<FolderOpen className="size-4" />}
+            eyebrow="Client Rooms"
+            title="Client Rooms ยังอยู่และกลับมาเป็นส่วนสำคัญ"
+            body="ดูจำนวนโปรเจกต์ เอกสาร งานที่ต้อง publish และสถานะ draft / dirty / live ในมุมเดียว"
+          >
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <ClientRoomMetric label="Active" value={activeClientRooms} icon={<FolderOpen className="size-4" />} />
+              <ClientRoomMetric label="Documents" value={clientRoomDocumentCount} icon={<FileText className="size-4" />} />
+              <ClientRoomMetric label="Need Publish" value={clientRoomPendingPublishes} icon={<AlertTriangle className="size-4" />} />
+            </div>
+            <div className="mt-4">
+              <SegmentedBar
+                items={clientRoomStatusSegments}
+                emptyLabel={clientRoomState.message}
+              />
+            </div>
+            <div className="mt-4 space-y-2">
+              {recentClientRooms.length === 0 ? (
+                <div className="rounded-[1.2rem] border border-dashed border-border bg-secondary/20 px-4 py-4 text-[0.92rem] text-muted-foreground">
+                  {clientRoomState.message}
+                </div>
+              ) : (
+                recentClientRooms.map((project) => (
+                  <Link
+                    key={project.id}
+                    href={`/client-rooms?projectId=${project.id}`}
+                    className="group flex items-start gap-3 rounded-[1.15rem] border border-border bg-secondary/20 px-4 py-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/40 hover:bg-background"
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+                        getClientRoomStatusTone(getClientRoomStatus(project)),
+                      )}
+                    >
+                      {getClientRoomStatusLabel(getClientRoomStatus(project))}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[0.94rem] font-semibold text-foreground">{project.title}</p>
+                      <p className="mt-1 text-[0.82rem] leading-5 text-muted-foreground">
+                        {project.clientName} · {project.documentCount} files · อัปเดต {formatPortalDate(project.updatedAt)}
+                      </p>
+                    </div>
+                    <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                  </Link>
+                ))
+              )}
+            </div>
+          </DashboardPanel>
+        </section>
+
+        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <DashboardPanel
             icon={<FolderKanban className="size-4" />}
             eyebrow="Project Mix"
@@ -736,21 +921,6 @@ export function DashboardView() {
               title="Top project types"
               items={projectMix}
               emptyLabel="ยังไม่มี project type ให้กระจายผลวิเคราะห์"
-            />
-          </DashboardPanel>
-        </section>
-
-        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
-          <DashboardPanel
-            icon={<CheckCircle2 className="size-4" />}
-            eyebrow="Completion Trend"
-            title="กราฟงานที่ปิดไปในรอบ 7 วันล่าสุด"
-            body="ใช้ดูจังหวะการปิดงานของ GTD และ Kanban ว่ามีแรงส่งจริงหรือกำลังสะสม backlog เพิ่มขึ้น"
-          >
-            <CompletionTrendCard
-              items={completionTrend}
-              totalCompleted={completionTotal}
-              emptyLabel="ยังไม่มีประวัติงานที่ปิดใน 7 วันที่ผ่านมา"
             />
           </DashboardPanel>
 
@@ -997,72 +1167,6 @@ function DistributionList({
   );
 }
 
-function CompletionTrendCard({
-  items,
-  totalCompleted,
-  emptyLabel,
-}: {
-  items: TrendPoint[];
-  totalCompleted: number;
-  emptyLabel: string;
-}) {
-  const max = Math.max(...items.map((item) => item.total), 0);
-
-  return (
-    <div className="rounded-[1.3rem] border border-border bg-secondary/25 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-foreground">7-day completion chart</p>
-        <span className="text-[0.92rem] text-muted-foreground">
-          ปิดงานรวม {totalCompleted} รายการ
-        </span>
-      </div>
-
-      {totalCompleted === 0 ? (
-        <p className="mt-4 text-[0.92rem] leading-6 text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {items.map((item) => (
-            <div key={item.fullLabel} className="grid gap-2 sm:grid-cols-[5.2rem_minmax(0,1fr)_3rem] sm:items-center">
-              <div>
-                <p className="text-[0.9rem] font-medium text-foreground">{item.label}</p>
-                <p className="text-[0.8rem] text-muted-foreground">{item.fullLabel}</p>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="h-3 rounded-full bg-background">
-                  <div
-                    className="flex h-full overflow-hidden rounded-full"
-                    style={{ width: `${max === 0 ? 0 : (item.total / max) * 100}%` }}
-                  >
-                    {item.gtd > 0 ? (
-                      <div
-                        className="bg-zinc-900"
-                        style={{ width: `${(item.gtd / item.total) * 100}%` }}
-                      />
-                    ) : null}
-                    {item.kanban > 0 ? (
-                      <div
-                        className="bg-zinc-400"
-                        style={{ width: `${(item.kanban / item.total) * 100}%` }}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3 text-[0.8rem] text-muted-foreground">
-                  <span>GTD {item.gtd}</span>
-                  <span>Kanban {item.kanban}</span>
-                </div>
-              </div>
-
-              <p className="text-right text-[0.94rem] font-semibold text-foreground">{item.total}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AttentionList({ items }: { items: AttentionItem[] }) {
   if (items.length === 0) {
     return (
@@ -1114,6 +1218,80 @@ function AttentionList({ items }: { items: AttentionItem[] }) {
   );
 }
 
+function ClientRoomMetric({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: number;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.1rem] border border-border bg-secondary/20 px-3.5 py-3">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="caption-editorial text-[0.68rem]">{label}</span>
+      </div>
+      <p className="mt-2 font-display text-[1.45rem] font-medium tracking-tight text-foreground">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function DailyTrendCard({
+  title,
+  items,
+  totalCompleted,
+  colorClassName,
+  emptyLabel,
+}: {
+  title: string;
+  items: DailySeriesPoint[];
+  totalCompleted: number;
+  colorClassName: string;
+  emptyLabel: string;
+}) {
+  const max = Math.max(...items.map((item) => item.value), 0);
+
+  return (
+    <div className="rounded-[1.3rem] border border-border bg-secondary/25 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <span className="text-[0.92rem] text-muted-foreground">
+          ปิดงานรวม {totalCompleted}
+        </span>
+      </div>
+
+      {totalCompleted === 0 ? (
+        <p className="mt-4 text-[0.92rem] leading-6 text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {items.map((item) => (
+            <div key={item.fullLabel} className="grid gap-2 sm:grid-cols-[5.2rem_minmax(0,1fr)_3rem] sm:items-center">
+              <div>
+                <p className="text-[0.9rem] font-medium text-foreground">{item.label}</p>
+                <p className="text-[0.8rem] text-muted-foreground">{item.fullLabel}</p>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-background">
+                <div
+                  className={cn("h-full rounded-full", colorClassName)}
+                  style={{
+                    width: `${max === 0 ? 0 : (item.value / max) * 100}%`,
+                    minWidth: item.value > 0 ? "0.4rem" : "0",
+                  }}
+                />
+              </div>
+              <p className="text-right text-[0.94rem] font-semibold text-foreground">{item.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RecommendationCard({
   title,
   body,
@@ -1127,6 +1305,40 @@ function RecommendationCard({
       <p className="mt-2 text-[0.92rem] leading-6 text-muted-foreground">{body}</p>
     </article>
   );
+}
+
+function getClientRoomStatus(project: ClientRoomProjectSummary): ClientRoomStatus {
+  if (!project.publishedAt) {
+    return "draft";
+  }
+
+  if (new Date(project.updatedAt).getTime() > new Date(project.publishedAt).getTime()) {
+    return "dirty";
+  }
+
+  return "live";
+}
+
+function getClientRoomStatusLabel(status: ClientRoomStatus) {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "dirty":
+      return "Dirty";
+    case "live":
+      return "Live";
+  }
+}
+
+function getClientRoomStatusTone(status: ClientRoomStatus) {
+  switch (status) {
+    case "draft":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "dirty":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "live":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
 }
 
 function getDayStart(value: number) {
@@ -1229,4 +1441,18 @@ async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
   }
 
   return data.workspace;
+}
+
+async function getClientRoomProjects(): Promise<ClientRoomProjectSummary[]> {
+  const response = await fetch("/api/client-rooms/projects", { cache: "no-store" });
+  const data = (await response.json()) as {
+    error?: string;
+    projects?: ClientRoomProjectSummary[];
+  };
+
+  if (!response.ok || !data.projects) {
+    throw new Error(data.error || "Client Rooms unavailable.");
+  }
+
+  return data.projects;
 }
