@@ -862,8 +862,8 @@ export function GtdWorkspace() {
             })}
           </div>
 
-          {/* Mobile popup overlay for Item Detail */}
-          {selectedItem ? (
+          {/* Mobile popup overlay for Item Detail – only when user explicitly taps a task */}
+          {selectedItemId && selectedItem ? (
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 xl:hidden" onClick={() => setSelectedItemId(null)}>
               <div
                 className="max-h-[85vh] w-full overflow-y-auto rounded-t-[2rem] border border-border bg-background p-5 shadow-xl animate-in slide-in-from-bottom duration-200"
