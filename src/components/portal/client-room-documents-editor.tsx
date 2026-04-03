@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import {
   DndContext,
@@ -930,13 +931,13 @@ function CollapsibleDocumentCard({
             className="block w-20 shrink-0 overflow-hidden rounded-lg border border-border"
             title="เปิดรูปเต็ม"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={getImagePreviewUrl(document)}
               alt={document.title || document.id}
+              width={800}
+              height={600}
+              unoptimized
               className="aspect-[4/3] w-full object-cover"
-              loading="lazy"
-              decoding="async"
             />
           </a>
         ) : null}

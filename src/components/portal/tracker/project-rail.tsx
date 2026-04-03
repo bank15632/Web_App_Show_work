@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FolderPlus, SquareKanban } from "lucide-react";
 
 import { phaseAccents, phaseLabels } from "@/lib/tracker/constants";
@@ -20,12 +21,12 @@ export function ProjectRail({
     <aside className="flex h-full w-full max-w-none flex-col border-b border-border bg-[linear-gradient(180deg,#ffffff_0%,#faf7f2_100%)] lg:max-w-[290px] lg:border-b-0 lg:border-r">
       <div className="border-b border-border px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex items-start gap-3 sm:gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={56}
             height={56}
+            priority
             className="h-9 w-auto shrink-0 sm:h-10"
           />
           <div className="min-w-0">

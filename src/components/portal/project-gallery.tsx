@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { GalleryRoom } from "@/lib/portal-data";
 
 type VisibleGalleryRoom = GalleryRoom;
@@ -34,10 +35,12 @@ export function ProjectGallery({ rooms }: { rooms: GalleryRoom[] }) {
                 {room.images.map((image) => (
                   <figure key={image.id} className="space-y-3">
                     <div className="overflow-hidden rounded-2xl bg-secondary">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={image.src}
                         alt={image.caption || room.name}
+                        width={1600}
+                        height={1000}
+                        unoptimized
                         className="aspect-[16/10] w-full object-cover"
                       />
                     </div>

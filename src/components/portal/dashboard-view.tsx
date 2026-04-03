@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -644,12 +645,12 @@ export function DashboardView() {
     >
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-[10px]">
         <div className="flex flex-col gap-3 px-4 py-3.5 sm:px-6 lg:flex-row lg:items-center lg:gap-5 lg:px-10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={120}
             height={60}
+            priority
             className="h-7 w-auto shrink-0 sm:h-8"
           />
           <div className="min-w-0 lg:mr-auto">
