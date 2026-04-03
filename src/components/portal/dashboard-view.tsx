@@ -25,7 +25,6 @@ import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
   bucketLabels,
   bucketOrder,
-  getWeeklyReviewStatus,
   type GtdItem,
 } from "@/lib/gtd-system";
 import { formatPortalDate } from "@/lib/portal-data";
@@ -55,6 +54,16 @@ type DistributionItem = {
   value: number;
   colorClassName: string;
   hint?: string;
+};
+
+type KpiTone = "neutral" | "warning" | "alert";
+
+type TaskControlMetric = {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  detail: string;
+  tone?: KpiTone;
 };
 
 type TrendPoint = {
@@ -178,7 +187,6 @@ export function DashboardView() {
     tone: "loading",
     message: "กำลังดึงข้อมูล Client Rooms...",
   });
-  const [reviewStatus, setReviewStatus] = useState(getWeeklyReviewStatus(null));
   const [referenceTime, setReferenceTime] = useState(() => Date.now());
 
   useEffect(() => {
@@ -199,14 +207,12 @@ export function DashboardView() {
 
       if (gtdResult.status === "fulfilled") {
         setGtdItems(gtdResult.value.items);
-        setReviewStatus(getWeeklyReviewStatus(gtdResult.value.review.lastCompletedAt));
         setGtdState({
           tone: "ready",
           message: "GTD workspace พร้อมใช้งาน",
         });
       } else {
         setGtdItems([]);
-        setReviewStatus(getWeeklyReviewStatus(null));
         setGtdState({
           tone: "error",
           message:
@@ -324,7 +330,6 @@ export function DashboardView() {
 
   const openGtdCount = openGtdItems.length;
   const openTrackerCount = openTrackerTasks.length;
-  const combinedOpenCount = openGtdCount + openTrackerCount;
   const activeClientRooms = clientRoomProjects.length;
   const clientRoomDocumentCount = clientRoomProjects.reduce(
     (count, project) => count + project.documentCount,
@@ -364,16 +369,6 @@ export function DashboardView() {
     [clientRoomGroups],
   );
 
-  const blockedTaskCount = openTrackerTasks.filter((task) => task.status === "blocked").length;
-  const waitingTaskCount = openTrackerTasks.filter((task) => task.status === "waiting").length;
-  const staleWaitingCount = openGtdItems.filter(
-    (item) =>
-      item.bucket === "waiting" &&
-      referenceTime - new Date(item.updatedAt).getTime() > DAY_MS * 5,
-  ).length;
-  const openReviewCount =
-    trackerWorkspace?.reviewItems.filter((item) => item.status === "pending").length ?? 0;
-
   const gtdOverdueCount = openGtdItems.filter((item) => isOverdue(item.dueDate, todayStart)).length;
   const gtdDueTodayCount = openGtdItems.filter((item) => isDueToday(item.dueDate, todayStart)).length;
   const gtdDueSoonCount = openGtdItems.filter((item) =>
@@ -391,11 +386,6 @@ export function DashboardView() {
     isDueBetween(task.dueDate, todayStart + DAY_MS, sevenDayWindowEnd),
   ).length;
   const trackerNoDeadlineCount = openTrackerTasks.filter((task) => !task.dueDate).length;
-
-  const combinedOverdueCount = gtdOverdueCount + trackerOverdueCount;
-  const combinedDueTodayCount = gtdDueTodayCount + trackerDueTodayCount;
-  const combinedDueSoonCount = gtdDueSoonCount + trackerDueSoonCount;
-  const combinedNoDeadlineCount = gtdNoDeadlineCount + trackerNoDeadlineCount;
 
   const gtdCounts = useMemo(() => {
     return bucketOrder.map((bucket) => ({
@@ -420,53 +410,6 @@ export function DashboardView() {
               : undefined,
       })),
     [trackerTasks],
-  );
-
-  const deadlineSegments = useMemo<DistributionItem[]>(
-    () => [
-      {
-        label: "Overdue",
-        value: combinedOverdueCount,
-        colorClassName: "bg-rose-500",
-      },
-      {
-        label: "Due today",
-        value: combinedDueTodayCount,
-        colorClassName: "bg-amber-400",
-      },
-      {
-        label: "Next 7 days",
-        value: combinedDueSoonCount,
-        colorClassName: "bg-sky-400",
-      },
-      {
-        label: "No deadline",
-        value: combinedNoDeadlineCount,
-        colorClassName: "bg-stone-300",
-      },
-    ],
-    [
-      combinedDueSoonCount,
-      combinedDueTodayCount,
-      combinedNoDeadlineCount,
-      combinedOverdueCount,
-    ],
-  );
-
-  const workloadSegments = useMemo<DistributionItem[]>(
-    () => [
-      {
-        label: "GTD",
-        value: openGtdCount,
-        colorClassName: "bg-zinc-900",
-      },
-      {
-        label: "Kanban",
-        value: openTrackerCount,
-        colorClassName: "bg-zinc-400",
-      },
-    ],
-    [openGtdCount, openTrackerCount],
   );
 
   const projectMix = useMemo<DistributionItem[]>(() => {
@@ -597,46 +540,76 @@ export function DashboardView() {
     [referenceTime],
   );
 
-  const focusHeadline = useMemo(() => {
-    if (combinedOverdueCount > 0) {
-      return `เคลียร์ ${combinedOverdueCount} งานที่เลย deadline ก่อน`;
-    }
-
-    if (combinedDueTodayCount > 0) {
-      return `มี ${combinedDueTodayCount} งานที่ต้องปิดภายในวันนี้`;
-    }
-
-    if (blockedTaskCount + staleWaitingCount > 0) {
-      return `ตาม ${blockedTaskCount + staleWaitingCount} งานที่ติด blocker หรือรอการ follow-up`;
-    }
-
-    return "ภาพรวมงานยังนิ่ง สามารถกลับไปโฟกัส deep work ได้";
-  }, [blockedTaskCount, combinedDueTodayCount, combinedOverdueCount, staleWaitingCount]);
-
-  const focusBody = useMemo(() => {
-    if (combinedOverdueCount > 0) {
-      return "เริ่มจากรายการ overdue ก่อน แล้วค่อยจัดลำดับงานที่ครบกำหนดวันนี้และภายใน 7 วัน";
-    }
-
-    if (combinedDueTodayCount > 0) {
-      return "งานที่ครบกำหนดวันนี้ควรถูกดึงขึ้นมาปิดก่อนงานที่ยังไม่มี deadline ชัด";
-    }
-
-    if (blockedTaskCount + staleWaitingCount > 0) {
-      return "ลดงานค้างที่รอคนอื่นหรือรอข้อมูล จะช่วยให้ flow ของ GTD และ Kanban สะอาดขึ้นเร็วที่สุด";
-    }
-
-    return "ตอนนี้ workload ค่อนข้างสมดุล ใช้ dashboard เป็นจุดเช็กสั้น ๆ แล้วกลับไปลงมือทำงานจริง";
-  }, [blockedTaskCount, combinedDueTodayCount, combinedOverdueCount, staleWaitingCount]);
-
   const gtdCompletionTotal = gtdCompletionTrend.reduce((sum, point) => sum + point.value, 0);
   const kanbanCompletionTotal = kanbanCompletionTrend.reduce((sum, point) => sum + point.value, 0);
-  const reviewToneClassName = cn(
-    "rounded-full border px-3 py-2 text-sm font-medium",
-    reviewStatus.tone === "good" && "border-emerald-200 bg-emerald-50 text-emerald-700",
-    reviewStatus.tone === "warning" && "border-amber-200 bg-amber-50 text-amber-700",
-    reviewStatus.tone === "danger" && "border-rose-200 bg-rose-50 text-rose-700",
-  );
+  const gtdTaskControlMetrics: TaskControlMetric[] = [
+    {
+      icon: <Layers3 className="size-4" />,
+      label: "Outstanding",
+      value: openGtdCount,
+      detail: "Open GTD items",
+    },
+    {
+      icon: <AlertTriangle className="size-4" />,
+      label: "Overdue",
+      value: gtdOverdueCount,
+      detail: "Past due GTD items",
+      tone: gtdOverdueCount > 0 ? "alert" : "neutral",
+    },
+    {
+      icon: <CalendarDays className="size-4" />,
+      label: "Due Today",
+      value: gtdDueTodayCount,
+      detail: "Need attention today",
+      tone: gtdDueTodayCount > 0 ? "warning" : "neutral",
+    },
+    {
+      icon: <Clock3 className="size-4" />,
+      label: "Next 7 Days",
+      value: gtdDueSoonCount,
+      detail: "Coming up this week",
+    },
+    {
+      icon: <CalendarDays className="size-4" />,
+      label: "No Deadline",
+      value: gtdNoDeadlineCount,
+      detail: "No due date set",
+    },
+  ];
+  const kanbanTaskControlMetrics: TaskControlMetric[] = [
+    {
+      icon: <Layers3 className="size-4" />,
+      label: "Outstanding",
+      value: openTrackerCount,
+      detail: "Open Kanban cards",
+    },
+    {
+      icon: <AlertTriangle className="size-4" />,
+      label: "Overdue",
+      value: trackerOverdueCount,
+      detail: "Past due Kanban cards",
+      tone: trackerOverdueCount > 0 ? "alert" : "neutral",
+    },
+    {
+      icon: <CalendarDays className="size-4" />,
+      label: "Due Today",
+      value: trackerDueTodayCount,
+      detail: "Need attention today",
+      tone: trackerDueTodayCount > 0 ? "warning" : "neutral",
+    },
+    {
+      icon: <Clock3 className="size-4" />,
+      label: "Next 7 Days",
+      value: trackerDueSoonCount,
+      detail: "Coming up this week",
+    },
+    {
+      icon: <CalendarDays className="size-4" />,
+      label: "No Deadline",
+      value: trackerNoDeadlineCount,
+      detail: "No due date set",
+    },
+  ];
 
   return (
     <div
@@ -699,9 +672,9 @@ export function DashboardView() {
       </header>
 
       <main className="space-y-5 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-7 lg:px-10 lg:py-8">
-        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.92fr)]">
+        <section className="fade-up">
           <div className="overflow-hidden rounded-[2rem] border border-border bg-[radial-gradient(circle_at_top_left,rgba(26,26,26,0.08),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(252,248,242,0.9))] p-5 sm:p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] xl:items-start">
               <div className="max-w-3xl">
                 <p className="caption-editorial mb-2">Task Control Tower</p>
                 <h1 className="font-display text-[2rem] font-medium tracking-tight sm:text-[2.35rem] lg:text-[2.7rem]">
@@ -724,93 +697,25 @@ export function DashboardView() {
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <KpiCard
-                icon={<Layers3 className="size-4" />}
-                label="Outstanding"
-                value={combinedOpenCount}
-                detail={`${openGtdCount} GTD · ${openTrackerCount} Kanban`}
+            <div className="mt-6 space-y-4">
+              <TaskControlBoard
+                icon={<ListChecks className="size-4" />}
+                eyebrow="GTD"
+                title="GTD task control"
+                body="แยก backlog ของ GTD ออกจากบอร์ด Kanban เพื่อให้ deadline และรายการที่ยังไม่มี due date อ่านได้ในมุมเดียว"
+                href="/gtd"
+                ctaLabel="Open GTD Workspace"
+                metrics={gtdTaskControlMetrics}
               />
-              <KpiCard
-                icon={<AlertTriangle className="size-4" />}
-                label="Overdue"
-                value={combinedOverdueCount}
-                detail="งานที่เลย deadline แล้ว"
-                tone={combinedOverdueCount > 0 ? "alert" : "neutral"}
+              <TaskControlBoard
+                icon={<ListTodo className="size-4" />}
+                eyebrow="Kanban"
+                title="Kanban task control"
+                body="ดูการ์ดใน project board แบบไม่ปนกับ GTD เพื่อเห็นงานส่งมอบที่ overdue งานที่ใกล้ครบกำหนด และงานที่ยังไม่มี deadline"
+                href="/todos"
+                ctaLabel="Open Kanban Board"
+                metrics={kanbanTaskControlMetrics}
               />
-              <KpiCard
-                icon={<CalendarDays className="size-4" />}
-                label="Due Today"
-                value={combinedDueTodayCount}
-                detail="งานที่ต้องปิดภายในวันนี้"
-                tone={combinedDueTodayCount > 0 ? "warning" : "neutral"}
-              />
-              <KpiCard
-                icon={<Clock3 className="size-4" />}
-                label="Next 7 Days"
-                value={combinedDueSoonCount}
-                detail="งานที่จะเริ่มกดดันในสัปดาห์นี้"
-              />
-            </div>
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-              <section className="rounded-[1.5rem] border border-border bg-background/80 p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="caption-editorial text-[0.68rem]">Priority Now</p>
-                    <h2 className="mt-2 font-display text-[1.3rem] font-medium tracking-tight sm:text-[1.5rem]">
-                      {focusHeadline}
-                    </h2>
-                  </div>
-                  <span className={reviewToneClassName}>{reviewStatus.title}</span>
-                </div>
-                <p className="mt-3 text-[0.94rem] leading-6 text-muted-foreground">{focusBody}</p>
-
-                <div className="mt-5">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-foreground">Deadline Health</p>
-                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                      overdue / today / next 7 days
-                    </p>
-                  </div>
-                  <SegmentedBar items={deadlineSegments} emptyLabel="ยังไม่มี deadline ให้ติดตาม" />
-                </div>
-              </section>
-
-              <aside className="rounded-[1.5rem] border border-border bg-[#faf7f2] p-4 sm:p-5">
-                <p className="caption-editorial text-[0.68rem]">Operational Signals</p>
-                <h2 className="mt-2 font-display text-[1.3rem] font-medium tracking-tight sm:text-[1.5rem]">
-                  สถานะที่ควรเช็กก่อนเริ่มงาน
-                </h2>
-
-                <div className="mt-4 space-y-3">
-                  <SignalCard
-                    label="Weekly Review"
-                    value={reviewStatus.title}
-                    detail={reviewStatus.action}
-                  />
-                  <SignalCard
-                    label="Kanban Friction"
-                    value={`${blockedTaskCount} blocked · ${waitingTaskCount} waiting`}
-                    detail="ใช้ตัวเลขนี้ดูว่าบอร์ดมีงานติดค้างจาก dependency มากแค่ไหน"
-                  />
-                  <SignalCard
-                    label="Follow-up Queue"
-                    value={`${staleWaitingCount} stale waiting · ${openReviewCount} review`}
-                    detail="เหมาะกับงานติดตามคน งานรอข้อมูล และ review ที่ยังไม่อนุมัติ"
-                  />
-                </div>
-
-                <div className="mt-5 rounded-[1.2rem] border border-border/80 bg-background/80 p-3.5">
-                  <p className="text-sm font-semibold text-foreground">Workload split</p>
-                  <p className="mt-1 text-[0.92rem] leading-6 text-muted-foreground">
-                    ดูว่างานค้างกระจุกอยู่ที่ GTD หรือ Kanban มากกว่า เพื่อเลือก workspace ให้ตรงก่อน
-                  </p>
-                  <div className="mt-3">
-                    <SegmentedBar items={workloadSegments} emptyLabel="ยังไม่มีงานค้างในระบบ" compact />
-                  </div>
-                </div>
-              </aside>
             </div>
           </div>
         </section>
@@ -978,12 +883,12 @@ function KpiCard({
   label: string;
   value: number;
   detail: string;
-  tone?: "neutral" | "warning" | "alert";
+  tone?: KpiTone;
 }) {
   return (
     <article
       className={cn(
-        "rounded-[1.35rem] border p-4",
+        "flex h-full flex-col rounded-[1.35rem] border p-4",
         tone === "neutral" && "border-border bg-background/80",
         tone === "warning" && "border-amber-200 bg-amber-50/80",
         tone === "alert" && "border-rose-200 bg-rose-50/80",
@@ -998,6 +903,62 @@ function KpiCard({
       </p>
       <p className="mt-1 text-[0.9rem] leading-6 text-muted-foreground">{detail}</p>
     </article>
+  );
+}
+
+function TaskControlBoard({
+  icon,
+  eyebrow,
+  title,
+  body,
+  href,
+  ctaLabel,
+  metrics,
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  body: string;
+  href: string;
+  ctaLabel: string;
+  metrics: TaskControlMetric[];
+}) {
+  return (
+    <section className="rounded-[1.6rem] border border-border bg-background/80 p-4 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            {icon}
+            <span className="caption-editorial text-[0.68rem]">{eyebrow}</span>
+          </div>
+          <h2 className="mt-3 font-display text-[1.35rem] font-medium tracking-tight sm:text-[1.55rem]">
+            {title}
+          </h2>
+          <p className="mt-2 text-[0.94rem] leading-6 text-muted-foreground">{body}</p>
+        </div>
+
+        <Link
+          href={href}
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-border bg-background px-4 text-[0.92rem] font-medium text-foreground transition-colors hover:border-foreground"
+        >
+          {ctaLabel}
+          <ArrowRight className="size-4" />
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {metrics.map((metric) => (
+          <KpiCard
+            key={`${eyebrow}-${metric.label}`}
+            icon={metric.icon}
+            label={metric.label}
+            value={metric.value}
+            detail={metric.detail}
+            tone={metric.tone}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1026,24 +987,6 @@ function DashboardPanel({
       <p className="mt-2 max-w-3xl text-[0.94rem] leading-6 text-muted-foreground">{body}</p>
       <div className="mt-5">{children}</div>
     </section>
-  );
-}
-
-function SignalCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-[1.2rem] border border-border/80 bg-background/80 p-3.5">
-      <p className="caption-editorial text-[0.68rem]">{label}</p>
-      <p className="mt-2 text-[1rem] font-semibold tracking-tight text-foreground">{value}</p>
-      <p className="mt-1.5 text-[0.9rem] leading-6 text-muted-foreground">{detail}</p>
-    </div>
   );
 }
 
