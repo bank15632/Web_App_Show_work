@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -63,6 +63,7 @@ export function SettingsView() {
   const [isExporting, setIsExporting] = useState(false);
   const [reviewStatusLabel, setReviewStatusLabel] = useState("ยังไม่เคยทำ Weekly Review");
   const [isReady, setIsReady] = useState(false);
+  const csvTimeoutIdsRef = useRef<number[]>([]);
 
   useEffect(() => {
     let ignore = false;
@@ -95,6 +96,8 @@ export function SettingsView() {
     return () => {
       ignore = true;
       window.removeEventListener("focus", handleWindowFocus);
+      csvTimeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
+      csvTimeoutIdsRef.current = [];
     };
   }, []);
 
@@ -237,11 +240,12 @@ export function SettingsView() {
         );
       }
 
-      files.forEach((file, index) => {
+      csvTimeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
+      csvTimeoutIdsRef.current = files.map((file, index) =>
         window.setTimeout(() => {
           downloadFile(file.name, file.contents, "text/csv;charset=utf-8");
-        }, index * 120);
-      });
+        }, index * 120),
+      );
 
       setStatusMessage(`Downloaded ${files.length} CSV file(s).`);
     } catch (error) {
@@ -292,10 +296,10 @@ export function SettingsView() {
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_24rem]">
           <div className="rounded-[2rem] border border-border bg-background p-8 shadow-[0_24px_80px_rgba(0,0,0,0.04)]">
             <p className="caption-editorial">Settings + Team</p>
-            <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-pretty">
+            <h1 className="mt-3 font-display text-3xl font-medium tracking-tight text-pretty sm:text-4xl lg:text-5xl">
               ตั้งค่า profile, notifications และ export
             </h1>
-            <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               หน้า settings นี้ยึดตามคู่มือผู้ใช้: profile ใช้กับ daily flow,
               notifications แยกตามประเภท และ export รองรับทั้ง CSV กับ JSON
             </p>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Prompt } from "next/font/google";
 
 import "./globals.css";
@@ -9,6 +9,11 @@ const prompt = Prompt({
   display: "swap",
   variable: "--font-body-ui",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: {

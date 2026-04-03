@@ -55,7 +55,7 @@ import type {
   TrackerTaskType,
 } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
-const initialReferenceTime = Date.parse("2026-03-20T12:00:00.000Z");
+const initialReferenceTime = Date.now();
 type GtdListMode = "active" | "archived";
 type KanbanBridgeDraft = {
   projectId: string;
@@ -1006,14 +1006,22 @@ export function GtdWorkspace() {
 
           {/* Mobile popup overlay for Item Detail – only when user explicitly taps a task */}
           {selectedItemId && selectedItem ? (
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 xl:hidden" onClick={() => setSelectedItemId(null)}>
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Close item detail"
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 xl:hidden"
+              onClick={() => setSelectedItemId(null)}
+              onKeyDown={(event) => { if (event.key === "Escape" || event.key === "Enter") setSelectedItemId(null); }}
+            >
               <div
                 className="max-h-[85vh] w-full overflow-y-auto rounded-t-[2rem] border border-border bg-background p-5 shadow-xl animate-in slide-in-from-bottom duration-200"
                 onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
               >
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <p className="caption-editorial">Item Detail</p>
-                  <button type="button" onClick={() => setSelectedItemId(null)} className="rounded-full p-2 hover:bg-secondary transition-colors">
+                  <button type="button" aria-label="Close" onClick={() => setSelectedItemId(null)} className="rounded-full p-2 hover:bg-secondary transition-colors">
                     <X className="size-5" />
                   </button>
                 </div>

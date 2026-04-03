@@ -198,10 +198,10 @@ export function SystemGuidePage({ guide }: { guide: ManualSystemGuide }) {
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_22rem]">
           <div className="rounded-[2rem] border border-border bg-background p-8 shadow-[0_24px_80px_rgba(0,0,0,0.04)]">
             <p className="caption-editorial">System Guide</p>
-            <h1 className="mt-3 font-display text-5xl font-medium tracking-tight">
+            <h1 className="mt-3 font-display text-3xl font-medium tracking-tight sm:text-4xl lg:text-5xl">
               {guide.name}
             </h1>
-            <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               {guide.role}
             </p>
             <p className="mt-4 text-sm leading-7 text-muted-foreground">
