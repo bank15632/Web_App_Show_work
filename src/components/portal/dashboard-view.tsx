@@ -28,7 +28,7 @@ import {
   type GtdItem,
 } from "@/lib/gtd-system";
 import { formatPortalDate } from "@/lib/portal-data";
-import { taskStatusLabels } from "@/lib/tracker/constants";
+import { priorityLabels, taskStatusLabels } from "@/lib/tracker/constants";
 import type { TrackerTaskRecord, TrackerWorkspaceData } from "@/lib/tracker/types";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,11 @@ type DistributionItem = {
   hint?: string;
 };
 
-type KpiTone = "neutral" | "warning" | "alert";
+type KpiTone = "neutral" | "warning" | "alert" | "accent";
+
+type TaskControlView = "timeline" | "table" | "calendar" | "chart";
+
+type TaskControlStage = DeadlineTone | "later" | "none";
 
 type TaskControlMetric = {
   icon: ReactNode;
@@ -64,6 +68,18 @@ type TaskControlMetric = {
   value: number;
   detail: string;
   tone?: KpiTone;
+};
+
+type TaskControlRecord = {
+  id: string;
+  title: string;
+  detail: string;
+  supportingText: string;
+  dueDate: string | null;
+  href: string;
+  stage: TaskControlStage;
+  updatedAt: string;
+  priorityLabel: string;
 };
 
 type TrendPoint = {
@@ -95,6 +111,29 @@ const deadlineToneClassNames: Record<DeadlineTone, string> = {
   overdue: "border-rose-200 bg-rose-50 text-rose-700",
   today: "border-amber-200 bg-amber-50 text-amber-700",
   soon: "border-sky-200 bg-sky-50 text-sky-700",
+};
+
+const taskControlViewOptions: Array<{ id: TaskControlView; label: string }> = [
+  { id: "timeline", label: "Timeline" },
+  { id: "table", label: "Table Data" },
+  { id: "calendar", label: "Calendar" },
+  { id: "chart", label: "Chart" },
+];
+
+const taskControlStageClassNames: Record<TaskControlStage, string> = {
+  overdue: "border-rose-200 bg-rose-50 text-rose-700",
+  today: "border-amber-200 bg-amber-50 text-amber-700",
+  soon: "border-sky-200 bg-sky-50 text-sky-700",
+  later: "border-stone-200 bg-stone-100 text-stone-700",
+  none: "border-violet-200 bg-violet-50 text-violet-700",
+};
+
+const taskControlStageBarClassNames: Record<TaskControlStage, string> = {
+  overdue: "bg-rose-500",
+  today: "bg-amber-400",
+  soon: "bg-sky-400",
+  later: "bg-stone-400",
+  none: "bg-violet-400",
 };
 
 const bucketColorClassNames: Record<string, string> = {
@@ -542,38 +581,73 @@ export function DashboardView() {
 
   const gtdCompletionTotal = gtdCompletionTrend.reduce((sum, point) => sum + point.value, 0);
   const kanbanCompletionTotal = kanbanCompletionTrend.reduce((sum, point) => sum + point.value, 0);
+  const gtdTaskControlItems = useMemo<TaskControlRecord[]>(
+    () =>
+      openGtdItems
+        .map((item) => ({
+          id: item.id,
+          title: item.text,
+          detail: bucketLabels[item.bucket],
+          supportingText: `${formatTaskControlContext(item.context)} · ${priorityLabels[item.priority]} priority`,
+          dueDate: item.dueDate,
+          href: "/gtd",
+          stage: getTaskControlStage(item.dueDate, todayStart, sevenDayWindowEnd),
+          updatedAt: item.updatedAt,
+          priorityLabel: priorityLabels[item.priority],
+        }))
+        .sort((a, b) => compareTaskControlRecords(a, b)),
+    [openGtdItems, sevenDayWindowEnd, todayStart],
+  );
+  const kanbanTaskControlItems = useMemo<TaskControlRecord[]>(
+    () =>
+      openTrackerTasks
+        .map((task) => ({
+          id: task.id,
+          title: task.title,
+          detail: `${task.projectName} · ${taskStatusLabels[task.status]}`,
+          supportingText: `${priorityLabels[task.priority]} priority${task.assignee ? ` · ${task.assignee}` : ""}`,
+          dueDate: task.dueDate,
+          href: "/todos",
+          stage: getTaskControlStage(task.dueDate, todayStart, sevenDayWindowEnd),
+          updatedAt: task.updatedAt,
+          priorityLabel: priorityLabels[task.priority],
+        }))
+        .sort((a, b) => compareTaskControlRecords(a, b)),
+    [openTrackerTasks, sevenDayWindowEnd, todayStart],
+  );
   const gtdTaskControlMetrics: TaskControlMetric[] = [
     {
       icon: <Layers3 className="size-4" />,
       label: "Outstanding",
       value: openGtdCount,
-      detail: "Open GTD items",
+      detail: "งาน GTD ที่ยังไม่ปิด",
     },
     {
       icon: <AlertTriangle className="size-4" />,
       label: "Overdue",
       value: gtdOverdueCount,
-      detail: "Past due GTD items",
+      detail: "เลยกำหนดแล้ว",
       tone: gtdOverdueCount > 0 ? "alert" : "neutral",
     },
     {
       icon: <CalendarDays className="size-4" />,
       label: "Due Today",
       value: gtdDueTodayCount,
-      detail: "Need attention today",
+      detail: "ต้องหยิบปิดวันนี้",
       tone: gtdDueTodayCount > 0 ? "warning" : "neutral",
     },
     {
       icon: <Clock3 className="size-4" />,
       label: "Next 7 Days",
       value: gtdDueSoonCount,
-      detail: "Coming up this week",
+      detail: "กำลังจะถึงใน 7 วัน",
     },
     {
       icon: <CalendarDays className="size-4" />,
       label: "No Deadline",
       value: gtdNoDeadlineCount,
-      detail: "No due date set",
+      detail: "ยังไม่ตั้ง due date",
+      tone: "accent",
     },
   ];
   const kanbanTaskControlMetrics: TaskControlMetric[] = [
@@ -581,33 +655,34 @@ export function DashboardView() {
       icon: <Layers3 className="size-4" />,
       label: "Outstanding",
       value: openTrackerCount,
-      detail: "Open Kanban cards",
+      detail: "การ์ด Kanban ที่ยังไม่ปิด",
     },
     {
       icon: <AlertTriangle className="size-4" />,
       label: "Overdue",
       value: trackerOverdueCount,
-      detail: "Past due Kanban cards",
+      detail: "เลยกำหนดแล้ว",
       tone: trackerOverdueCount > 0 ? "alert" : "neutral",
     },
     {
       icon: <CalendarDays className="size-4" />,
       label: "Due Today",
       value: trackerDueTodayCount,
-      detail: "Need attention today",
+      detail: "ต้องหยิบปิดวันนี้",
       tone: trackerDueTodayCount > 0 ? "warning" : "neutral",
     },
     {
       icon: <Clock3 className="size-4" />,
       label: "Next 7 Days",
       value: trackerDueSoonCount,
-      detail: "Coming up this week",
+      detail: "กำลังจะถึงใน 7 วัน",
     },
     {
       icon: <CalendarDays className="size-4" />,
       label: "No Deadline",
       value: trackerNoDeadlineCount,
-      detail: "No due date set",
+      detail: "ยังไม่ตั้ง due date",
+      tone: "accent",
     },
   ];
 
@@ -706,6 +781,9 @@ export function DashboardView() {
                 href="/gtd"
                 ctaLabel="Open GTD Workspace"
                 metrics={gtdTaskControlMetrics}
+                items={gtdTaskControlItems}
+                emptyLabel="ยังไม่มีงาน GTD ค้างในระบบ"
+                todayStart={todayStart}
               />
               <TaskControlBoard
                 icon={<ListTodo className="size-4" />}
@@ -715,6 +793,9 @@ export function DashboardView() {
                 href="/todos"
                 ctaLabel="Open Kanban Board"
                 metrics={kanbanTaskControlMetrics}
+                items={kanbanTaskControlItems}
+                emptyLabel="ยังไม่มีการ์ด Kanban ค้างในระบบ"
+                todayStart={todayStart}
               />
             </div>
           </div>
@@ -892,6 +973,7 @@ function KpiCard({
         tone === "neutral" && "border-border bg-background/80",
         tone === "warning" && "border-amber-200 bg-amber-50/80",
         tone === "alert" && "border-rose-200 bg-rose-50/80",
+        tone === "accent" && "border-violet-200 bg-violet-50/90",
       )}
     >
       <div className="flex items-center gap-2 text-muted-foreground">
@@ -914,6 +996,9 @@ function TaskControlBoard({
   href,
   ctaLabel,
   metrics,
+  items,
+  emptyLabel,
+  todayStart,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -922,7 +1007,12 @@ function TaskControlBoard({
   href: string;
   ctaLabel: string;
   metrics: TaskControlMetric[];
+  items: TaskControlRecord[];
+  emptyLabel: string;
+  todayStart: number;
 }) {
+  const [activeView, setActiveView] = useState<TaskControlView>("timeline");
+
   return (
     <section className="rounded-[1.6rem] border border-border bg-background/80 p-4 sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -946,6 +1036,24 @@ function TaskControlBoard({
         </Link>
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {taskControlViewOptions.map((option) => (
+          <button
+            key={`${eyebrow}-${option.id}`}
+            type="button"
+            onClick={() => setActiveView(option.id)}
+            className={cn(
+              "inline-flex h-9 items-center rounded-full border px-3.5 text-[0.9rem] font-medium transition-colors",
+              activeView === option.id
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {metrics.map((metric) => (
           <KpiCard
@@ -958,7 +1066,384 @@ function TaskControlBoard({
           />
         ))}
       </div>
+
+      <div className="mt-5">
+        {activeView === "timeline" ? (
+          <TaskControlTimelineView items={items} emptyLabel={emptyLabel} />
+        ) : activeView === "table" ? (
+          <TaskControlTableView items={items} emptyLabel={emptyLabel} />
+        ) : activeView === "calendar" ? (
+          <TaskControlCalendarView items={items} emptyLabel={emptyLabel} todayStart={todayStart} />
+        ) : (
+          <TaskControlChartView items={items} emptyLabel={emptyLabel} />
+        )}
+      </div>
     </section>
+  );
+}
+
+function TaskControlTimelineView({
+  items,
+  emptyLabel,
+}: {
+  items: TaskControlRecord[];
+  emptyLabel: string;
+}) {
+  const groups = useMemo(
+    () =>
+      (["overdue", "today", "soon", "later", "none"] as const)
+        .map((stage) => ({
+          stage,
+          label: getTaskControlStageLabel(stage),
+          items: items.filter((item) => item.stage === stage),
+        }))
+        .filter((group) => group.items.length > 0),
+    [items],
+  );
+
+  if (items.length === 0) {
+    return <TaskControlEmptyState label={emptyLabel} />;
+  }
+
+  return (
+    <div className="grid gap-3 xl:grid-cols-2">
+      {groups.map((group) => (
+        <section
+          key={group.stage}
+          className="rounded-[1.35rem] border border-border bg-secondary/20 p-4"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className={cn(
+                "inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+                taskControlStageClassNames[group.stage],
+              )}
+            >
+              {group.label}
+            </span>
+            <span className="text-[0.82rem] text-muted-foreground">
+              {group.items.length} งาน
+            </span>
+          </div>
+
+          <div className="mt-3 max-h-[20rem] space-y-2 overflow-auto pr-1">
+            {group.items.map((item) => (
+              <TaskControlItemCard key={item.id} item={item} compact />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function TaskControlTableView({
+  items,
+  emptyLabel,
+}: {
+  items: TaskControlRecord[];
+  emptyLabel: string;
+}) {
+  if (items.length === 0) {
+    return <TaskControlEmptyState label={emptyLabel} />;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-[1.35rem] border border-border bg-secondary/20">
+      <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(9rem,0.7fr)_7rem] gap-3 border-b border-border/80 px-4 py-3 text-[0.76rem] font-medium uppercase tracking-[0.12em] text-muted-foreground lg:grid">
+        <span>Task</span>
+        <span>Scope</span>
+        <span className="text-right">Due</span>
+        <span className="text-right">Priority</span>
+      </div>
+
+      <div className="max-h-[24rem] overflow-auto">
+        {items.map((item) => (
+          <Link
+            key={item.id}
+            href={item.href}
+            className="block border-b border-border/70 px-4 py-3 transition-colors hover:bg-background/80 last:border-b-0"
+          >
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(9rem,0.7fr)_7rem] lg:items-center">
+              <div className="min-w-0">
+                <p className="truncate text-[0.95rem] font-semibold text-foreground">{item.title}</p>
+                <p className="mt-1 text-[0.82rem] text-muted-foreground lg:hidden">
+                  {item.detail}
+                </p>
+              </div>
+
+              <div className="min-w-0">
+                <p className="truncate text-[0.88rem] text-foreground">{item.detail}</p>
+                <p className="mt-1 truncate text-[0.8rem] text-muted-foreground">
+                  {item.supportingText}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <span
+                  className={cn(
+                    "inline-flex rounded-full border px-2.5 py-1 text-[0.72rem] font-medium",
+                    taskControlStageClassNames[item.stage],
+                  )}
+                >
+                  {getTaskControlStageLabel(item.stage)}
+                </span>
+                <span className="text-[0.82rem] text-muted-foreground">
+                  {item.dueDate ? formatDueDate(item.dueDate) : "No due date"}
+                </span>
+              </div>
+
+              <p className="text-[0.88rem] font-medium text-foreground lg:text-right">
+                {item.priorityLabel}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskControlCalendarView({
+  items,
+  emptyLabel,
+  todayStart,
+}: {
+  items: TaskControlRecord[];
+  emptyLabel: string;
+  todayStart: number;
+}) {
+  const dayColumns = useMemo(
+    () =>
+      Array.from({ length: 8 }, (_, index) => {
+        const dayStart = todayStart + DAY_MS * index;
+        return {
+          id: dayStart.toString(),
+          label: index === 0 ? "Today" : formatShortDay(dayStart),
+          fullLabel: formatDateLabel(dayStart),
+          items: items.filter((item) => getDueDay(item.dueDate) === dayStart),
+        };
+      }),
+    [items, todayStart],
+  );
+
+  if (items.length === 0) {
+    return <TaskControlEmptyState label={emptyLabel} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="overflow-x-auto pb-1">
+        <div className="grid min-w-[72rem] grid-cols-8 gap-3">
+          {dayColumns.map((day) => (
+            <section
+              key={day.id}
+              className="rounded-[1.25rem] border border-border bg-secondary/20 p-3.5"
+            >
+              <div className="border-b border-border/70 pb-2.5">
+                <p className="text-[0.84rem] font-semibold text-foreground">{day.label}</p>
+                <p className="text-[0.78rem] text-muted-foreground">{day.fullLabel}</p>
+              </div>
+
+              {day.items.length === 0 ? (
+                <p className="mt-3 text-[0.82rem] leading-5 text-muted-foreground">
+                  ไม่มีงานตามวัน
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {day.items.map((item) => (
+                    <TaskControlItemCard key={item.id} item={item} compact />
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <TaskControlStageBucket
+          title="Overdue"
+          stage="overdue"
+          items={items.filter((item) => item.stage === "overdue")}
+          emptyLabel="ไม่มีงานที่เลยกำหนด"
+        />
+        <TaskControlStageBucket
+          title="Later"
+          stage="later"
+          items={items.filter((item) => item.stage === "later")}
+          emptyLabel="ไม่มีงานหลังจากช่วง 7 วัน"
+        />
+        <TaskControlStageBucket
+          title="No Deadline"
+          stage="none"
+          items={items.filter((item) => item.stage === "none")}
+          emptyLabel="ไม่มีงานที่ยังไม่ตั้ง due date"
+        />
+      </div>
+    </div>
+  );
+}
+
+function TaskControlChartView({
+  items,
+  emptyLabel,
+}: {
+  items: TaskControlRecord[];
+  emptyLabel: string;
+}) {
+  const chartItems = useMemo(
+    () =>
+      (["overdue", "today", "soon", "later", "none"] as const).map((stage) => ({
+        stage,
+        label: getTaskControlStageLabel(stage),
+        value: items.filter((item) => item.stage === stage).length,
+        caption: getTaskControlStageDescription(stage),
+      })),
+    [items],
+  );
+  const max = Math.max(...chartItems.map((item) => item.value), 0);
+
+  if (items.length === 0) {
+    return <TaskControlEmptyState label={emptyLabel} />;
+  }
+
+  return (
+    <div className="rounded-[1.35rem] border border-border bg-secondary/20 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Deadline distribution</p>
+          <p className="mt-1 text-[0.88rem] text-muted-foreground">
+            ดูว่าปริมาณงานกระจุกอยู่ช่วงเวลาไหนมากที่สุด
+          </p>
+        </div>
+        <span className="text-[0.88rem] text-muted-foreground">Open tasks {items.length}</span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {chartItems.map((item) => (
+          <div
+            key={item.stage}
+            className="rounded-[1.2rem] border border-border bg-background/80 p-3.5"
+          >
+            <div className="flex h-32 items-end">
+              <div
+                className={cn(
+                  "w-full rounded-t-[1rem] transition-all",
+                  taskControlStageBarClassNames[item.stage],
+                )}
+                style={{
+                  height: `${max === 0 ? 0 : Math.max((item.value / max) * 100, item.value > 0 ? 10 : 0)}%`,
+                }}
+              />
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span
+                className={cn(
+                  "inline-flex rounded-full border px-2.5 py-1 text-[0.72rem] font-medium",
+                  taskControlStageClassNames[item.stage],
+                )}
+              >
+                {item.label}
+              </span>
+              <span className="font-display text-[1.55rem] font-medium tracking-tight text-foreground">
+                {item.value}
+              </span>
+            </div>
+            <p className="mt-1 text-[0.82rem] leading-5 text-muted-foreground">{item.caption}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskControlStageBucket({
+  title,
+  stage,
+  items,
+  emptyLabel,
+}: {
+  title: string;
+  stage: TaskControlStage;
+  items: TaskControlRecord[];
+  emptyLabel: string;
+}) {
+  return (
+    <section className="rounded-[1.25rem] border border-border bg-secondary/20 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className={cn(
+            "inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+            taskControlStageClassNames[stage],
+          )}
+        >
+          {title}
+        </span>
+        <span className="text-[0.82rem] text-muted-foreground">{items.length} งาน</span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="mt-3 text-[0.84rem] leading-5 text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <div className="mt-3 max-h-[18rem] space-y-2 overflow-auto pr-1">
+          {items.map((item) => (
+            <TaskControlItemCard key={item.id} item={item} compact />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TaskControlItemCard({
+  item,
+  compact = false,
+}: {
+  item: TaskControlRecord;
+  compact?: boolean;
+}) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "group block rounded-[1.05rem] border border-border bg-background/80 transition-all hover:-translate-y-0.5 hover:border-foreground/40 hover:bg-background",
+        compact ? "px-3 py-3" : "px-4 py-3.5",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[0.92rem] font-semibold leading-5 text-foreground">
+            {item.title}
+          </p>
+          <p className="mt-1 text-[0.82rem] text-muted-foreground">{item.detail}</p>
+          <p className="mt-1 text-[0.78rem] text-muted-foreground">{item.supportingText}</p>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <span
+            className={cn(
+              "inline-flex rounded-full border px-2.5 py-1 text-[0.7rem] font-medium",
+              taskControlStageClassNames[item.stage],
+            )}
+          >
+            {getTaskControlStageLabel(item.stage)}
+          </span>
+          <p className="mt-2 text-[0.76rem] text-muted-foreground">
+            {item.dueDate ? formatDueDate(item.dueDate) : "No due date"}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function TaskControlEmptyState({ label }: { label: string }) {
+  return (
+    <div className="rounded-[1.35rem] border border-dashed border-border bg-secondary/20 px-4 py-5 text-[0.92rem] text-muted-foreground">
+      {label}
+    </div>
   );
 }
 
@@ -1344,6 +1829,78 @@ function compareAttentionItems(a: AttentionItem, b: AttentionItem) {
   }
 
   return parseDateInput(a.dueDate).getTime() - parseDateInput(b.dueDate).getTime();
+}
+
+function getTaskControlStage(
+  value: string | null,
+  todayStart: number,
+  sevenDayWindowEnd: number,
+): TaskControlStage {
+  if (isOverdue(value, todayStart)) return "overdue";
+  if (isDueToday(value, todayStart)) return "today";
+  if (isDueBetween(value, todayStart + DAY_MS, sevenDayWindowEnd)) return "soon";
+  if (value) return "later";
+  return "none";
+}
+
+function compareTaskControlRecords(a: TaskControlRecord, b: TaskControlRecord) {
+  const stageRank: Record<TaskControlStage, number> = {
+    overdue: 0,
+    today: 1,
+    soon: 2,
+    later: 3,
+    none: 4,
+  };
+
+  if (stageRank[a.stage] !== stageRank[b.stage]) {
+    return stageRank[a.stage] - stageRank[b.stage];
+  }
+
+  const aDueDay = getDueDay(a.dueDate);
+  const bDueDay = getDueDay(b.dueDate);
+
+  if (aDueDay !== null && bDueDay !== null && aDueDay !== bDueDay) {
+    return aDueDay - bDueDay;
+  }
+
+  if (aDueDay !== null && bDueDay === null) return -1;
+  if (aDueDay === null && bDueDay !== null) return 1;
+
+  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+}
+
+function getTaskControlStageLabel(stage: TaskControlStage) {
+  switch (stage) {
+    case "overdue":
+      return "Overdue";
+    case "today":
+      return "Due Today";
+    case "soon":
+      return "Next 7 Days";
+    case "later":
+      return "Later";
+    case "none":
+      return "No Deadline";
+  }
+}
+
+function getTaskControlStageDescription(stage: TaskControlStage) {
+  switch (stage) {
+    case "overdue":
+      return "งานที่เลยกำหนดแล้ว";
+    case "today":
+      return "งานที่ควรปิดภายในวันนี้";
+    case "soon":
+      return "งานที่กำลังจะถึงใน 7 วัน";
+    case "later":
+      return "งานที่มี due date แต่ยังอยู่หลังช่วงนี้";
+    case "none":
+      return "งานที่ยังไม่ตั้ง due date";
+  }
+}
+
+function formatTaskControlContext(context: GtdItem["context"]) {
+  return context ? `@${context}` : "No context";
 }
 
 function formatShortDay(value: number) {
