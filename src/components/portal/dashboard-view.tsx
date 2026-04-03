@@ -1722,7 +1722,6 @@ function TaskControlChartView({
     () => chartData.reduce((sum, item) => sum + item.value, 0),
     [chartData],
   );
-  const max = Math.max(...chartData.map((item) => item.value), 0);
 
   if (total === 0) {
     return <TaskControlEmptyState label={emptyLabel} />;
@@ -1734,59 +1733,75 @@ function TaskControlChartView({
         <div>
           <p className="text-sm font-semibold text-foreground">{chartTitle}</p>
           <p className="mt-1 text-[0.88rem] text-muted-foreground">
-            สรุปสถานะงานของบอร์ดนี้ในมุมเดียว
+            สัดส่วนงานของบอร์ดนี้ในรูปแบบ infographic
           </p>
         </div>
         <span className="text-[0.88rem] text-muted-foreground">Total tasks {total}</span>
       </div>
 
       <div className="mt-4 rounded-[1.2rem] border border-border bg-background/80 p-4">
-        <div className="grid min-h-[18rem] grid-cols-[3rem_minmax(0,1fr)] gap-3">
-          <div className="flex flex-col justify-between py-1 text-[0.74rem] text-muted-foreground">
-            {[max, Math.round(max * 0.66), Math.round(max * 0.33), 0].map((value, index) => (
-              <span key={`${value}-${index}`}>{value}</span>
-            ))}
-          </div>
+        <div className="space-y-4">
+          {chartData.map((item) => {
+            const percent = getTaskControlPercent(item.value, total);
+            const fillWidth = getTaskControlFillWidth(percent);
 
-          <div className="relative">
-            <div className="absolute inset-0 flex flex-col justify-between py-1">
-              {[0, 1, 2, 3].map((index) => (
-                <div key={index} className="border-t border-dashed border-border/70" />
-              ))}
-            </div>
-
-            <div
-              className={cn(
-                "relative grid h-full items-end gap-3",
-                chartData.length <= 2 && "grid-cols-2",
-                chartData.length === 3 && "grid-cols-3",
-                chartData.length === 4 && "grid-cols-4",
-                chartData.length >= 5 && "grid-cols-5",
-              )}
-            >
-              {chartData.map((item) => (
-                <div key={item.label} className="flex h-full flex-col justify-end">
-                  <div className="rounded-[1rem] border border-border bg-secondary/20 p-3">
-                    <div className="flex h-40 items-end">
-                      <div
-                        className={cn("w-full rounded-t-[0.9rem]", item.colorClassName)}
-                        style={{
-                          height: `${max === 0 ? 0 : Math.max((item.value / max) * 100, item.value > 0 ? 12 : 0)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <p className="text-[0.84rem] font-semibold text-foreground">{item.label}</p>
-                      <p className="font-display text-[1.35rem] font-medium tracking-tight text-foreground">
-                        {item.value}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-[0.8rem] leading-5 text-muted-foreground">{item.detail}</p>
-                  </div>
+            return (
+              <div
+                key={item.label}
+                className="grid gap-3 sm:grid-cols-[minmax(7rem,9rem)_minmax(0,1fr)] sm:items-center"
+              >
+                <div className="min-w-0">
+                  <p className="text-[0.86rem] font-semibold uppercase tracking-[0.08em] text-foreground">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-[0.78rem] text-muted-foreground">
+                    {item.value} tasks
+                  </p>
+                  <p className="text-[0.76rem] text-muted-foreground">{item.detail}</p>
                 </div>
-              ))}
-            </div>
-          </div>
+
+                <div className="relative h-12">
+                  <div className="absolute inset-y-0 left-0 right-4 rounded-l-[0.95rem] bg-secondary/60" />
+                  <div
+                    className="absolute inset-y-0 right-0 w-4 bg-secondary/60"
+                    style={{ clipPath: "polygon(0 0, 100% 50%, 0 100%)" }}
+                  />
+
+                  {fillWidth > 0 ? (
+                    <div
+                      className="absolute inset-y-0 left-0"
+                      style={{ width: `${fillWidth}%` }}
+                    >
+                      <div className="relative h-full">
+                        <div
+                          className={cn(
+                            "absolute inset-y-0 left-0 rounded-l-[0.95rem]",
+                            item.colorClassName,
+                          )}
+                          style={{ right: "1rem" }}
+                        />
+                        <div
+                          className={cn("absolute right-0 top-0 h-full w-4", item.colorClassName)}
+                          style={{ clipPath: "polygon(0 0, 100% 50%, 0 100%)" }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-end pr-3">
+                          <span className="text-[0.95rem] font-semibold text-white">
+                            {percent}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+                      <span className="text-[0.88rem] font-medium text-muted-foreground">
+                        0%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -2397,6 +2412,16 @@ function getPriorityRank(priority: "low" | "medium" | "high") {
     case "low":
       return 1;
   }
+}
+
+function getTaskControlPercent(value: number, total: number) {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
+}
+
+function getTaskControlFillWidth(percent: number) {
+  if (percent <= 0) return 0;
+  return Math.min(Math.max(percent, 18), 100);
 }
 
 function formatTaskControlContext(context: GtdItem["context"]) {
