@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { ImagePlus, LoaderCircle, Plus, Trash2 } from "lucide-react";
 
@@ -267,10 +268,12 @@ export function ClientRoomGalleryEditor({
                   </div>
                   <div className="overflow-hidden rounded-xl border border-border bg-secondary/30">
                     {image.src ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={image.src}
                         alt={image.caption || room.name}
+                        width={800}
+                        height={600}
+                        unoptimized
                         className="aspect-[4/3] h-full w-full object-cover"
                       />
                     ) : (

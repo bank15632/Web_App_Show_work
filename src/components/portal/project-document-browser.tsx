@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Download, Eye, FileDown, LoaderCircle } from "lucide-react";
 
@@ -573,12 +574,12 @@ function ImageDocumentCard({
     <figure className="space-y-2">
       <div className="group relative overflow-hidden rounded-3xl bg-secondary">
         <a href={previewUrl} target="_blank" rel="noreferrer">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={previewUrl}
             alt={document.title || `${category.label} ${index + 1}`}
-            loading="lazy"
-            decoding="async"
+            width={1200}
+            height={800}
+            unoptimized
             className="block h-auto w-full"
           />
         </a>

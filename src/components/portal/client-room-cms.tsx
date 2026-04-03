@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import {
@@ -460,12 +461,12 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
         <div className="flex items-center gap-3 px-5 py-4 md:px-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={120}
             height={60}
+            priority
             className="h-8 w-auto shrink-0"
           />
           <div className="min-w-0">
@@ -752,10 +753,12 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
                     </div>
                     {project.draftData.heroImageUrl ? (
                       <div className="overflow-hidden rounded-2xl border border-border bg-secondary/30">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={project.draftData.heroImageUrl}
                           alt={project.draftData.title}
+                          width={1600}
+                          height={900}
+                          unoptimized
                           className="aspect-[16/9] w-full object-cover"
                         />
                       </div>

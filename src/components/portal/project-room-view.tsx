@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ProjectDocumentBrowser } from "@/components/portal/project-document-browser";
 import { ProjectGallery } from "@/components/portal/project-gallery";
 import type { ClientProject } from "@/lib/portal-data";
@@ -7,12 +8,12 @@ export function ProjectRoomView({ project }: { project: ClientProject }) {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-4 md:px-8 xl:px-12">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/logo-bnj.svg"
             alt="BNJ Studio"
             width={100}
             height={50}
+            priority
             className="h-8 w-auto shrink-0"
           />
           <div className="min-w-0">
@@ -35,10 +36,12 @@ export function ProjectRoomView({ project }: { project: ClientProject }) {
 
             <div className="mt-10 overflow-hidden rounded-2xl bg-secondary">
               {project.heroImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={project.heroImageUrl}
                   alt={project.title}
+                  width={1600}
+                  height={900}
+                  unoptimized
                   className="aspect-[16/9] w-full object-cover"
                 />
               ) : (
