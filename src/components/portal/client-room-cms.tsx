@@ -442,8 +442,12 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
       return;
     }
 
-    await navigator.clipboard.writeText(absoluteUrl);
-    setStatusMessage("คัดลอกลิงก์ลูกค้าแล้ว");
+    try {
+      await navigator.clipboard.writeText(absoluteUrl);
+      setStatusMessage("คัดลอกลิงก์ลูกค้าแล้ว");
+    } catch {
+      setStatusMessage("ไม่สามารถคัดลอกลิงก์ได้ กรุณาคัดลอกด้วยตนเอง");
+    }
   }
 
   const sharePath = project?.shareToken
