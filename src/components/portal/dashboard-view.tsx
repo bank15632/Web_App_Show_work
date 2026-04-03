@@ -5,10 +5,15 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
+  ArrowUpDown,
   BarChart3,
   BookOpenText,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock3,
   FileText,
@@ -61,6 +66,8 @@ type KpiTone = "neutral" | "warning" | "alert" | "accent";
 type TaskControlView = "timeline" | "table" | "calendar" | "chart";
 
 type TaskControlStage = DeadlineTone | "later" | "none";
+type TaskControlSortKey = "title" | "scope" | "due" | "priority";
+type SortDirection = "asc" | "desc";
 
 type TaskControlMetric = {
   icon: ReactNode;
@@ -80,6 +87,7 @@ type TaskControlRecord = {
   stage: TaskControlStage;
   updatedAt: string;
   priorityLabel: string;
+  priorityRank: number;
 };
 
 type TrendPoint = {
@@ -126,14 +134,6 @@ const taskControlStageClassNames: Record<TaskControlStage, string> = {
   soon: "border-sky-200 bg-sky-50 text-sky-700",
   later: "border-stone-200 bg-stone-100 text-stone-700",
   none: "border-violet-200 bg-violet-50 text-violet-700",
-};
-
-const taskControlStageBarClassNames: Record<TaskControlStage, string> = {
-  overdue: "bg-rose-500",
-  today: "bg-amber-400",
-  soon: "bg-sky-400",
-  later: "bg-stone-400",
-  none: "bg-violet-400",
 };
 
 const bucketColorClassNames: Record<string, string> = {
@@ -594,6 +594,7 @@ export function DashboardView() {
           stage: getTaskControlStage(item.dueDate, todayStart, sevenDayWindowEnd),
           updatedAt: item.updatedAt,
           priorityLabel: priorityLabels[item.priority],
+          priorityRank: getPriorityRank(item.priority),
         }))
         .sort((a, b) => compareTaskControlRecords(a, b)),
     [openGtdItems, sevenDayWindowEnd, todayStart],
@@ -611,6 +612,7 @@ export function DashboardView() {
           stage: getTaskControlStage(task.dueDate, todayStart, sevenDayWindowEnd),
           updatedAt: task.updatedAt,
           priorityLabel: priorityLabels[task.priority],
+          priorityRank: getPriorityRank(task.priority),
         }))
         .sort((a, b) => compareTaskControlRecords(a, b)),
     [openTrackerTasks, sevenDayWindowEnd, todayStart],
@@ -1069,13 +1071,13 @@ function TaskControlBoard({
 
       <div className="mt-5">
         {activeView === "timeline" ? (
-          <TaskControlTimelineView items={items} emptyLabel={emptyLabel} />
+          <TaskControlTimelineView items={items} emptyLabel={emptyLabel} todayStart={todayStart} />
         ) : activeView === "table" ? (
           <TaskControlTableView items={items} emptyLabel={emptyLabel} />
         ) : activeView === "calendar" ? (
           <TaskControlCalendarView items={items} emptyLabel={emptyLabel} todayStart={todayStart} />
         ) : (
-          <TaskControlChartView items={items} emptyLabel={emptyLabel} />
+          <TaskControlChartView items={items} emptyLabel={emptyLabel} todayStart={todayStart} />
         )}
       </div>
     </section>
@@ -1085,54 +1087,257 @@ function TaskControlBoard({
 function TaskControlTimelineView({
   items,
   emptyLabel,
+  todayStart,
 }: {
   items: TaskControlRecord[];
   emptyLabel: string;
+  todayStart: number;
 }) {
-  const groups = useMemo(
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const noDateItems = useMemo(() => items.filter((item) => item.stage === "none"), [items]);
+  const rangeStart = todayStart - DAY_MS * 15 + DAY_MS * 7 * weekOffset;
+  const days = useMemo(
     () =>
-      (["overdue", "today", "soon", "later", "none"] as const)
-        .map((stage) => ({
-          stage,
-          label: getTaskControlStageLabel(stage),
-          items: items.filter((item) => item.stage === stage),
-        }))
-        .filter((group) => group.items.length > 0),
-    [items],
+      Array.from({ length: 32 }, (_, index) => {
+        const time = rangeStart + DAY_MS * index;
+        return {
+          id: time.toString(),
+          time,
+          dayLabel: new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(time),
+          monthKey: new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(time),
+        };
+      }),
+    [rangeStart],
   );
+  const monthLabels = useMemo(
+    () =>
+      days.flatMap((day, index) =>
+        index === 0 || days[index - 1]?.monthKey !== day.monthKey
+          ? [{ label: day.monthKey, index }]
+          : [],
+      ),
+    [days],
+  );
+  const timelineMap = useMemo(() => {
+    const grouped = new Map<number, TaskControlRecord[]>();
+
+    for (const item of items) {
+      const dueDay = getDueDay(item.dueDate);
+      if (dueDay === null) continue;
+      if (dueDay < rangeStart || dueDay >= rangeStart + DAY_MS * days.length) continue;
+
+      const current = grouped.get(dueDay) ?? [];
+      current.push(item);
+      grouped.set(dueDay, current);
+    }
+
+    for (const value of grouped.values()) {
+      value.sort((a, b) => compareTaskControlRecords(a, b));
+    }
+
+    return grouped;
+  }, [days.length, items, rangeStart]);
+  const datedKeys = useMemo(
+    () => days.filter((day) => (timelineMap.get(day.time)?.length ?? 0) > 0).map((day) => day.id),
+    [days, timelineMap],
+  );
+  const fallbackKey = useMemo(() => {
+    if (datedKeys.includes(todayStart.toString())) return todayStart.toString();
+    if (datedKeys.length > 0) return datedKeys[0];
+    if (noDateItems.length > 0) return "none";
+    return null;
+  }, [datedKeys, noDateItems.length, todayStart]);
+  const activeKey =
+    selectedKey === "none"
+      ? noDateItems.length > 0
+        ? "none"
+        : fallbackKey
+      : selectedKey && datedKeys.includes(selectedKey)
+        ? selectedKey
+        : fallbackKey;
+  const activeItems =
+    activeKey === "none"
+      ? noDateItems
+      : activeKey
+        ? timelineMap.get(Number(activeKey)) ?? []
+        : [];
+  const activeLabel =
+    activeKey === "none"
+      ? `No date · ${noDateItems.length} tasks`
+      : activeKey
+        ? formatFullDate(Number(activeKey))
+        : "No active date";
 
   if (items.length === 0) {
     return <TaskControlEmptyState label={emptyLabel} />;
   }
 
   return (
-    <div className="grid gap-3 xl:grid-cols-2">
-      {groups.map((group) => (
-        <section
-          key={group.stage}
-          className="rounded-[1.35rem] border border-border bg-secondary/20 p-4"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <span
-              className={cn(
-                "inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
-                taskControlStageClassNames[group.stage],
-              )}
-            >
-              {group.label}
-            </span>
-            <span className="text-[0.82rem] text-muted-foreground">
-              {group.items.length} งาน
-            </span>
-          </div>
+    <div className="space-y-4 rounded-[1.35rem] border border-border bg-secondary/20 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex rounded-full border border-border bg-background px-3 py-1.5 text-[0.88rem] font-medium text-foreground">
+            Timeline
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedKey("none")}
+            className={cn(
+              "inline-flex rounded-full border px-3 py-1.5 text-[0.88rem] font-medium transition-colors",
+              activeKey === "none"
+                ? "border-violet-300 bg-violet-100 text-violet-800"
+                : "border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300",
+            )}
+          >
+            No date ({noDateItems.length})
+          </button>
+        </div>
 
-          <div className="mt-3 max-h-[20rem] space-y-2 overflow-auto pr-1">
-            {group.items.map((item) => (
-              <TaskControlItemCard key={item.id} item={item} compact />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setWeekOffset((value) => value - 1)}
+            className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            aria-label="Previous timeline window"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setWeekOffset(0)}
+            className="inline-flex h-9 items-center rounded-full border border-border bg-background px-3.5 text-[0.88rem] font-medium text-foreground transition-colors hover:border-foreground"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => setWeekOffset((value) => value + 1)}
+            className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            aria-label="Next timeline window"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto pb-1">
+        <div className="min-w-[70rem]">
+          <div className="relative h-7">
+            {monthLabels.map((month) => (
+              <div
+                key={month.label}
+                className="absolute top-0 text-[0.9rem] font-medium text-foreground"
+                style={{ left: `calc(${(month.index / days.length) * 100}% + 0.25rem)` }}
+              >
+                {month.label}
+              </div>
             ))}
           </div>
-        </section>
-      ))}
+
+          <div className="mt-2 grid grid-cols-32 gap-0">
+            {days.map((day) => {
+              const isActive = activeKey === day.id;
+              const isToday = day.time === todayStart;
+
+              return (
+                <button
+                  key={day.id}
+                  type="button"
+                  onClick={() => setSelectedKey(day.id)}
+                  className={cn(
+                    "flex h-10 items-center justify-center border-y border-r border-border/70 text-[0.8rem] text-muted-foreground first:border-l hover:bg-background/60",
+                    isActive && "bg-background text-foreground",
+                  )}
+                >
+                  <div className="flex flex-col items-center">
+                    <span>{day.dayLabel}</span>
+                    {isToday ? <span className="mt-0.5 size-1.5 rounded-full bg-rose-500" /> : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative grid h-28 grid-cols-32 overflow-hidden rounded-b-[1.15rem] border-x border-b border-border/70 bg-background/70">
+            <div className="pointer-events-none absolute left-0 right-0 top-[4rem] h-px bg-border/80" />
+            {days.map((day, index) => {
+              const dayItems = timelineMap.get(day.time) ?? [];
+              const isActive = activeKey === day.id;
+
+              return (
+                <button
+                  key={`${day.id}-lane`}
+                  type="button"
+                  onClick={() => setSelectedKey(day.id)}
+                  className={cn(
+                    "relative border-r border-border/60 transition-colors first:border-l",
+                    index % 2 === 0 ? "bg-secondary/30" : "bg-background/50",
+                    isActive && "bg-rose-50/60",
+                  )}
+                >
+                  {dayItems.length > 0 ? (
+                    <>
+                      <span
+                        className={cn(
+                          "absolute left-1/2 top-4 inline-flex -translate-x-1/2 items-center justify-center rounded-full text-[0.72rem] font-semibold",
+                          dayItems.length > 9 ? "size-7" : "size-6",
+                          isActive
+                            ? "bg-rose-500 text-white"
+                            : "border border-rose-200 bg-white text-rose-600",
+                        )}
+                      >
+                        {dayItems.length}
+                      </span>
+                      <span
+                        className={cn(
+                          "absolute left-1/2 top-10 h-10 -translate-x-1/2 border-l",
+                          isActive ? "border-rose-400" : "border-rose-200",
+                        )}
+                      />
+                    </>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <section className="rounded-[1.2rem] border border-border bg-background/80 p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{activeLabel}</p>
+            <p className="text-[0.84rem] text-muted-foreground">
+              {activeItems.length} tasks in focus
+            </p>
+          </div>
+          <span
+            className={cn(
+              "inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+              activeKey === "none"
+                ? taskControlStageClassNames.none
+                : taskControlStageClassNames[getTaskControlStageForKey(activeKey, todayStart)],
+            )}
+          >
+            {activeKey === "none"
+              ? "No Deadline"
+              : activeKey
+                ? getTaskControlStageLabel(getTaskControlStageForKey(activeKey, todayStart))
+                : "Timeline"}
+          </span>
+        </div>
+
+        {activeItems.length === 0 ? (
+          <p className="mt-3 text-[0.88rem] text-muted-foreground">ไม่มีงานในช่วงที่เลือก</p>
+        ) : (
+          <div className="mt-4 grid gap-3 xl:grid-cols-2">
+            {activeItems.map((item) => (
+              <TaskControlItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -1144,61 +1349,98 @@ function TaskControlTableView({
   items: TaskControlRecord[];
   emptyLabel: string;
 }) {
+  const [sortKey, setSortKey] = useState<TaskControlSortKey>("due");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const sortedItems = useMemo(
+    () => sortTaskControlItems(items, sortKey, sortDirection),
+    [items, sortDirection, sortKey],
+  );
+
   if (items.length === 0) {
     return <TaskControlEmptyState label={emptyLabel} />;
   }
 
   return (
     <div className="overflow-hidden rounded-[1.35rem] border border-border bg-secondary/20">
-      <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(9rem,0.7fr)_7rem] gap-3 border-b border-border/80 px-4 py-3 text-[0.76rem] font-medium uppercase tracking-[0.12em] text-muted-foreground lg:grid">
-        <span>Task</span>
-        <span>Scope</span>
-        <span className="text-right">Due</span>
-        <span className="text-right">Priority</span>
-      </div>
+      <div className="overflow-x-auto">
+        <div className="min-w-[62rem]">
+          <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(10rem,0.8fr)_8rem] gap-3 border-b border-border/80 px-4 py-3 text-[0.76rem] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            <TaskControlSortButton
+              label="Task"
+              sortKey="title"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onClick={(key) => toggleTaskControlSort(key, sortKey, sortDirection, setSortKey, setSortDirection)}
+            />
+            <TaskControlSortButton
+              label="Scope"
+              sortKey="scope"
+              activeKey={sortKey}
+              direction={sortDirection}
+              onClick={(key) => toggleTaskControlSort(key, sortKey, sortDirection, setSortKey, setSortDirection)}
+            />
+            <TaskControlSortButton
+              label="Due"
+              sortKey="due"
+              activeKey={sortKey}
+              direction={sortDirection}
+              align="end"
+              onClick={(key) => toggleTaskControlSort(key, sortKey, sortDirection, setSortKey, setSortDirection)}
+            />
+            <TaskControlSortButton
+              label="Priority"
+              sortKey="priority"
+              activeKey={sortKey}
+              direction={sortDirection}
+              align="end"
+              onClick={(key) => toggleTaskControlSort(key, sortKey, sortDirection, setSortKey, setSortDirection)}
+            />
+          </div>
 
-      <div className="max-h-[24rem] overflow-auto">
-        {items.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            className="block border-b border-border/70 px-4 py-3 transition-colors hover:bg-background/80 last:border-b-0"
-          >
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(9rem,0.7fr)_7rem] lg:items-center">
-              <div className="min-w-0">
-                <p className="truncate text-[0.95rem] font-semibold text-foreground">{item.title}</p>
-                <p className="mt-1 text-[0.82rem] text-muted-foreground lg:hidden">
-                  {item.detail}
-                </p>
-              </div>
+          <div className="max-h-[24rem] overflow-auto">
+            {sortedItems.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="block border-b border-border/70 px-4 py-3 transition-colors hover:bg-background/80 last:border-b-0"
+              >
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(10rem,0.8fr)_8rem] lg:items-center">
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.95rem] font-semibold text-foreground">{item.title}</p>
+                    <p className="mt-1 text-[0.82rem] text-muted-foreground lg:hidden">
+                      {item.detail}
+                    </p>
+                  </div>
 
-              <div className="min-w-0">
-                <p className="truncate text-[0.88rem] text-foreground">{item.detail}</p>
-                <p className="mt-1 truncate text-[0.8rem] text-muted-foreground">
-                  {item.supportingText}
-                </p>
-              </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.88rem] text-foreground">{item.detail}</p>
+                    <p className="mt-1 truncate text-[0.8rem] text-muted-foreground">
+                      {item.supportingText}
+                    </p>
+                  </div>
 
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <span
-                  className={cn(
-                    "inline-flex rounded-full border px-2.5 py-1 text-[0.72rem] font-medium",
-                    taskControlStageClassNames[item.stage],
-                  )}
-                >
-                  {getTaskControlStageLabel(item.stage)}
-                </span>
-                <span className="text-[0.82rem] text-muted-foreground">
-                  {item.dueDate ? formatDueDate(item.dueDate) : "No due date"}
-                </span>
-              </div>
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full border px-2.5 py-1 text-[0.72rem] font-medium",
+                        taskControlStageClassNames[item.stage],
+                      )}
+                    >
+                      {getTaskControlStageLabel(item.stage)}
+                    </span>
+                    <span className="text-[0.82rem] text-muted-foreground">
+                      {item.dueDate ? formatDueDate(item.dueDate) : "No due date"}
+                    </span>
+                  </div>
 
-              <p className="text-[0.88rem] font-medium text-foreground lg:text-right">
-                {item.priorityLabel}
-              </p>
-            </div>
-          </Link>
-        ))}
+                  <p className="text-[0.88rem] font-medium text-foreground lg:text-right">
+                    {item.priorityLabel}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1213,74 +1455,159 @@ function TaskControlCalendarView({
   emptyLabel: string;
   todayStart: number;
 }) {
-  const dayColumns = useMemo(
-    () =>
-      Array.from({ length: 8 }, (_, index) => {
-        const dayStart = todayStart + DAY_MS * index;
-        return {
-          id: dayStart.toString(),
-          label: index === 0 ? "Today" : formatShortDay(dayStart),
-          fullLabel: formatDateLabel(dayStart),
-          items: items.filter((item) => getDueDay(item.dueDate) === dayStart),
-        };
-      }),
-    [items, todayStart],
-  );
+  const [monthStart, setMonthStart] = useState(() => getMonthStart(todayStart));
+  const noDateItems = useMemo(() => items.filter((item) => item.stage === "none"), [items]);
+  const calendarMap = useMemo(() => {
+    const grouped = new Map<number, TaskControlRecord[]>();
+
+    for (const item of items) {
+      const dueDay = getDueDay(item.dueDate);
+      if (dueDay === null) continue;
+      const current = grouped.get(dueDay) ?? [];
+      current.push(item);
+      grouped.set(dueDay, current);
+    }
+
+    for (const value of grouped.values()) {
+      value.sort((a, b) => compareTaskControlRecords(a, b));
+    }
+
+    return grouped;
+  }, [items]);
+  const calendarDays = useMemo(() => buildCalendarDays(monthStart), [monthStart]);
 
   if (items.length === 0) {
     return <TaskControlEmptyState label={emptyLabel} />;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="overflow-x-auto pb-1">
-        <div className="grid min-w-[72rem] grid-cols-8 gap-3">
-          {dayColumns.map((day) => (
-            <section
-              key={day.id}
-              className="rounded-[1.25rem] border border-border bg-secondary/20 p-3.5"
-            >
-              <div className="border-b border-border/70 pb-2.5">
-                <p className="text-[0.84rem] font-semibold text-foreground">{day.label}</p>
-                <p className="text-[0.78rem] text-muted-foreground">{day.fullLabel}</p>
-              </div>
+    <div className="space-y-4 rounded-[1.35rem] border border-border bg-secondary/20 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex rounded-full border border-border bg-background px-3 py-1.5 text-[0.88rem] font-medium text-foreground">
+            Calendar
+          </span>
+          <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[0.88rem] font-medium text-violet-700">
+            No date ({noDateItems.length})
+          </span>
+        </div>
 
-              {day.items.length === 0 ? (
-                <p className="mt-3 text-[0.82rem] leading-5 text-muted-foreground">
-                  ไม่มีงานตามวัน
-                </p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {day.items.map((item) => (
-                    <TaskControlItemCard key={item.id} item={item} compact />
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMonthStart((value) => shiftMonth(value, -1))}
+            className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMonthStart(getMonthStart(todayStart))}
+            className="inline-flex h-9 items-center rounded-full border border-border bg-background px-3.5 text-[0.88rem] font-medium text-foreground transition-colors hover:border-foreground"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => setMonthStart((value) => shiftMonth(value, 1))}
+            className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            aria-label="Next month"
+          >
+            <ChevronRight className="size-4" />
+          </button>
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <TaskControlStageBucket
-          title="Overdue"
-          stage="overdue"
-          items={items.filter((item) => item.stage === "overdue")}
-          emptyLabel="ไม่มีงานที่เลยกำหนด"
-        />
-        <TaskControlStageBucket
-          title="Later"
-          stage="later"
-          items={items.filter((item) => item.stage === "later")}
-          emptyLabel="ไม่มีงานหลังจากช่วง 7 วัน"
-        />
-        <TaskControlStageBucket
-          title="No Deadline"
-          stage="none"
-          items={items.filter((item) => item.stage === "none")}
-          emptyLabel="ไม่มีงานที่ยังไม่ตั้ง due date"
-        />
-      </div>
+      <section className="rounded-[1.2rem] border border-border bg-background/80">
+        <div className="flex flex-col gap-3 border-b border-border/80 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[1.05rem] font-semibold text-foreground">{formatMonthHeading(monthStart)}</p>
+          <p className="text-[0.84rem] text-muted-foreground">
+            Month view of dated tasks
+          </p>
+        </div>
+
+        <div className="grid grid-cols-7 border-b border-border/70 bg-background/70">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <div
+              key={day}
+              className="px-3 py-2 text-center text-[0.76rem] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7">
+          {calendarDays.map((day, index) => {
+            const dayItems = calendarMap.get(day.time) ?? [];
+            const isCurrentMonth = day.month === new Date(monthStart).getMonth();
+            const isToday = day.time === todayStart;
+
+            return (
+              <div
+                key={day.id}
+                className={cn(
+                  "min-h-[8.4rem] border-r border-b border-border/70 px-3 py-3 last:border-r-0 sm:min-h-[9.2rem]",
+                  !isCurrentMonth && "bg-secondary/15 text-muted-foreground/70",
+                  isToday && "bg-rose-50/40",
+                  index % 7 === 6 && "border-r-0",
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span
+                    className={cn(
+                      "text-[0.84rem] font-medium",
+                      isCurrentMonth ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {day.label}
+                  </span>
+                  {dayItems.length > 0 ? (
+                    <span className="inline-flex size-7 items-center justify-center rounded-full bg-rose-500 text-[0.78rem] font-semibold text-white">
+                      {dayItems.length}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 space-y-1.5">
+                  {dayItems.slice(0, 2).map((item) => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={cn(
+                        "block truncate rounded-full border px-2.5 py-1 text-[0.76rem] font-medium transition-colors hover:border-foreground/40 hover:bg-background",
+                        taskControlStageClassNames[item.stage],
+                      )}
+                    >
+                      {item.title}
+                    </Link>
+                  ))}
+                  {dayItems.length > 2 ? (
+                    <p className="text-[0.76rem] text-muted-foreground">
+                      +{dayItems.length - 2} more
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {noDateItems.length > 0 ? (
+        <section className="rounded-[1.2rem] border border-violet-200 bg-violet-50/80 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-violet-900">No date queue</p>
+            <span className="text-[0.84rem] text-violet-700">{noDateItems.length} tasks</span>
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {noDateItems.slice(0, 4).map((item) => (
+              <TaskControlItemCard key={item.id} item={item} compact />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -1288,21 +1615,39 @@ function TaskControlCalendarView({
 function TaskControlChartView({
   items,
   emptyLabel,
+  todayStart,
 }: {
   items: TaskControlRecord[];
   emptyLabel: string;
+  todayStart: number;
 }) {
-  const chartItems = useMemo(
-    () =>
-      (["overdue", "today", "soon", "later", "none"] as const).map((stage) => ({
-        stage,
-        label: getTaskControlStageLabel(stage),
-        value: items.filter((item) => item.stage === stage).length,
-        caption: getTaskControlStageDescription(stage),
-      })),
+  const noDateCount = useMemo(
+    () => items.filter((item) => item.stage === "none").length,
     [items],
   );
-  const max = Math.max(...chartItems.map((item) => item.value), 0);
+  const chartDays = useMemo(() => {
+    const datedItems = items.filter((item) => item.dueDate);
+    const anchor =
+      datedItems.length > 0
+        ? Math.min(...datedItems.map((item) => getDueDay(item.dueDate) ?? Number.POSITIVE_INFINITY))
+        : todayStart;
+    const start = getDayStart(anchor - DAY_MS * 3);
+
+    return Array.from({ length: 18 }, (_, index) => {
+      const dayStart = start + DAY_MS * index;
+      const count = items.filter((item) => getDueDay(item.dueDate) === dayStart).length;
+
+      return {
+        id: dayStart.toString(),
+        time: dayStart,
+        label: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(dayStart),
+        shortLabel: new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(dayStart),
+        value: count,
+      };
+    });
+  }, [items, todayStart]);
+  const max = Math.max(...chartDays.map((item) => item.value), 0);
+  const chartGeometry = useMemo(() => buildAreaChartGeometry(chartDays, max), [chartDays, max]);
 
   if (items.length === 0) {
     return <TaskControlEmptyState label={emptyLabel} />;
@@ -1312,88 +1657,103 @@ function TaskControlChartView({
     <div className="rounded-[1.35rem] border border-border bg-secondary/20 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Deadline distribution</p>
+          <p className="text-sm font-semibold text-foreground">Due date load curve</p>
           <p className="mt-1 text-[0.88rem] text-muted-foreground">
-            ดูว่าปริมาณงานกระจุกอยู่ช่วงเวลาไหนมากที่สุด
+            Area chart ของงานที่มี due date ตามลำดับวัน
           </p>
         </div>
-        <span className="text-[0.88rem] text-muted-foreground">Open tasks {items.length}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.88rem] text-muted-foreground">Open tasks {items.length}</span>
+          <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[0.78rem] font-medium text-violet-700">
+            No date {noDateCount}
+          </span>
+        </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {chartItems.map((item) => (
-          <div
-            key={item.stage}
-            className="rounded-[1.2rem] border border-border bg-background/80 p-3.5"
-          >
-            <div className="flex h-32 items-end">
-              <div
-                className={cn(
-                  "w-full rounded-t-[1rem] transition-all",
-                  taskControlStageBarClassNames[item.stage],
-                )}
-                style={{
-                  height: `${max === 0 ? 0 : Math.max((item.value / max) * 100, item.value > 0 ? 10 : 0)}%`,
-                }}
-              />
-            </div>
+      <div className="mt-4 rounded-[1.2rem] border border-border bg-background/80 p-4">
+        <div className="relative h-[19rem]">
+          <svg viewBox="0 0 760 280" className="h-full w-full" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="task-control-area-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#111827" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="#111827" stopOpacity="0.04" />
+              </linearGradient>
+            </defs>
 
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span
-                className={cn(
-                  "inline-flex rounded-full border px-2.5 py-1 text-[0.72rem] font-medium",
-                  taskControlStageClassNames[item.stage],
-                )}
-              >
-                {item.label}
-              </span>
-              <span className="font-display text-[1.55rem] font-medium tracking-tight text-foreground">
-                {item.value}
-              </span>
-            </div>
-            <p className="mt-1 text-[0.82rem] leading-5 text-muted-foreground">{item.caption}</p>
+            {[0, 1, 2, 3].map((line) => {
+              const y = 26 + line * 58;
+              return (
+                <line
+                  key={line}
+                  x1="34"
+                  x2="736"
+                  y1={y}
+                  y2={y}
+                  stroke="#e7e5e4"
+                  strokeDasharray="4 6"
+                />
+              );
+            })}
+
+            <path d={chartGeometry.areaPath} fill="url(#task-control-area-fill)" />
+            <path d={chartGeometry.linePath} fill="none" stroke="#111827" strokeWidth="3" strokeLinejoin="round" />
+
+            {chartGeometry.points.map((point) => (
+              <g key={point.id}>
+                <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="#111827" strokeWidth="2" />
+                {point.value > 0 ? (
+                  <text
+                    x={point.x}
+                    y={point.y - 12}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: "12px" }}
+                  >
+                    {point.value}
+                  </text>
+                ) : null}
+              </g>
+            ))}
+          </svg>
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 grid grid-cols-6 gap-2 px-1">
+            {chartDays
+              .filter((_, index) => index % 3 === 0 || index === chartDays.length - 1)
+              .map((day) => (
+                <div key={day.id} className="text-[0.74rem] text-muted-foreground">
+                  {day.label}
+                </div>
+              ))}
           </div>
-        ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-[1rem] border border-border bg-secondary/20 px-3.5 py-3">
+            <p className="text-[0.76rem] uppercase tracking-[0.12em] text-muted-foreground">Peak</p>
+            <p className="mt-2 font-display text-[1.5rem] font-medium tracking-tight text-foreground">
+              {chartGeometry.peakPoint?.value ?? 0}
+            </p>
+            <p className="mt-1 text-[0.84rem] text-muted-foreground">
+              {chartGeometry.peakPoint ? chartGeometry.peakPoint.label : "No due date data"}
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-border bg-secondary/20 px-3.5 py-3">
+            <p className="text-[0.76rem] uppercase tracking-[0.12em] text-muted-foreground">Dated tasks</p>
+            <p className="mt-2 font-display text-[1.5rem] font-medium tracking-tight text-foreground">
+              {chartDays.reduce((sum, day) => sum + day.value, 0)}
+            </p>
+            <p className="mt-1 text-[0.84rem] text-muted-foreground">Visible along this curve</p>
+          </div>
+          <div className="rounded-[1rem] border border-violet-200 bg-violet-50/80 px-3.5 py-3">
+            <p className="text-[0.76rem] uppercase tracking-[0.12em] text-violet-700">No deadline</p>
+            <p className="mt-2 font-display text-[1.5rem] font-medium tracking-tight text-violet-900">
+              {noDateCount}
+            </p>
+            <p className="mt-1 text-[0.84rem] text-violet-700">Separate from dated workload</p>
+          </div>
+        </div>
       </div>
     </div>
-  );
-}
-
-function TaskControlStageBucket({
-  title,
-  stage,
-  items,
-  emptyLabel,
-}: {
-  title: string;
-  stage: TaskControlStage;
-  items: TaskControlRecord[];
-  emptyLabel: string;
-}) {
-  return (
-    <section className="rounded-[1.25rem] border border-border bg-secondary/20 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className={cn(
-            "inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
-            taskControlStageClassNames[stage],
-          )}
-        >
-          {title}
-        </span>
-        <span className="text-[0.82rem] text-muted-foreground">{items.length} งาน</span>
-      </div>
-
-      {items.length === 0 ? (
-        <p className="mt-3 text-[0.84rem] leading-5 text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div className="mt-3 max-h-[18rem] space-y-2 overflow-auto pr-1">
-          {items.map((item) => (
-            <TaskControlItemCard key={item.id} item={item} compact />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -1436,6 +1796,42 @@ function TaskControlItemCard({
         </div>
       </div>
     </Link>
+  );
+}
+
+function TaskControlSortButton({
+  label,
+  sortKey,
+  activeKey,
+  direction,
+  align = "start",
+  onClick,
+}: {
+  label: string;
+  sortKey: TaskControlSortKey;
+  activeKey: TaskControlSortKey;
+  direction: SortDirection;
+  align?: "start" | "end";
+  onClick: (key: TaskControlSortKey) => void;
+}) {
+  const isActive = activeKey === sortKey;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(sortKey)}
+      className={cn(
+        "inline-flex items-center gap-2 text-left transition-colors hover:text-foreground",
+        align === "end" && "justify-end",
+      )}
+    >
+      <span>{label}</span>
+      {isActive ? (
+        direction === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />
+      ) : (
+        <ArrowUpDown className="size-3.5 opacity-70" />
+      )}
+    </button>
   );
 }
 
@@ -1884,18 +2280,86 @@ function getTaskControlStageLabel(stage: TaskControlStage) {
   }
 }
 
-function getTaskControlStageDescription(stage: TaskControlStage) {
-  switch (stage) {
-    case "overdue":
-      return "งานที่เลยกำหนดแล้ว";
-    case "today":
-      return "งานที่ควรปิดภายในวันนี้";
-    case "soon":
-      return "งานที่กำลังจะถึงใน 7 วัน";
-    case "later":
-      return "งานที่มี due date แต่ยังอยู่หลังช่วงนี้";
-    case "none":
-      return "งานที่ยังไม่ตั้ง due date";
+function getTaskControlStageForKey(key: string | null, todayStart: number): TaskControlStage {
+  if (!key || key === "none") return "none";
+
+  const dueDay = Number(key);
+  if (Number.isNaN(dueDay)) return "none";
+  if (dueDay < todayStart) return "overdue";
+  if (dueDay === todayStart) return "today";
+  if (dueDay <= todayStart + DAY_MS * 7) return "soon";
+  return "later";
+}
+
+function toggleTaskControlSort(
+  nextKey: TaskControlSortKey,
+  currentKey: TaskControlSortKey,
+  currentDirection: SortDirection,
+  setSortKey: (value: TaskControlSortKey) => void,
+  setSortDirection: (value: SortDirection) => void,
+) {
+  if (nextKey === currentKey) {
+    setSortDirection(currentDirection === "asc" ? "desc" : "asc");
+    return;
+  }
+
+  setSortKey(nextKey);
+  setSortDirection(nextKey === "due" ? "asc" : "desc");
+}
+
+function sortTaskControlItems(
+  items: TaskControlRecord[],
+  sortKey: TaskControlSortKey,
+  direction: SortDirection,
+) {
+  const sorted = [...items];
+
+  sorted.sort((a, b) => {
+    let comparison = 0;
+
+    switch (sortKey) {
+      case "title":
+        comparison = a.title.localeCompare(b.title, "th");
+        break;
+      case "scope":
+        comparison = `${a.detail} ${a.supportingText}`.localeCompare(`${b.detail} ${b.supportingText}`, "th");
+        break;
+      case "due": {
+        const aDue = getDueDay(a.dueDate);
+        const bDue = getDueDay(b.dueDate);
+        comparison =
+          aDue === null && bDue === null
+            ? 0
+            : aDue === null
+              ? 1
+              : bDue === null
+                ? -1
+                : aDue - bDue;
+        break;
+      }
+      case "priority":
+        comparison = a.priorityRank - b.priorityRank;
+        break;
+    }
+
+    if (comparison === 0) {
+      comparison = compareTaskControlRecords(a, b);
+    }
+
+    return direction === "asc" ? comparison : comparison * -1;
+  });
+
+  return sorted;
+}
+
+function getPriorityRank(priority: "low" | "medium" | "high") {
+  switch (priority) {
+    case "high":
+      return 3;
+    case "medium":
+      return 2;
+    case "low":
+      return 1;
   }
 }
 
@@ -1924,6 +2388,14 @@ function formatDueDate(value: string) {
   }).format(date);
 }
 
+function formatFullDate(value: number) {
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(value);
+}
+
 function parseDateInput(value: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const [year, month, day] = value.split("-").map(Number);
@@ -1931,6 +2403,88 @@ function parseDateInput(value: string) {
   }
 
   return new Date(value);
+}
+
+function getMonthStart(value: number) {
+  const date = new Date(value);
+  date.setDate(1);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function shiftMonth(value: number, amount: number) {
+  const date = new Date(value);
+  date.setMonth(date.getMonth() + amount);
+  return getMonthStart(date.getTime());
+}
+
+function formatMonthHeading(value: number) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(value);
+}
+
+function buildCalendarDays(monthStart: number) {
+  const month = new Date(monthStart).getMonth();
+  const startDate = new Date(monthStart);
+  startDate.setDate(1);
+  startDate.setHours(0, 0, 0, 0);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    date.setHours(0, 0, 0, 0);
+
+    return {
+      id: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+      time: date.getTime(),
+      label: date.getDate().toString(),
+      month: date.getMonth(),
+      isCurrentMonth: date.getMonth() === month,
+    };
+  });
+}
+
+function buildAreaChartGeometry(
+  days: Array<{ id: string; value: number; label: string }>,
+  max: number,
+) {
+  const left = 34;
+  const right = 736;
+  const top = 26;
+  const bottom = 234;
+  const width = right - left;
+  const height = bottom - top;
+  const safeMax = Math.max(max, 1);
+
+  const points = days.map((day, index) => {
+    const x = left + (width / Math.max(days.length - 1, 1)) * index;
+    const y = bottom - (day.value / safeMax) * height;
+    return {
+      id: day.id,
+      label: day.label,
+      value: day.value,
+      x,
+      y,
+    };
+  });
+
+  const linePath = points.length
+    ? `M ${points.map((point) => `${point.x} ${point.y}`).join(" L ")}`
+    : "";
+  const areaPath = points.length
+    ? `M ${points[0]?.x} ${bottom} L ${points.map((point) => `${point.x} ${point.y}`).join(" L ")} L ${points[points.length - 1]?.x} ${bottom} Z`
+    : "";
+  const peakPoint = [...points].sort((a, b) => b.value - a.value)[0] ?? null;
+
+  return {
+    points,
+    linePath,
+    areaPath,
+    peakPoint,
+  };
 }
 
 async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
