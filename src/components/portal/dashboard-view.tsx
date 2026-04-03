@@ -77,6 +77,13 @@ type TaskControlMetric = {
   tone?: KpiTone;
 };
 
+type TaskControlChartDatum = {
+  label: string;
+  value: number;
+  colorClassName: string;
+  detail: string;
+};
+
 type TaskControlRecord = {
   id: string;
   title: string;
@@ -134,6 +141,30 @@ const taskControlStageClassNames: Record<TaskControlStage, string> = {
   soon: "border-sky-200 bg-sky-50 text-sky-700",
   later: "border-stone-200 bg-stone-100 text-stone-700",
   none: "border-violet-200 bg-violet-50 text-violet-700",
+};
+
+const taskControlStageSurfaceClassNames: Record<TaskControlStage, string> = {
+  overdue: "bg-rose-50/60",
+  today: "bg-amber-50/60",
+  soon: "bg-sky-50/60",
+  later: "bg-stone-100/60",
+  none: "bg-violet-50/80",
+};
+
+const taskControlStageMarkerClassNames: Record<TaskControlStage, string> = {
+  overdue: "bg-rose-500 text-white",
+  today: "bg-amber-400 text-amber-950",
+  soon: "bg-sky-500 text-white",
+  later: "bg-stone-500 text-white",
+  none: "bg-violet-500 text-white",
+};
+
+const taskControlStageRailClassNames: Record<TaskControlStage, string> = {
+  overdue: "border-rose-300",
+  today: "border-amber-300",
+  soon: "border-sky-300",
+  later: "border-stone-300",
+  none: "border-violet-300",
 };
 
 const bucketColorClassNames: Record<string, string> = {
@@ -581,6 +612,7 @@ export function DashboardView() {
 
   const gtdCompletionTotal = gtdCompletionTrend.reduce((sum, point) => sum + point.value, 0);
   const kanbanCompletionTotal = kanbanCompletionTrend.reduce((sum, point) => sum + point.value, 0);
+  const gtdDoneCount = gtdItems.filter((item) => item.done).length;
   const gtdTaskControlItems = useMemo<TaskControlRecord[]>(
     () =>
       openGtdItems
@@ -687,6 +719,52 @@ export function DashboardView() {
       tone: "accent",
     },
   ];
+  const gtdTaskControlChartData: TaskControlChartDatum[] = [
+    {
+      label: "Done",
+      value: gtdDoneCount,
+      colorClassName: "bg-emerald-500",
+      detail: "งานที่ปิดแล้ว",
+    },
+    {
+      label: "Not Done",
+      value: openGtdCount,
+      colorClassName: "bg-zinc-900",
+      detail: "งานที่ยังเปิดอยู่",
+    },
+  ];
+  const kanbanTaskControlChartData: TaskControlChartDatum[] = [
+    {
+      label: "To Do",
+      value: trackerTasks.filter((task) => task.status === "todo").length,
+      colorClassName: "bg-zinc-800",
+      detail: "พร้อมเริ่ม",
+    },
+    {
+      label: "Doing",
+      value: trackerTasks.filter((task) => task.status === "doing").length,
+      colorClassName: "bg-sky-500",
+      detail: "กำลังทำ",
+    },
+    {
+      label: "Waiting",
+      value: trackerTasks.filter((task) => task.status === "waiting").length,
+      colorClassName: "bg-amber-400",
+      detail: "รอข้อมูลหรืออนุมัติ",
+    },
+    {
+      label: "Blocked",
+      value: trackerTasks.filter((task) => task.status === "blocked").length,
+      colorClassName: "bg-rose-500",
+      detail: "ติด blocker",
+    },
+    {
+      label: "Done",
+      value: trackerTasks.filter((task) => task.status === "done").length,
+      colorClassName: "bg-emerald-500",
+      detail: "ปิดงานแล้ว",
+    },
+  ];
 
   return (
     <div
@@ -786,6 +864,8 @@ export function DashboardView() {
                 items={gtdTaskControlItems}
                 emptyLabel="ยังไม่มีงาน GTD ค้างในระบบ"
                 todayStart={todayStart}
+                chartTitle="Done vs Not Done"
+                chartData={gtdTaskControlChartData}
               />
               <TaskControlBoard
                 icon={<ListTodo className="size-4" />}
@@ -798,6 +878,8 @@ export function DashboardView() {
                 items={kanbanTaskControlItems}
                 emptyLabel="ยังไม่มีการ์ด Kanban ค้างในระบบ"
                 todayStart={todayStart}
+                chartTitle="Board Status Split"
+                chartData={kanbanTaskControlChartData}
               />
             </div>
           </div>
@@ -1001,6 +1083,8 @@ function TaskControlBoard({
   items,
   emptyLabel,
   todayStart,
+  chartTitle,
+  chartData,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -1012,6 +1096,8 @@ function TaskControlBoard({
   items: TaskControlRecord[];
   emptyLabel: string;
   todayStart: number;
+  chartTitle: string;
+  chartData: TaskControlChartDatum[];
 }) {
   const [activeView, setActiveView] = useState<TaskControlView>("timeline");
 
@@ -1077,7 +1163,11 @@ function TaskControlBoard({
         ) : activeView === "calendar" ? (
           <TaskControlCalendarView items={items} emptyLabel={emptyLabel} todayStart={todayStart} />
         ) : (
-          <TaskControlChartView items={items} emptyLabel={emptyLabel} todayStart={todayStart} />
+          <TaskControlChartView
+            chartTitle={chartTitle}
+            chartData={chartData}
+            emptyLabel={emptyLabel}
+          />
         )}
       </div>
     </section>
@@ -1264,6 +1354,7 @@ function TaskControlTimelineView({
             {days.map((day, index) => {
               const dayItems = timelineMap.get(day.time) ?? [];
               const isActive = activeKey === day.id;
+              const dayStage = getTaskControlStageForKey(day.id, todayStart);
 
               return (
                 <button
@@ -1273,7 +1364,7 @@ function TaskControlTimelineView({
                   className={cn(
                     "relative border-r border-border/60 transition-colors first:border-l",
                     index % 2 === 0 ? "bg-secondary/30" : "bg-background/50",
-                    isActive && "bg-rose-50/60",
+                    isActive && taskControlStageSurfaceClassNames[dayStage],
                   )}
                 >
                   {dayItems.length > 0 ? (
@@ -1282,9 +1373,8 @@ function TaskControlTimelineView({
                         className={cn(
                           "absolute left-1/2 top-4 inline-flex -translate-x-1/2 items-center justify-center rounded-full text-[0.72rem] font-semibold",
                           dayItems.length > 9 ? "size-7" : "size-6",
-                          isActive
-                            ? "bg-rose-500 text-white"
-                            : "border border-rose-200 bg-white text-rose-600",
+                          taskControlStageMarkerClassNames[dayStage],
+                          isActive && "ring-4 ring-background",
                         )}
                       >
                         {dayItems.length}
@@ -1292,7 +1382,7 @@ function TaskControlTimelineView({
                       <span
                         className={cn(
                           "absolute left-1/2 top-10 h-10 -translate-x-1/2 border-l",
-                          isActive ? "border-rose-400" : "border-rose-200",
+                          taskControlStageRailClassNames[dayStage],
                         )}
                       />
                     </>
@@ -1543,6 +1633,7 @@ function TaskControlCalendarView({
             const dayItems = calendarMap.get(day.time) ?? [];
             const isCurrentMonth = day.month === new Date(monthStart).getMonth();
             const isToday = day.time === todayStart;
+            const dayStage = getTaskControlStageForKey(day.time.toString(), todayStart);
 
             return (
               <div
@@ -1550,7 +1641,8 @@ function TaskControlCalendarView({
                 className={cn(
                   "min-h-[8.4rem] border-r border-b border-border/70 px-3 py-3 last:border-r-0 sm:min-h-[9.2rem]",
                   !isCurrentMonth && "bg-secondary/15 text-muted-foreground/70",
-                  isToday && "bg-rose-50/40",
+                  dayItems.length > 0 && isCurrentMonth && taskControlStageSurfaceClassNames[dayStage],
+                  isToday && dayItems.length === 0 && "bg-amber-50/30",
                   index % 7 === 6 && "border-r-0",
                 )}
               >
@@ -1564,7 +1656,12 @@ function TaskControlCalendarView({
                     {day.label}
                   </span>
                   {dayItems.length > 0 ? (
-                    <span className="inline-flex size-7 items-center justify-center rounded-full bg-rose-500 text-[0.78rem] font-semibold text-white">
+                    <span
+                      className={cn(
+                        "inline-flex size-7 items-center justify-center rounded-full text-[0.78rem] font-semibold",
+                        taskControlStageMarkerClassNames[dayStage],
+                      )}
+                    >
                       {dayItems.length}
                     </span>
                   ) : null}
@@ -1613,43 +1710,21 @@ function TaskControlCalendarView({
 }
 
 function TaskControlChartView({
-  items,
+  chartTitle,
+  chartData,
   emptyLabel,
-  todayStart,
 }: {
-  items: TaskControlRecord[];
+  chartTitle: string;
+  chartData: TaskControlChartDatum[];
   emptyLabel: string;
-  todayStart: number;
 }) {
-  const noDateCount = useMemo(
-    () => items.filter((item) => item.stage === "none").length,
-    [items],
+  const total = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.value, 0),
+    [chartData],
   );
-  const chartDays = useMemo(() => {
-    const datedItems = items.filter((item) => item.dueDate);
-    const anchor =
-      datedItems.length > 0
-        ? Math.min(...datedItems.map((item) => getDueDay(item.dueDate) ?? Number.POSITIVE_INFINITY))
-        : todayStart;
-    const start = getDayStart(anchor - DAY_MS * 3);
+  const max = Math.max(...chartData.map((item) => item.value), 0);
 
-    return Array.from({ length: 18 }, (_, index) => {
-      const dayStart = start + DAY_MS * index;
-      const count = items.filter((item) => getDueDay(item.dueDate) === dayStart).length;
-
-      return {
-        id: dayStart.toString(),
-        time: dayStart,
-        label: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(dayStart),
-        shortLabel: new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(dayStart),
-        value: count,
-      };
-    });
-  }, [items, todayStart]);
-  const max = Math.max(...chartDays.map((item) => item.value), 0);
-  const chartGeometry = useMemo(() => buildAreaChartGeometry(chartDays, max), [chartDays, max]);
-
-  if (items.length === 0) {
+  if (total === 0) {
     return <TaskControlEmptyState label={emptyLabel} />;
   }
 
@@ -1657,99 +1732,60 @@ function TaskControlChartView({
     <div className="rounded-[1.35rem] border border-border bg-secondary/20 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Due date load curve</p>
+          <p className="text-sm font-semibold text-foreground">{chartTitle}</p>
           <p className="mt-1 text-[0.88rem] text-muted-foreground">
-            Area chart ของงานที่มี due date ตามลำดับวัน
+            สรุปสถานะงานของบอร์ดนี้ในมุมเดียว
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[0.88rem] text-muted-foreground">Open tasks {items.length}</span>
-          <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[0.78rem] font-medium text-violet-700">
-            No date {noDateCount}
-          </span>
-        </div>
+        <span className="text-[0.88rem] text-muted-foreground">Total tasks {total}</span>
       </div>
 
       <div className="mt-4 rounded-[1.2rem] border border-border bg-background/80 p-4">
-        <div className="relative h-[19rem]">
-          <svg viewBox="0 0 760 280" className="h-full w-full" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="task-control-area-fill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#111827" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#111827" stopOpacity="0.04" />
-              </linearGradient>
-            </defs>
-
-            {[0, 1, 2, 3].map((line) => {
-              const y = 26 + line * 58;
-              return (
-                <line
-                  key={line}
-                  x1="34"
-                  x2="736"
-                  y1={y}
-                  y2={y}
-                  stroke="#e7e5e4"
-                  strokeDasharray="4 6"
-                />
-              );
-            })}
-
-            <path d={chartGeometry.areaPath} fill="url(#task-control-area-fill)" />
-            <path d={chartGeometry.linePath} fill="none" stroke="#111827" strokeWidth="3" strokeLinejoin="round" />
-
-            {chartGeometry.points.map((point) => (
-              <g key={point.id}>
-                <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="#111827" strokeWidth="2" />
-                {point.value > 0 ? (
-                  <text
-                    x={point.x}
-                    y={point.y - 12}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: "12px" }}
-                  >
-                    {point.value}
-                  </text>
-                ) : null}
-              </g>
+        <div className="grid min-h-[18rem] grid-cols-[3rem_minmax(0,1fr)] gap-3">
+          <div className="flex flex-col justify-between py-1 text-[0.74rem] text-muted-foreground">
+            {[max, Math.round(max * 0.66), Math.round(max * 0.33), 0].map((value, index) => (
+              <span key={`${value}-${index}`}>{value}</span>
             ))}
-          </svg>
+          </div>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 grid grid-cols-6 gap-2 px-1">
-            {chartDays
-              .filter((_, index) => index % 3 === 0 || index === chartDays.length - 1)
-              .map((day) => (
-                <div key={day.id} className="text-[0.74rem] text-muted-foreground">
-                  {day.label}
+          <div className="relative">
+            <div className="absolute inset-0 flex flex-col justify-between py-1">
+              {[0, 1, 2, 3].map((index) => (
+                <div key={index} className="border-t border-dashed border-border/70" />
+              ))}
+            </div>
+
+            <div
+              className={cn(
+                "relative grid h-full items-end gap-3",
+                chartData.length <= 2 && "grid-cols-2",
+                chartData.length === 3 && "grid-cols-3",
+                chartData.length === 4 && "grid-cols-4",
+                chartData.length >= 5 && "grid-cols-5",
+              )}
+            >
+              {chartData.map((item) => (
+                <div key={item.label} className="flex h-full flex-col justify-end">
+                  <div className="rounded-[1rem] border border-border bg-secondary/20 p-3">
+                    <div className="flex h-40 items-end">
+                      <div
+                        className={cn("w-full rounded-t-[0.9rem]", item.colorClassName)}
+                        style={{
+                          height: `${max === 0 ? 0 : Math.max((item.value / max) * 100, item.value > 0 ? 12 : 0)}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-[0.84rem] font-semibold text-foreground">{item.label}</p>
+                      <p className="font-display text-[1.35rem] font-medium tracking-tight text-foreground">
+                        {item.value}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-[0.8rem] leading-5 text-muted-foreground">{item.detail}</p>
+                  </div>
                 </div>
               ))}
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-[1rem] border border-border bg-secondary/20 px-3.5 py-3">
-            <p className="text-[0.76rem] uppercase tracking-[0.12em] text-muted-foreground">Peak</p>
-            <p className="mt-2 font-display text-[1.5rem] font-medium tracking-tight text-foreground">
-              {chartGeometry.peakPoint?.value ?? 0}
-            </p>
-            <p className="mt-1 text-[0.84rem] text-muted-foreground">
-              {chartGeometry.peakPoint ? chartGeometry.peakPoint.label : "No due date data"}
-            </p>
-          </div>
-          <div className="rounded-[1rem] border border-border bg-secondary/20 px-3.5 py-3">
-            <p className="text-[0.76rem] uppercase tracking-[0.12em] text-muted-foreground">Dated tasks</p>
-            <p className="mt-2 font-display text-[1.5rem] font-medium tracking-tight text-foreground">
-              {chartDays.reduce((sum, day) => sum + day.value, 0)}
-            </p>
-            <p className="mt-1 text-[0.84rem] text-muted-foreground">Visible along this curve</p>
-          </div>
-          <div className="rounded-[1rem] border border-violet-200 bg-violet-50/80 px-3.5 py-3">
-            <p className="text-[0.76rem] uppercase tracking-[0.12em] text-violet-700">No deadline</p>
-            <p className="mt-2 font-display text-[1.5rem] font-medium tracking-tight text-violet-900">
-              {noDateCount}
-            </p>
-            <p className="mt-1 text-[0.84rem] text-violet-700">Separate from dated workload</p>
+            </div>
           </div>
         </div>
       </div>
@@ -2445,46 +2481,6 @@ function buildCalendarDays(monthStart: number) {
       isCurrentMonth: date.getMonth() === month,
     };
   });
-}
-
-function buildAreaChartGeometry(
-  days: Array<{ id: string; value: number; label: string }>,
-  max: number,
-) {
-  const left = 34;
-  const right = 736;
-  const top = 26;
-  const bottom = 234;
-  const width = right - left;
-  const height = bottom - top;
-  const safeMax = Math.max(max, 1);
-
-  const points = days.map((day, index) => {
-    const x = left + (width / Math.max(days.length - 1, 1)) * index;
-    const y = bottom - (day.value / safeMax) * height;
-    return {
-      id: day.id,
-      label: day.label,
-      value: day.value,
-      x,
-      y,
-    };
-  });
-
-  const linePath = points.length
-    ? `M ${points.map((point) => `${point.x} ${point.y}`).join(" L ")}`
-    : "";
-  const areaPath = points.length
-    ? `M ${points[0]?.x} ${bottom} L ${points.map((point) => `${point.x} ${point.y}`).join(" L ")} L ${points[points.length - 1]?.x} ${bottom} Z`
-    : "";
-  const peakPoint = [...points].sort((a, b) => b.value - a.value)[0] ?? null;
-
-  return {
-    points,
-    linePath,
-    areaPath,
-    peakPoint,
-  };
 }
 
 async function getTrackerWorkspace(): Promise<TrackerWorkspaceData> {
