@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 
 import {
+  aecPhaseModules,
+  type AecPhaseModule,
+  type AecWorkflowModule,
+} from "@/lib/aec-workflow-content";
+import {
   buildClientRoomSharePath,
   type ClientRoomProjectSummary,
 } from "@/lib/client-rooms/types";
@@ -701,29 +706,20 @@ export function DashboardView() {
 
         <section className="fade-up rounded-[2rem] border border-border bg-background p-5 sm:p-6">
           <div className="max-w-3xl">
-            <p className="caption-editorial mb-2">Suggested Next Improvements</p>
+            <p className="caption-editorial mb-2">Phased Delivery Roadmap</p>
             <h2 className="font-display text-[1.7rem] font-medium tracking-tight sm:text-[2rem]">
-              ถ้าจะใช้กับ Website, Anime, Content หรือโปรเจกต์ส่วนตัว ควรเพิ่มอะไรต่อ
+              ทำทุกอย่างให้ครบแบบแบ่งเป็น Phase เพื่อขยายจากของที่มีอยู่ไปสู่ระบบเต็ม
             </h2>
             <p className="mt-3 text-[0.95rem] leading-6 text-muted-foreground">
-              โครง GTD + Kanban ตอนนี้ใช้ต่อได้เลย แต่ถ้าจะให้เหมาะกับงาน creative หรือ digital
-              project มากขึ้น แนะนำให้เพิ่ม template และ metadata ตามลักษณะงานจริง
+              Roadmap นี้ยึดของที่มีอยู่จริงในระบบตอนนี้เป็นฐาน แล้วค่อยต่อฟีเจอร์ที่ต้องใช้ข้อมูล,
+              team layer และ client-facing workflow เพิ่มทีละ phase โดยไม่รื้อของเดิมทิ้ง
             </p>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
-            <RecommendationCard
-              title="Custom project types"
-              body="ตั้ง project type ให้สะท้อนงานจริง เช่น Website, Anime, YouTube Content, Marketing, Admin เพื่อให้ dashboard วิเคราะห์ workload ตามหมวดงานได้แม่นขึ้น"
-            />
-            <RecommendationCard
-              title="Pipeline templates"
-              body="งานแต่ละชนิดควรมีสถานะไม่เหมือนกัน เช่น script → storyboard → edit → publish หรือ brief → design → build → QA → launch"
-            />
-            <RecommendationCard
-              title="Creative contexts"
-              body="GTD จะทรงพลังขึ้นถ้ามี context หรือ tag สำหรับงานอย่าง writing, recording, editing, rendering, review และ publishing"
-            />
+          <div className="mt-6 space-y-4">
+            {aecPhaseModules.map((phase) => (
+              <PhaseRoadmapCard key={phase.id} phase={phase} />
+            ))}
           </div>
         </section>
       </main>
@@ -1783,18 +1779,132 @@ function ClientRoomDashboardCard({ project }: { project: ClientRoomProjectSummar
   );
 }
 
-function RecommendationCard({
-  title,
-  body,
+function PhaseRoadmapCard({ phase }: { phase: AecPhaseModule }) {
+  const liveCount = phase.modules.filter((module) => module.status === "live").length;
+  const partialCount = phase.modules.filter((module) => module.status === "partial").length;
+  const plannedCount = phase.modules.filter((module) => module.status === "planned").length;
+
+  return (
+    <article className="rounded-[1.55rem] border border-border bg-secondary/20 p-4 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1 text-[0.74rem] font-semibold uppercase tracking-[0.16em] text-white">
+              {phase.shortLabel}
+            </span>
+            <span className="inline-flex rounded-full border border-border bg-background px-3 py-1 text-[0.8rem] text-muted-foreground">
+              {phase.duration}
+            </span>
+          </div>
+          <h3 className="mt-3 text-[1.1rem] font-semibold tracking-tight text-foreground sm:text-[1.2rem]">
+            {phase.name}
+          </h3>
+          <p className="mt-2 text-[0.92rem] leading-6 text-muted-foreground">
+            {phase.summary}
+          </p>
+          <p className="mt-3 text-[0.9rem] font-medium text-foreground">
+            เป้าหมายของ phase นี้: <span className="font-normal text-muted-foreground">{phase.objective}</span>
+          </p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3 lg:w-[18rem] lg:grid-cols-1">
+          <PhaseMetric label="Live" value={liveCount} tone="live" />
+          <PhaseMetric label="Partial" value={partialCount} tone="partial" />
+          <PhaseMetric label="Planned" value={plannedCount} tone="planned" />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.9fr)]">
+        <div className="grid gap-3 lg:grid-cols-2">
+          {phase.modules.map((module) => (
+            <PhaseModuleCard key={`${phase.id}-${module.name}`} module={module} />
+          ))}
+        </div>
+
+        <div className="rounded-[1.25rem] border border-border/80 bg-background/80 p-4">
+          <p className="text-[0.86rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Build Checklist
+          </p>
+          <div className="mt-3 space-y-2.5">
+            {phase.buildChecklist.map((item, index) => (
+              <div
+                key={`${phase.id}-check-${index}`}
+                className="flex items-start gap-3 rounded-[1rem] border border-border/70 bg-secondary/20 px-3 py-3"
+              >
+                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[0.76rem] font-semibold text-white">
+                  {index + 1}
+                </span>
+                <p className="text-[0.9rem] leading-6 text-foreground">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PhaseModuleCard({ module }: { module: AecWorkflowModule }) {
+  return (
+    <article className="rounded-[1.2rem] border border-border/80 bg-background/80 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "inline-flex rounded-full border px-2.5 py-1 text-[0.74rem] font-medium",
+            getWorkflowModuleStatusTone(module.status),
+          )}
+        >
+          {getWorkflowModuleStatusLabel(module.status)}
+        </span>
+        <span className="text-[0.8rem] text-muted-foreground">{module.deliverable}</span>
+      </div>
+
+      <h4 className="mt-3 text-[1rem] font-semibold text-foreground">{module.name}</h4>
+      <p className="mt-2 text-[0.9rem] leading-6 text-muted-foreground">{module.summary}</p>
+
+      <div className="mt-3 rounded-[1rem] bg-secondary/30 px-3 py-3">
+        <p className="text-[0.74rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Current Fit
+        </p>
+        <p className="mt-1 text-[0.88rem] leading-6 text-foreground">{module.currentFit}</p>
+      </div>
+
+      {module.launchHref && module.launchLabel ? (
+        <div className="mt-4">
+          <Link
+            href={module.launchHref}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-4 text-[0.88rem] font-medium text-foreground transition-colors hover:border-foreground"
+          >
+            {module.launchLabel}
+            <ArrowRight className="size-4" />
+          </Link>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function PhaseMetric({
+  label,
+  value,
+  tone,
 }: {
-  title: string;
-  body: string;
+  label: string;
+  value: number;
+  tone: "live" | "partial" | "planned";
 }) {
   return (
-    <article className="rounded-[1.4rem] border border-border bg-secondary/25 p-4">
-      <p className="text-[1rem] font-semibold tracking-tight text-foreground">{title}</p>
-      <p className="mt-2 text-[0.92rem] leading-6 text-muted-foreground">{body}</p>
-    </article>
+    <div
+      className={cn(
+        "rounded-[1rem] border px-3.5 py-3",
+        tone === "live" && "border-emerald-200 bg-emerald-50/80",
+        tone === "partial" && "border-amber-200 bg-amber-50/80",
+        tone === "planned" && "border-zinc-200 bg-zinc-50/80",
+      )}
+    >
+      <p className="caption-editorial text-[0.68rem] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-[1.4rem] font-semibold tracking-tight text-foreground">{value}</p>
+    </div>
   );
 }
 
@@ -1829,6 +1939,28 @@ function getClientRoomStatusTone(status: ClientRoomStatus) {
       return "border-sky-200 bg-sky-50 text-sky-700";
     case "live":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+}
+
+function getWorkflowModuleStatusLabel(status: AecWorkflowModule["status"]) {
+  switch (status) {
+    case "live":
+      return "Live";
+    case "partial":
+      return "Partial";
+    case "planned":
+      return "Planned";
+  }
+}
+
+function getWorkflowModuleStatusTone(status: AecWorkflowModule["status"]) {
+  switch (status) {
+    case "live":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "partial":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "planned":
+      return "border-zinc-200 bg-zinc-100 text-zinc-700";
   }
 }
 
