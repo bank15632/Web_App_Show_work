@@ -14,16 +14,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  FileText,
   FolderOpen,
-  FolderKanban,
   Layers3,
   ListChecks,
   ListTodo,
   Settings2,
 } from "lucide-react";
 
-import { type ClientRoomProjectSummary } from "@/lib/client-rooms/types";
+import {
+  buildClientRoomSharePath,
+  type ClientRoomProjectSummary,
+} from "@/lib/client-rooms/types";
 import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
   bucketLabels,
@@ -37,7 +38,6 @@ import { cn } from "@/lib/utils";
 const DAY_MS = 86_400_000;
 
 type SourceStateTone = "loading" | "ready" | "error";
-type DashboardTaskSystem = "GTD" | "Kanban";
 type DeadlineTone = "overdue" | "today" | "soon";
 type ClientRoomStatus = "draft" | "dirty" | "live";
 
@@ -48,7 +48,6 @@ type SourceState = {
 
 type TrackerTaskWithProject = TrackerTaskRecord & {
   projectName: string;
-  projectType: string;
 };
 
 type DistributionItem = {
@@ -92,23 +91,6 @@ type TaskControlRecord = {
   updatedAt: string;
   priorityLabel: string;
   priorityRank: number;
-};
-
-type AttentionItem = {
-  id: string;
-  system: DashboardTaskSystem;
-  title: string;
-  context: string;
-  dueDate: string;
-  dueLabel: string;
-  tone: DeadlineTone;
-  href: string;
-};
-
-const deadlineToneClassNames: Record<DeadlineTone, string> = {
-  overdue: "border-rose-200 bg-rose-50 text-rose-700",
-  today: "border-amber-200 bg-amber-50 text-amber-700",
-  soon: "border-sky-200 bg-sky-50 text-sky-700",
 };
 
 const taskControlViewOptions: Array<{ id: TaskControlView; label: string }> = [
@@ -324,19 +306,7 @@ export function DashboardView() {
         project.tasks.map((task) => ({
           ...task,
           projectName: project.name,
-          projectType: project.projectType.trim() || "General",
         })),
-      ),
-    [trackerProjects],
-  );
-
-  const trackerProjectTypeById = useMemo(
-    () =>
-      new Map(
-        trackerProjects.map((project) => [
-          project.id,
-          project.projectType.trim() || "General",
-        ]),
       ),
     [trackerProjects],
   );
@@ -365,14 +335,6 @@ export function DashboardView() {
 
   const openGtdCount = openGtdItems.length;
   const openTrackerCount = openTrackerTasks.length;
-  const activeClientRooms = clientRoomProjects.length;
-  const clientRoomDocumentCount = clientRoomProjects.reduce(
-    (count, project) => count + project.documentCount,
-    0,
-  );
-  const clientRoomPendingPublishes = clientRoomProjects.filter(
-    (project) => getClientRoomStatus(project) !== "live",
-  ).length;
   const recentClientRooms = useMemo(
     () =>
       [...clientRoomProjects]
@@ -421,79 +383,6 @@ export function DashboardView() {
     isDueBetween(task.dueDate, todayStart + DAY_MS, sevenDayWindowEnd),
   ).length;
   const trackerNoDeadlineCount = openTrackerTasks.filter((task) => !task.dueDate).length;
-
-  const projectMix = useMemo<DistributionItem[]>(() => {
-    const counts = new Map<string, number>();
-
-    for (const task of openTrackerTasks) {
-      counts.set(task.projectType, (counts.get(task.projectType) ?? 0) + 1);
-    }
-
-    for (const item of openGtdItems) {
-      const label = item.linkedProjectId
-        ? trackerProjectTypeById.get(item.linkedProjectId) ?? "Personal / Misc"
-        : "Personal / Misc";
-      counts.set(label, (counts.get(label) ?? 0) + 1);
-    }
-
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([label, value], index) => ({
-        label,
-        value,
-        colorClassName:
-          index === 0
-            ? "bg-zinc-900"
-            : index === 1
-              ? "bg-zinc-700"
-              : index === 2
-                ? "bg-sky-400"
-                : index === 3
-                  ? "bg-amber-400"
-                  : "bg-stone-400",
-      }));
-  }, [openGtdItems, openTrackerTasks, trackerProjectTypeById]);
-
-  const riskItems = useMemo<AttentionItem[]>(() => {
-    const items: AttentionItem[] = [];
-
-    for (const item of openGtdItems) {
-      const tone = getDeadlineTone(item.dueDate, todayStart, sevenDayWindowEnd);
-      if (!tone) continue;
-
-      items.push({
-        id: item.id,
-        system: "GTD",
-        title: item.text,
-        context: bucketLabels[item.bucket],
-        dueDate: item.dueDate ?? "",
-        dueLabel: tone === "overdue" ? "เลย deadline" : tone === "today" ? "ครบกำหนดวันนี้" : "กำลังจะถึง",
-        tone,
-        href: "/gtd",
-      });
-    }
-
-    for (const task of openTrackerTasks) {
-      const tone = getDeadlineTone(task.dueDate, todayStart, sevenDayWindowEnd);
-      if (!tone) continue;
-
-      items.push({
-        id: task.id,
-        system: "Kanban",
-        title: task.title,
-        context: `${task.projectName} · ${taskStatusLabels[task.status]}`,
-        dueDate: task.dueDate ?? "",
-        dueLabel: tone === "overdue" ? "เลย deadline" : tone === "today" ? "ครบกำหนดวันนี้" : "กำลังจะถึง",
-        tone,
-        href: "/todos",
-      });
-    }
-
-    return items
-      .sort((a, b) => compareAttentionItems(a, b))
-      .slice(0, 8);
-  }, [openGtdItems, openTrackerTasks, sevenDayWindowEnd, todayStart]);
 
   const sourceStatuses = [
     { label: "GTD", state: gtdState },
@@ -788,74 +677,25 @@ export function DashboardView() {
             icon={<FolderOpen className="size-4" />}
             eyebrow="Client Rooms"
             title="Client Rooms ยังอยู่และกลับมาเป็นส่วนสำคัญ"
-            body="ดูจำนวนโปรเจกต์ เอกสาร งานที่ต้อง publish และสถานะ draft / dirty / live ในมุมเดียว"
+            body="ดูสถานะ draft / dirty / live พร้อมภาพ thumbnail ของแต่ละงาน แล้วเข้าไปแก้ไขหรือเปิดหน้าลูกค้าได้ทันทีจากบล็อกเดียว"
           >
-            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <ClientRoomMetric label="Active" value={activeClientRooms} icon={<FolderOpen className="size-4" />} />
-              <ClientRoomMetric label="Documents" value={clientRoomDocumentCount} icon={<FileText className="size-4" />} />
-              <ClientRoomMetric label="Need Publish" value={clientRoomPendingPublishes} icon={<AlertTriangle className="size-4" />} />
-            </div>
-            <div className="mt-4">
+            <div>
               <SegmentedBar
                 items={clientRoomStatusSegments}
                 emptyLabel={clientRoomState.message}
               />
             </div>
-            <div className="mt-4 space-y-2">
+            <div className="mt-4 space-y-3">
               {recentClientRooms.length === 0 ? (
                 <div className="rounded-[1.2rem] border border-dashed border-border bg-secondary/20 px-4 py-4 text-[0.92rem] text-muted-foreground">
                   {clientRoomState.message}
                 </div>
               ) : (
                 recentClientRooms.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/client-rooms?projectId=${project.id}`}
-                    className="group flex items-start gap-3 rounded-[1.15rem] border border-border bg-secondary/20 px-4 py-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/40 hover:bg-background"
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
-                        getClientRoomStatusTone(getClientRoomStatus(project)),
-                      )}
-                    >
-                      {getClientRoomStatusLabel(getClientRoomStatus(project))}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[0.94rem] font-semibold text-foreground">{project.title}</p>
-                      <p className="mt-1 text-[0.82rem] leading-5 text-muted-foreground">
-                        {project.clientName} · {project.documentCount} files · อัปเดต {formatPortalDate(project.updatedAt)}
-                      </p>
-                    </div>
-                    <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-foreground" />
-                  </Link>
+                  <ClientRoomDashboardCard key={project.id} project={project} />
                 ))
               )}
             </div>
-          </DashboardPanel>
-        </section>
-
-        <section className="fade-up grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          <DashboardPanel
-            icon={<FolderKanban className="size-4" />}
-            eyebrow="Project Mix"
-            title="รองรับงานหลายประเภท ไม่ได้จำกัดแค่งานสถาปัตยกรรม"
-            body="หากเพิ่ม project type เป็น Website, Anime, YouTube Content หรือหมวดอื่น ๆ dashboard จะกระจาย workload ตามประเภทงานให้เองทันที"
-          >
-            <DistributionList
-              title="Top project types"
-              items={projectMix}
-              emptyLabel="ยังไม่มี project type ให้กระจายผลวิเคราะห์"
-            />
-          </DashboardPanel>
-
-          <DashboardPanel
-            icon={<AlertTriangle className="size-4" />}
-            eyebrow="Risk Radar"
-            title="รายการที่เสี่ยงหลุด deadline มากที่สุด"
-            body="รวมงานจาก GTD และ Kanban ไว้ในลิสต์เดียว เพื่อให้คุณหยิบงานที่เสี่ยงก่อนกลับไป deep work"
-          >
-            <AttentionList items={riskItems} />
           </DashboardPanel>
         </section>
 
@@ -1850,123 +1690,96 @@ function SegmentedBar({
   );
 }
 
-function DistributionList({
-  title,
-  items,
-  emptyLabel,
-}: {
-  title: string;
-  items: DistributionItem[];
-  emptyLabel: string;
-}) {
-  const max = Math.max(...items.map((item) => item.value), 0);
+function ClientRoomDashboardCard({ project }: { project: ClientRoomProjectSummary }) {
+  const status = getClientRoomStatus(project);
+  const editHref = getClientRoomEditHref(project.id);
+  const clientHref = status === "live" ? getClientRoomPublicHref(project) : null;
+  const hasThumbnail = project.thumbnailUrl.trim().length > 0;
+  const locationDetail = [project.location, project.year].filter(Boolean).join(" · ");
 
   return (
-    <div className="rounded-[1.3rem] border border-border bg-secondary/25 p-4">
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-
-      {items.length === 0 ? (
-        <p className="mt-4 text-[0.92rem] leading-6 text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {items.map((item) => (
-            <div key={item.label} className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[0.94rem] font-medium text-foreground">{item.label}</p>
-                  {item.hint ? (
-                    <p className="truncate text-[0.82rem] text-muted-foreground">{item.hint}</p>
-                  ) : null}
-                </div>
-                <span className="text-[0.92rem] font-semibold text-foreground">{item.value}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-background">
-                <div
-                  className={cn("h-full rounded-full", item.colorClassName)}
-                  style={{
-                    width: `${max === 0 ? 0 : (item.value / max) * 100}%`,
-                    minWidth: item.value > 0 ? "0.5rem" : "0",
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AttentionList({ items }: { items: AttentionItem[] }) {
-  if (items.length === 0) {
-    return (
-      <div className="rounded-[1.3rem] border border-dashed border-border bg-secondary/20 px-4 py-5 text-[0.92rem] text-muted-foreground">
-        ตอนนี้ยังไม่มีงานที่ overdue หรือใกล้ deadline มากพอจะขึ้น risk radar
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {items.map((item) => (
+    <article className="overflow-hidden rounded-[1.35rem] border border-border bg-secondary/20 p-3 sm:p-4">
+      <div className="flex flex-col gap-4 md:flex-row">
         <Link
-          key={`${item.system}-${item.id}`}
-          href={item.href}
-          className="group flex items-start gap-3 rounded-[1.2rem] border border-border bg-secondary/20 px-4 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/40 hover:bg-background"
+          href={editHref}
+          className="group relative block overflow-hidden rounded-[1.05rem] border border-border bg-background md:w-56 md:shrink-0"
         >
-          <span
-            className={cn(
-              "mt-0.5 inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
-              deadlineToneClassNames[item.tone],
-            )}
-          >
-            {item.system}
-          </span>
-
-          <div className="min-w-0 flex-1">
-            <p className="text-[0.95rem] font-semibold text-foreground">{item.title}</p>
-            <p className="mt-1 text-[0.88rem] leading-5 text-muted-foreground">{item.context}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
-                  deadlineToneClassNames[item.tone],
-                )}
-              >
-                {item.dueLabel}
-              </span>
-              <span className="text-[0.82rem] text-muted-foreground">
-                {formatDueDate(item.dueDate)}
-              </span>
+          {hasThumbnail ? (
+            <Image
+              src={project.thumbnailUrl}
+              alt={project.title}
+              width={720}
+              height={540}
+              unoptimized
+              className="aspect-[4/3] h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="flex aspect-[4/3] h-full items-end bg-gradient-to-br from-stone-100 via-white to-stone-200 p-4">
+              <div>
+                <p className="caption-editorial text-[0.68rem] text-muted-foreground">Client Room</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{project.clientName}</p>
+              </div>
             </div>
+          )}
+        </Link>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex rounded-full border px-2.5 py-1 text-[0.76rem] font-medium",
+                getClientRoomStatusTone(status),
+              )}
+            >
+              {getClientRoomStatusLabel(status)}
+            </span>
+            <span className="text-[0.82rem] text-muted-foreground">
+              {project.documentCount} files
+            </span>
+            <span className="text-[0.82rem] text-muted-foreground">
+              อัปเดต {formatPortalDate(project.updatedAt)}
+            </span>
           </div>
 
-          <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-foreground" />
-        </Link>
-      ))}
-    </div>
-  );
-}
+          <Link href={editHref} className="mt-3 block">
+            <h3 className="text-[1rem] font-semibold text-foreground transition-colors hover:text-foreground/75 sm:text-[1.05rem]">
+              {project.title}
+            </h3>
+          </Link>
 
-function ClientRoomMetric({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: number;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="rounded-[1.1rem] border border-border bg-secondary/20 px-3.5 py-3">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span className="caption-editorial text-[0.68rem]">{label}</span>
+          <p className="mt-1 text-[0.88rem] text-muted-foreground">{project.clientName}</p>
+
+          {locationDetail ? (
+            <p className="mt-1 text-[0.84rem] text-muted-foreground">{locationDetail}</p>
+          ) : null}
+
+          {project.overview.trim() ? (
+            <p className="mt-3 text-[0.9rem] leading-6 text-muted-foreground">
+              {project.overview}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap gap-2 md:w-44 md:flex-col md:items-stretch">
+          <Link
+            href={editHref}
+            className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-background px-4 text-[0.88rem] font-medium text-foreground transition-colors hover:border-foreground"
+          >
+            Edit Project
+          </Link>
+          {clientHref ? (
+            <Link
+              href={clientHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 px-4 text-[0.88rem] font-medium text-emerald-700 transition-colors hover:border-emerald-500"
+            >
+              Open Client Page
+            </Link>
+          ) : null}
+        </div>
       </div>
-      <p className="mt-2 font-display text-[1.45rem] font-medium tracking-tight text-foreground">
-        {value}
-      </p>
-    </div>
+    </article>
   );
 }
 
@@ -2019,6 +1832,14 @@ function getClientRoomStatusTone(status: ClientRoomStatus) {
   }
 }
 
+function getClientRoomEditHref(projectId: string) {
+  return `/client-rooms?projectId=${projectId}`;
+}
+
+function getClientRoomPublicHref(project: ClientRoomProjectSummary) {
+  return project.shareToken ? buildClientRoomSharePath(project.shareToken) : null;
+}
+
 function getDayStart(value: number) {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
@@ -2046,31 +1867,6 @@ function isDueToday(value: string | null, todayStart: number) {
 function isDueBetween(value: string | null, start: number, end: number) {
   const dueDay = getDueDay(value);
   return dueDay !== null && dueDay >= start && dueDay <= end;
-}
-
-function getDeadlineTone(
-  value: string | null,
-  todayStart: number,
-  sevenDayWindowEnd: number,
-): DeadlineTone | null {
-  if (isOverdue(value, todayStart)) return "overdue";
-  if (isDueToday(value, todayStart)) return "today";
-  if (isDueBetween(value, todayStart + DAY_MS, sevenDayWindowEnd)) return "soon";
-  return null;
-}
-
-function compareAttentionItems(a: AttentionItem, b: AttentionItem) {
-  const toneRank: Record<DeadlineTone, number> = {
-    overdue: 0,
-    today: 1,
-    soon: 2,
-  };
-
-  if (toneRank[a.tone] !== toneRank[b.tone]) {
-    return toneRank[a.tone] - toneRank[b.tone];
-  }
-
-  return parseDateInput(a.dueDate).getTime() - parseDateInput(b.dueDate).getTime();
 }
 
 function getTaskControlStage(
