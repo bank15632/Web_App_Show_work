@@ -9,12 +9,10 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpDown,
-  BarChart3,
   BookOpenText,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   Clock3,
   FileText,
   FolderOpen,
@@ -29,7 +27,6 @@ import { type ClientRoomProjectSummary } from "@/lib/client-rooms/types";
 import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
   bucketLabels,
-  bucketOrder,
   type GtdItem,
 } from "@/lib/gtd-system";
 import { formatPortalDate } from "@/lib/portal-data";
@@ -97,20 +94,6 @@ type TaskControlRecord = {
   priorityRank: number;
 };
 
-type TrendPoint = {
-  label: string;
-  fullLabel: string;
-  gtd: number;
-  kanban: number;
-  total: number;
-};
-
-type DailySeriesPoint = {
-  label: string;
-  fullLabel: string;
-  value: number;
-};
-
 type AttentionItem = {
   id: string;
   system: DashboardTaskSystem;
@@ -165,24 +148,6 @@ const taskControlStageRailClassNames: Record<TaskControlStage, string> = {
   soon: "border-sky-300",
   later: "border-stone-300",
   none: "border-violet-300",
-};
-
-const bucketColorClassNames: Record<string, string> = {
-  inbox: "bg-zinc-900",
-  next: "bg-zinc-700",
-  projects: "bg-zinc-600",
-  waiting: "bg-amber-400",
-  calendar: "bg-sky-400",
-  someday: "bg-stone-400",
-  reference: "bg-emerald-400",
-};
-
-const kanbanStatusColorClassNames: Record<string, string> = {
-  todo: "bg-zinc-800",
-  doing: "bg-sky-500",
-  waiting: "bg-amber-400",
-  blocked: "bg-rose-500",
-  done: "bg-emerald-500",
 };
 
 function useScrollAnimation() {
@@ -457,31 +422,6 @@ export function DashboardView() {
   ).length;
   const trackerNoDeadlineCount = openTrackerTasks.filter((task) => !task.dueDate).length;
 
-  const gtdCounts = useMemo(() => {
-    return bucketOrder.map((bucket) => ({
-      label: bucketLabels[bucket],
-      value: openGtdItems.filter((item) => item.bucket === bucket).length,
-      colorClassName: bucketColorClassNames[bucket],
-      hint: bucket === "waiting" ? "ติดตามงานค้าง" : undefined,
-    }));
-  }, [openGtdItems]);
-
-  const kanbanStatusCounts = useMemo<DistributionItem[]>(
-    () =>
-      (["todo", "doing", "waiting", "blocked", "done"] as const).map((status) => ({
-        label: taskStatusLabels[status],
-        value: trackerTasks.filter((task) => task.status === status).length,
-        colorClassName: kanbanStatusColorClassNames[status],
-        hint:
-          status === "blocked"
-            ? "ติด blocker"
-            : status === "waiting"
-              ? "รอ input หรือ approval"
-              : undefined,
-      })),
-    [trackerTasks],
-  );
-
   const projectMix = useMemo<DistributionItem[]>(() => {
     const counts = new Map<string, number>();
 
@@ -514,46 +454,6 @@ export function DashboardView() {
                   : "bg-stone-400",
       }));
   }, [openGtdItems, openTrackerTasks, trackerProjectTypeById]);
-
-  const completionTrend = useMemo<TrendPoint[]>(() => {
-    return Array.from({ length: 7 }, (_, index) => {
-      const dayStart = todayStart - DAY_MS * (6 - index);
-      const nextDay = dayStart + DAY_MS;
-
-      const gtd = gtdItems.filter((item) =>
-        isTimestampInRange(item.doneAt, dayStart, nextDay),
-      ).length;
-      const kanban = trackerTasks.filter((task) =>
-        isTimestampInRange(task.completedAt, dayStart, nextDay),
-      ).length;
-
-      return {
-        label: formatShortDay(dayStart),
-        fullLabel: formatDateLabel(dayStart),
-        gtd,
-        kanban,
-        total: gtd + kanban,
-      };
-    });
-  }, [gtdItems, todayStart, trackerTasks]);
-  const gtdCompletionTrend = useMemo<DailySeriesPoint[]>(
-    () =>
-      completionTrend.map((point) => ({
-        label: point.label,
-        fullLabel: point.fullLabel,
-        value: point.gtd,
-      })),
-    [completionTrend],
-  );
-  const kanbanCompletionTrend = useMemo<DailySeriesPoint[]>(
-    () =>
-      completionTrend.map((point) => ({
-        label: point.label,
-        fullLabel: point.fullLabel,
-        value: point.kanban,
-      })),
-    [completionTrend],
-  );
 
   const riskItems = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = [];
@@ -610,8 +510,6 @@ export function DashboardView() {
     [referenceTime],
   );
 
-  const gtdCompletionTotal = gtdCompletionTrend.reduce((sum, point) => sum + point.value, 0);
-  const kanbanCompletionTotal = kanbanCompletionTrend.reduce((sum, point) => sum + point.value, 0);
   const gtdDoneCount = gtdItems.filter((item) => item.done).length;
   const gtdTaskControlItems = useMemo<TaskControlRecord[]>(
     () =>
@@ -885,51 +783,7 @@ export function DashboardView() {
           </div>
         </section>
 
-        <section className="fade-up grid gap-4 xl:grid-cols-3">
-          <DashboardPanel
-            icon={<BarChart3 className="size-4" />}
-            eyebrow="GTD Analytics"
-            title="กราฟ GTD แยกชัดจาก Kanban"
-            body="ดูว่างานค้างอยู่ bucket ไหน และใน 7 วันที่ผ่านมา GTD ปิดงานได้ต่อเนื่องแค่ไหน"
-          >
-            <DistributionList
-              title="Open GTD buckets"
-              items={gtdCounts.filter((item) => item.value > 0)}
-              emptyLabel={gtdState.message}
-            />
-            <div className="mt-4">
-              <DailyTrendCard
-                title="GTD completion · 7 วันล่าสุด"
-                items={gtdCompletionTrend}
-                totalCompleted={gtdCompletionTotal}
-                colorClassName="bg-zinc-900"
-                emptyLabel="ยังไม่มีงาน GTD ที่ปิดใน 7 วันที่ผ่านมา"
-              />
-            </div>
-          </DashboardPanel>
-
-          <DashboardPanel
-            icon={<CheckCircle2 className="size-4" />}
-            eyebrow="Kanban Analytics"
-            title="กราฟ Kanban แยกชัดจาก GTD"
-            body="ดูว่างานทีมติดอยู่ที่ status ไหน และงานที่ปิดจริงในบอร์ดเดินสม่ำเสมอหรือไม่"
-          >
-            <DistributionList
-              title="Open Kanban statuses"
-              items={kanbanStatusCounts.filter((item) => item.value > 0)}
-              emptyLabel={trackerState.message}
-            />
-            <div className="mt-4">
-              <DailyTrendCard
-                title="Kanban completion · 7 วันล่าสุด"
-                items={kanbanCompletionTrend}
-                totalCompleted={kanbanCompletionTotal}
-                colorClassName="bg-sky-500"
-                emptyLabel="ยังไม่มีงาน Kanban ที่ปิดใน 7 วันที่ผ่านมา"
-              />
-            </div>
-          </DashboardPanel>
-
+        <section className="fade-up grid gap-4 xl:grid-cols-1">
           <DashboardPanel
             icon={<FolderOpen className="size-4" />}
             eyebrow="Client Rooms"
@@ -2116,58 +1970,6 @@ function ClientRoomMetric({
   );
 }
 
-function DailyTrendCard({
-  title,
-  items,
-  totalCompleted,
-  colorClassName,
-  emptyLabel,
-}: {
-  title: string;
-  items: DailySeriesPoint[];
-  totalCompleted: number;
-  colorClassName: string;
-  emptyLabel: string;
-}) {
-  const max = Math.max(...items.map((item) => item.value), 0);
-
-  return (
-    <div className="rounded-[1.3rem] border border-border bg-secondary/25 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        <span className="text-[0.92rem] text-muted-foreground">
-          ปิดงานรวม {totalCompleted}
-        </span>
-      </div>
-
-      {totalCompleted === 0 ? (
-        <p className="mt-4 text-[0.92rem] leading-6 text-muted-foreground">{emptyLabel}</p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {items.map((item) => (
-            <div key={item.fullLabel} className="grid gap-2 sm:grid-cols-[5.2rem_minmax(0,1fr)_3rem] sm:items-center">
-              <div>
-                <p className="text-[0.9rem] font-medium text-foreground">{item.label}</p>
-                <p className="text-[0.8rem] text-muted-foreground">{item.fullLabel}</p>
-              </div>
-              <div className="h-3 overflow-hidden rounded-full bg-background">
-                <div
-                  className={cn("h-full rounded-full", colorClassName)}
-                  style={{
-                    width: `${max === 0 ? 0 : (item.value / max) * 100}%`,
-                    minWidth: item.value > 0 ? "0.4rem" : "0",
-                  }}
-                />
-              </div>
-              <p className="text-right text-[0.94rem] font-semibold text-foreground">{item.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function RecommendationCard({
   title,
   body,
@@ -2244,13 +2046,6 @@ function isDueToday(value: string | null, todayStart: number) {
 function isDueBetween(value: string | null, start: number, end: number) {
   const dueDay = getDueDay(value);
   return dueDay !== null && dueDay >= start && dueDay <= end;
-}
-
-function isTimestampInRange(value: string | null, start: number, end: number) {
-  if (!value) return false;
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return false;
-  return timestamp >= start && timestamp < end;
 }
 
 function getDeadlineTone(
@@ -2426,17 +2221,6 @@ function getTaskControlFillWidth(percent: number) {
 
 function formatTaskControlContext(context: GtdItem["context"]) {
   return context ? `@${context}` : "No context";
-}
-
-function formatShortDay(value: number) {
-  return new Intl.DateTimeFormat("th-TH", { weekday: "short" }).format(value);
-}
-
-function formatDateLabel(value: number) {
-  return new Intl.DateTimeFormat("th-TH", {
-    day: "numeric",
-    month: "short",
-  }).format(value);
 }
 
 function formatDueDate(value: string) {
