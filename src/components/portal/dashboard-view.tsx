@@ -32,6 +32,12 @@ import {
 } from "@/lib/client-rooms/types";
 import { fetchGtdWorkspace } from "@/lib/gtd/client";
 import {
+  buildContextDistribution,
+  buildPersonalTrackerMetrics,
+  buildProjectTypeDistribution,
+  getWorkflowContextLabel,
+} from "@/lib/personal-workflow";
+import {
   bucketLabels,
   type GtdItem,
 } from "@/lib/gtd-system";
@@ -136,6 +142,24 @@ const taskControlStageRailClassNames: Record<TaskControlStage, string> = {
   later: "border-stone-300",
   none: "border-violet-300",
 };
+
+const phaseTwoProjectTypePalette = [
+  "bg-zinc-800",
+  "bg-amber-400",
+  "bg-sky-500",
+  "bg-emerald-500",
+  "bg-violet-500",
+  "bg-rose-500",
+];
+
+const phaseTwoContextPalette = [
+  "bg-sky-500",
+  "bg-emerald-500",
+  "bg-amber-400",
+  "bg-violet-500",
+  "bg-rose-500",
+  "bg-zinc-800",
+];
 
 function useScrollAnimation() {
   const ref = useRef<HTMLDivElement>(null);
@@ -369,6 +393,30 @@ export function DashboardView() {
       },
     ],
     [clientRoomGroups],
+  );
+  const personalTrackerMetrics = useMemo(
+    () => buildPersonalTrackerMetrics(trackerTasks, referenceTime),
+    [referenceTime, trackerTasks],
+  );
+  const projectTypeSegments = useMemo<DistributionItem[]>(
+    () =>
+      buildProjectTypeDistribution(trackerProjects).map((item, index) => ({
+        label: item.label,
+        value: item.value,
+        colorClassName:
+          phaseTwoProjectTypePalette[index % phaseTwoProjectTypePalette.length] ?? "bg-zinc-800",
+      })),
+    [trackerProjects],
+  );
+  const creativeContextSegments = useMemo<DistributionItem[]>(
+    () =>
+      buildContextDistribution(openGtdItems).map((item, index) => ({
+        label: item.label,
+        value: item.value,
+        colorClassName:
+          phaseTwoContextPalette[index % phaseTwoContextPalette.length] ?? "bg-sky-500",
+      })),
+    [openGtdItems],
   );
 
   const gtdOverdueCount = openGtdItems.filter((item) => isOverdue(item.dueDate, todayStart)).length;
@@ -700,6 +748,150 @@ export function DashboardView() {
                   <ClientRoomDashboardCard key={project.id} project={project} />
                 ))
               )}
+            </div>
+          </DashboardPanel>
+        </section>
+
+        <section className="fade-up grid gap-4 xl:grid-cols-1">
+          <DashboardPanel
+            icon={<Layers3 className="size-4" />}
+            eyebrow="Phase 2"
+            title="Personal metrics + workflow depth"
+            body="Phase 2 now turns solo usage into a scorecard: it measures delivery pace, shows which project types are active, and surfaces the creative contexts currently driving your GTD flow."
+          >
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]">
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard
+                    icon={<ArrowUp className="size-4" />}
+                    label="Throughput 7d"
+                    value={personalTrackerMetrics.throughput7d}
+                    detail="Tasks completed in the last 7 days"
+                    tone={personalTrackerMetrics.throughput7d > 0 ? "accent" : "neutral"}
+                  />
+                  <KpiCard
+                    icon={<ArrowUpDown className="size-4" />}
+                    label="Throughput 30d"
+                    value={personalTrackerMetrics.throughput30d}
+                    detail="Tasks completed in the last 30 days"
+                  />
+                  <KpiCard
+                    icon={<Clock3 className="size-4" />}
+                    label="Lead Time"
+                    value={personalTrackerMetrics.averageLeadTimeDays}
+                    detail="Average days from create to done"
+                  />
+                  <KpiCard
+                    icon={<CalendarDays className="size-4" />}
+                    label="On-Time %"
+                    value={personalTrackerMetrics.onTimeRate}
+                    detail={
+                      personalTrackerMetrics.scheduledCompletions > 0
+                        ? `${personalTrackerMetrics.scheduledCompletions} scheduled completions tracked`
+                        : "Need completed tasks with due dates"
+                    }
+                    tone={personalTrackerMetrics.scheduledCompletions > 0 && personalTrackerMetrics.onTimeRate < 70 ? "warning" : "neutral"}
+                  />
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-[1.35rem] border border-border bg-secondary/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="caption-editorial text-[0.68rem]">Project Type Mix</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          Which workflow templates are active across the tracker right now.
+                        </p>
+                      </div>
+                      <Link
+                        href="/todos"
+                        className="inline-flex h-9 shrink-0 items-center rounded-full border border-border bg-background px-3 text-[0.82rem] font-medium text-foreground transition-colors hover:border-foreground"
+                      >
+                        Open Kanban
+                      </Link>
+                    </div>
+                    <div className="mt-4">
+                      <SegmentedBar
+                        items={projectTypeSegments}
+                        emptyLabel="Create a project to start seeing template mix."
+                        compact
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.35rem] border border-border bg-secondary/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="caption-editorial text-[0.68rem]">Creative Context Mix</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          Open GTD items grouped by active context, so writing, review, edit, and publish work stay visible.
+                        </p>
+                      </div>
+                      <Link
+                        href="/gtd"
+                        className="inline-flex h-9 shrink-0 items-center rounded-full border border-border bg-background px-3 text-[0.82rem] font-medium text-foreground transition-colors hover:border-foreground"
+                      >
+                        Open GTD
+                      </Link>
+                    </div>
+                    <div className="mt-4">
+                      <SegmentedBar
+                        items={creativeContextSegments}
+                        emptyLabel="Add contexts in GTD to see your active work modes."
+                        compact
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[1.35rem] border border-border bg-background/80 p-4">
+                <p className="caption-editorial text-[0.68rem]">Workflow Depth</p>
+                <h3 className="mt-3 text-[1.05rem] font-semibold tracking-tight text-foreground">
+                  Phase 2 is now active in the working surfaces
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Tracker projects now use project-type templates with starter tasks, while GTD exposes creative contexts and quick capture rules for solo flow.
+                </p>
+
+                <div className="mt-4 grid gap-2">
+                  <div className="rounded-[1rem] border border-border bg-secondary/20 px-3 py-3">
+                    <p className="text-[0.8rem] text-muted-foreground">Stale open work</p>
+                    <p className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                      {personalTrackerMetrics.staleOpenCount}
+                    </p>
+                  </div>
+                  <div className="rounded-[1rem] border border-border bg-secondary/20 px-3 py-3">
+                    <p className="text-[0.8rem] text-muted-foreground">Open without due date</p>
+                    <p className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                      {personalTrackerMetrics.openWithoutDueDate}
+                    </p>
+                  </div>
+                  <div className="rounded-[1rem] border border-border bg-secondary/20 px-3 py-3">
+                    <p className="text-[0.8rem] text-muted-foreground">Doing now</p>
+                    <p className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                      {personalTrackerMetrics.activeDoingCount}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <Link
+                    href="/todos"
+                    className="inline-flex h-10 w-full items-center justify-between rounded-full border border-border bg-background px-4 text-[0.88rem] font-medium text-foreground transition-colors hover:border-foreground"
+                  >
+                    Create template-based project
+                    <ArrowRight className="size-4" />
+                  </Link>
+                  <Link
+                    href="/gtd"
+                    className="inline-flex h-10 w-full items-center justify-between rounded-full border border-border bg-background px-4 text-[0.88rem] font-medium text-foreground transition-colors hover:border-foreground"
+                  >
+                    Review creative contexts
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </div>
+              </div>
             </div>
           </DashboardPanel>
         </section>
@@ -2148,7 +2340,7 @@ function getTaskControlFillWidth(percent: number) {
 }
 
 function formatTaskControlContext(context: GtdItem["context"]) {
-  return context ? `@${context}` : "No context";
+  return context ? getWorkflowContextLabel(context) : "No context";
 }
 
 function formatDueDate(value: string) {

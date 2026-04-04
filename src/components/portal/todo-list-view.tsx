@@ -48,6 +48,7 @@ import type {
   TrackerWorkspaceData,
 } from "@/lib/tracker/types";
 import { createGtdItemRequest } from "@/lib/gtd/client";
+import { defaultTrackerProjectType } from "@/lib/personal-workflow";
 import { cn } from "@/lib/utils";
 
 type DialogState = null | "task" | "decision" | "project";
@@ -108,7 +109,7 @@ function createEmptyProjectDraft(): ProjectDraft {
     status: "active",
     clientName: "",
     code: "",
-    projectType: "Internal",
+    projectType: defaultTrackerProjectType,
     location: "Bangkok",
     overview: "",
     nextMilestone: "",
@@ -223,17 +224,6 @@ function downloadTextFile(filename: string, contents: string) {
   link.click();
   link.remove();
   window.URL.revokeObjectURL(url);
-}
-
-function getEditableSubtasks(
-  subtasks: TrackerTaskMutationInput["subtasks"] | TrackerTaskRecord["subtasks"],
-) {
-  const rows = [...(subtasks ?? [])].map((subtask) => ({
-    title: subtask.title,
-    completed: subtask.completed === true,
-  }));
-
-  return rows.length > 0 ? rows : [{ title: "", completed: false }];
 }
 
 function sanitizeTaskDraft(draft: TrackerTaskMutationInput): TrackerTaskMutationInput {
@@ -1015,7 +1005,11 @@ export function TodoListView() {
               );
             }}
           >
-            <TaskFormFields draft={taskDraft} onChange={setTaskDraft} />
+            <TaskFormFields
+              draft={taskDraft}
+              projectType={activeProject.projectType}
+              onChange={setTaskDraft}
+            />
             <DialogActions onCancel={() => setDialog(null)} working={working} />
           </form>
         </DialogFrame>
@@ -1046,6 +1040,7 @@ export function TodoListView() {
           >
             <TaskFormFields
               draft={editingTask}
+              projectType={activeProject.projectType}
               onChange={(draft) =>
                 setEditingTask((prev) => {
                   if (!prev) {

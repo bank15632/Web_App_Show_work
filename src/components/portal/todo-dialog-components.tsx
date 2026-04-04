@@ -16,6 +16,10 @@ import type {
   TrackerProjectMutationInput,
   TrackerTaskMutationInput,
 } from "@/lib/tracker/types";
+import {
+  getTrackerProjectTypeTemplate,
+  trackerProjectTypeTemplates,
+} from "@/lib/personal-workflow";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { cn } from "@/lib/utils";
 
@@ -184,14 +188,17 @@ export function DialogActions({
 
 export function TaskFormFields({
   draft,
+  projectType,
   onChange,
 }: {
   draft: TrackerTaskMutationInput;
+  projectType?: string;
   onChange: (draft: TrackerTaskMutationInput) => void;
 }) {
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const subtaskRows = getEditableSubtasks(draft.subtasks ?? []);
   const subtaskCount = subtaskRows.filter((subtask) => subtask.title.trim().length > 0).length;
+  const projectTypeTemplate = getTrackerProjectTypeTemplate(projectType);
 
   function updateSubtasks(nextSubtasks: NonNullable<TrackerTaskMutationInput["subtasks"]>) {
     onChange({
@@ -231,6 +238,34 @@ export function TaskFormFields({
         title="Use this form when the task is already clear."
         body="Create or update a task here when the owner, scope, and next step are known enough to track directly on the Kanban board."
       />
+      {projectType ? (
+        <div className="rounded-[1.25rem] border border-border bg-background px-4 py-4 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">
+            {projectTypeTemplate.label} workflow
+          </p>
+          <p className="mt-1 leading-7">{projectTypeTemplate.pipelineSummary}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {projectTypeTemplate.pipelineSteps.map((step) => (
+              <span
+                key={`${projectTypeTemplate.value}-${step}`}
+                className="rounded-full border border-border bg-secondary/40 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em]"
+              >
+                {step}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {projectTypeTemplate.suggestedTaskTypes.map((taskType) => (
+              <span
+                key={`${projectTypeTemplate.value}-${taskType}`}
+                className="rounded-full border border-border px-3 py-1 text-[11px] font-medium text-foreground"
+              >
+                {taskTypeLabels[taskType]}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <input
         value={draft.title}
         onChange={(event) => onChange({ ...draft, title: event.target.value })}
@@ -470,8 +505,14 @@ export function ProjectFormFields({
   draft: ProjectDraft;
   onChange: (draft: ProjectDraft) => void;
 }) {
+  const selectedTemplate = getTrackerProjectTypeTemplate(draft.projectType);
+
   return (
     <>
+      <DialogHelperCard
+        title="Choose a project type before filling the rest."
+        body="Phase 2 templates now seed the project with a starter workflow, suggested task mix, and a clearer first pipeline based on the kind of work you are starting."
+      />
       <input
         value={draft.name}
         onChange={(event) => onChange({ ...draft, name: event.target.value })}
@@ -493,6 +534,24 @@ export function ProjectFormFields({
           placeholder="Client"
           className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
         />
+        <select
+          value={selectedTemplate.value}
+          onChange={(event) => {
+            const template = getTrackerProjectTypeTemplate(event.target.value);
+            onChange({
+              ...draft,
+              projectType: template.value,
+              phase: template.defaultPhase,
+            });
+          }}
+          className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
+        >
+          {trackerProjectTypeTemplates.map((template) => (
+            <option key={template.value} value={template.value}>
+              {template.label}
+            </option>
+          ))}
+        </select>
         <select
           value={draft.phase}
           onChange={(event) =>
@@ -519,6 +578,41 @@ export function ProjectFormFields({
           placeholder="Location"
           className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
         />
+      </div>
+      <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm">
+        <p className="font-medium text-foreground">{selectedTemplate.label}</p>
+        <p className="mt-1 leading-7 text-muted-foreground">
+          {selectedTemplate.description}
+        </p>
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Pipeline
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selectedTemplate.pipelineSteps.map((step) => (
+            <span
+              key={`${selectedTemplate.value}-pipeline-${step}`}
+              className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-foreground"
+            >
+              {step}
+            </span>
+          ))}
+        </div>
+        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Starter Tasks
+        </p>
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
+          {selectedTemplate.starterTasks.map((task) => (
+            <div
+              key={`${selectedTemplate.value}-starter-${task.title}`}
+              className="rounded-[1rem] border border-border bg-background px-3 py-3"
+            >
+              <p className="text-sm font-medium text-foreground">{task.title}</p>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                {taskTypeLabels[task.taskType]} · {priorityLabels[task.priority]}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
       <textarea
         value={draft.overview ?? ""}

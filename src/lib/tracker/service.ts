@@ -1,5 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { buildStarterTasksForProjectType } from "@/lib/personal-workflow";
 import { trackerPhaseChecklistTemplates } from "@/lib/tracker/checklists";
 import type { TrackerEnv } from "@/lib/tracker/env";
 import {
@@ -1008,6 +1009,20 @@ export async function createProject(
   });
 
   await ensureProjectChecklistItems(env.DB, projectId, parsed.phase);
+
+  if (input.seedTemplateTasks !== false) {
+    const starterTasks = buildStarterTasksForProjectType({
+      phase: parsed.phase,
+      projectType: parsed.projectType ?? input.projectType,
+      location: input.location,
+    });
+
+    for (const task of starterTasks) {
+      await createTask(env, projectId, task, {
+        actor: "template.phase2",
+      });
+    }
+  }
 
   const project = await getProjectById(env, projectId);
   if (!project) {
@@ -2124,6 +2139,7 @@ async function ensureLegacyInboxProject(env: TrackerEnv) {
     code: "LEGACY",
     clientName: "BNJ Studio",
     projectType: "Internal",
+    seedTemplateTasks: false,
     location: "Bangkok",
     phase: "concept",
     status: "active",

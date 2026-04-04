@@ -2,6 +2,7 @@
 
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 
+import { getTrackerProjectTypeTemplate } from "@/lib/personal-workflow";
 import { phaseAccents, phaseLabels, projectStatuses } from "@/lib/tracker/constants";
 import type { TrackerPhase, TrackerProjectDetail, TrackerProjectStatus } from "@/lib/tracker/types";
 
@@ -24,6 +25,7 @@ export function WorkspaceHeader({
   const progress = project.tasks.length
     ? Math.round((doneCount / project.tasks.length) * 100)
     : 0;
+  const projectTypeTemplate = getTrackerProjectTypeTemplate(project.projectType);
 
   return (
     <section className="rounded-[1.5rem] border border-border bg-[radial-gradient(circle_at_top_left,#f6f1e8_0%,#ffffff_45%)] p-4 sm:rounded-[2rem] sm:p-5 md:p-6">
@@ -44,12 +46,18 @@ export function WorkspaceHeader({
               {phaseLabels[project.phase]}
             </span>
             <span className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted-foreground sm:px-4 sm:py-2 sm:text-sm">
+              {projectTypeTemplate.label} template
+            </span>
+            <span className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted-foreground sm:px-4 sm:py-2 sm:text-sm">
               {project.clientName || "BNJ Studio"} · {project.location || "Bangkok"}
             </span>
             <span className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted-foreground sm:px-4 sm:py-2 sm:text-sm">
               {project.tasks.length} tasks · {doneCount} done · {progress}% complete
             </span>
           </div>
+          <p className="mt-3 max-w-3xl text-[12px] leading-6 text-muted-foreground sm:text-[13px]">
+            {projectTypeTemplate.pipelineSummary}
+          </p>
         </div>
 
         <div className="flex max-w-xl flex-col gap-3">

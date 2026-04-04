@@ -50,6 +50,12 @@ import {
   createTrackerTaskRequest,
   fetchTrackerWorkspace,
 } from "@/lib/tracker/client";
+import {
+  getTrackerProjectTypeTemplate,
+  getWorkflowContextLabel,
+  phaseTwoCaptureRules,
+  workflowContextDefinitions,
+} from "@/lib/personal-workflow";
 import type {
   TrackerProjectDetail,
   TrackerTaskType,
@@ -69,6 +75,9 @@ import {
 } from "@/components/portal/gtd-helpers";
 import { cn } from "@/lib/utils";
 const initialReferenceTime = Date.now();
+const phaseTwoCreativeContexts = workflowContextDefinitions.filter(
+  (context) => context.group !== "classic",
+);
 type GtdListMode = "active" | "archived";
 type KanbanBridgeDraft = {
   projectId: string;
@@ -229,6 +238,28 @@ export function GtdWorkspace() {
       projectId: trackerProjects[0]?.id ?? "",
     }));
   }, [kanbanDraft.projectId, trackerProjects]);
+
+  const selectedKanbanProject = useMemo(
+    () => trackerProjects.find((project) => project.id === kanbanDraft.projectId) ?? null,
+    [kanbanDraft.projectId, trackerProjects],
+  );
+  const selectedKanbanTemplate = useMemo(
+    () => getTrackerProjectTypeTemplate(selectedKanbanProject?.projectType),
+    [selectedKanbanProject?.projectType],
+  );
+
+  useEffect(() => {
+    if (!selectedKanbanProject) return;
+
+    const suggestedTaskType = selectedKanbanTemplate.suggestedTaskTypes[0];
+    if (!suggestedTaskType) return;
+    if (selectedKanbanTemplate.suggestedTaskTypes.includes(kanbanDraft.taskType)) return;
+
+    setKanbanDraft((prev) => ({
+      ...prev,
+      taskType: suggestedTaskType,
+    }));
+  }, [kanbanDraft.taskType, selectedKanbanProject, selectedKanbanTemplate]);
 
   function applyWorkspace(workspace: GtdWorkspaceData) {
     setItems(workspace.items);
@@ -856,6 +887,39 @@ export function GtdWorkspace() {
                 {reviewStatus.action}
               </p>
             </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(16rem,0.8fr)]">
+              <div className="rounded-[1.4rem] border border-border bg-background px-4 py-4">
+                <p className="caption-editorial text-[0.68rem]">Capture Rules</p>
+                <div className="mt-3 grid gap-3">
+                  {phaseTwoCaptureRules.map((rule) => (
+                    <div
+                      key={rule.title}
+                      className="rounded-[1rem] border border-border/70 bg-secondary/20 px-3 py-3"
+                    >
+                      <p className="text-sm font-medium text-foreground">{rule.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{rule.body}</p>
+                      <p className="mt-2 text-xs leading-5 text-foreground/80">{rule.example}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-[1.4rem] border border-border bg-background px-4 py-4">
+                <p className="caption-editorial text-[0.68rem]">Creative Contexts</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Use these when the next action already implies a specific mode of work.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {phaseTwoCreativeContexts.map((context) => (
+                    <span
+                      key={context.value}
+                      className="rounded-full border border-border bg-secondary/20 px-3 py-1.5 text-[11px] font-medium text-foreground"
+                    >
+                      {context.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-1">
             <MetricCard icon={<Inbox className="size-4" />} label="Inbox" value={counts.inbox} body="สิ่งที่ยังไม่ได้ clarify" />
@@ -980,7 +1044,11 @@ export function GtdWorkspace() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="caption-editorial text-[0.68rem]">{bucketLabels[item.bucket]}</span>
-                        {item.context ? <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">@{item.context}</span> : null}
+                        {item.context ? (
+                          <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+                            {getWorkflowContextLabel(item.context)}
+                          </span>
+                        ) : null}
                         <span className={priorityClassName(item.priority)}>{item.priority}</span>
                         {isOverdue ? (
                           <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-semibold text-rose-700">
@@ -1624,12 +1692,16 @@ export function GtdWorkspace() {
                   <span className="caption-editorial text-[0.68rem]">Project</span>
                   <select
                     value={kanbanDraft.projectId}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const nextProject =
+                        trackerProjects.find((project) => project.id === event.target.value) ?? null;
+                      const nextTemplate = getTrackerProjectTypeTemplate(nextProject?.projectType);
                       setKanbanDraft((prev) => ({
                         ...prev,
                         projectId: event.target.value,
-                      }))
-                    }
+                        taskType: nextTemplate.suggestedTaskTypes[0] ?? prev.taskType,
+                      }));
+                    }}
                     className="h-11 rounded-full border border-border px-4 text-sm outline-none transition-colors focus:border-foreground"
                   >
                     {trackerProjects.map((project) => (
@@ -1639,6 +1711,23 @@ export function GtdWorkspace() {
                     ))}
                   </select>
                 </label>
+
+                <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">
+                    {selectedKanbanTemplate.label} workflow
+                  </p>
+                  <p className="mt-1 leading-6">{selectedKanbanTemplate.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedKanbanTemplate.pipelineSteps.map((step) => (
+                      <span
+                        key={`${selectedKanbanTemplate.value}-${step}`}
+                        className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-foreground"
+                      >
+                        {step}
+                      </span>
+                    ))}
+                  </div>
+                </div>
 
                 <label className="grid gap-2">
                   <span className="caption-editorial text-[0.68rem]">Task Type</span>
@@ -1661,6 +1750,16 @@ export function GtdWorkspace() {
                   <p className="text-sm leading-6 text-muted-foreground">
                     {taskTypeDescriptions[kanbanDraft.taskType]}
                   </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedKanbanTemplate.suggestedTaskTypes.map((taskType) => (
+                      <span
+                        key={`${selectedKanbanTemplate.value}-${taskType}`}
+                        className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground"
+                      >
+                        {taskTypeLabels[taskType]}
+                      </span>
+                    ))}
+                  </div>
                 </label>
 
                 <div className="rounded-[1.25rem] border border-border bg-secondary/30 px-4 py-4 text-sm leading-7 text-muted-foreground">

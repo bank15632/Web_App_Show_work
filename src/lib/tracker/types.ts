@@ -245,6 +245,7 @@ export interface TrackerProjectMutationInput {
   clientName?: string;
   code?: string;
   projectType?: string;
+  seedTemplateTasks?: boolean;
   location?: string;
   phase: TrackerPhase;
   status?: TrackerProjectStatus;

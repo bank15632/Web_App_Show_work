@@ -27,6 +27,7 @@ export const projectMutationSchema = z.object({
   clientName: z.string().trim().optional(),
   code: z.string().trim().optional(),
   projectType: z.string().trim().optional(),
+  seedTemplateTasks: z.boolean().optional(),
   location: z.string().trim().optional(),
   phase: trackerPhaseSchema,
   status: trackerProjectStatusSchema.optional(),

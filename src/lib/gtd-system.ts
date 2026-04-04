@@ -1,3 +1,8 @@
+import {
+  workflowContextDefinitions,
+  type WorkflowContextValue,
+} from "@/lib/personal-workflow";
+
 export type GtdBucket =
   | "inbox"
   | "next"
@@ -7,14 +12,7 @@ export type GtdBucket =
   | "someday"
   | "reference";
 
-export type GtdContext =
-  | ""
-  | "computer"
-  | "phone"
-  | "site"
-  | "office"
-  | "errands"
-  | "home";
+export type GtdContext = "" | WorkflowContextValue;
 
 export type GtdPriority = "high" | "medium" | "low";
 
@@ -100,12 +98,10 @@ export const bucketLabels: Record<GtdBucket, string> = {
 
 export const contextOptions: Array<{ value: GtdContext | "all"; label: string }> = [
   { value: "all", label: "All contexts" },
-  { value: "computer", label: "@computer" },
-  { value: "phone", label: "@phone" },
-  { value: "site", label: "@site" },
-  { value: "office", label: "@office" },
-  { value: "errands", label: "@errands" },
-  { value: "home", label: "@home" },
+  ...workflowContextDefinitions.map((context) => ({
+    value: context.value,
+    label: context.label,
+  })),
 ];
 
 export const reviewSteps = [
