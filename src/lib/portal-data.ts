@@ -122,17 +122,6 @@ export function getProjectPresentationSlides(
 ): ProjectPresentationSlide[] {
   const slides: ProjectPresentationSlide[] = [];
 
-  if (hasUsableUrl(project.heroImageUrl)) {
-    slides.push({
-      id: "hero",
-      src: project.heroImageUrl as string,
-      alt: project.title,
-      title: project.title,
-      subtitle: "Hero image",
-      description: project.overview,
-    });
-  }
-
   for (const section of project.sections) {
     let imageIndex = 0;
 

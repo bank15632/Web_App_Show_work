@@ -97,11 +97,10 @@ function createProject(): ClientProject {
 }
 
 describe("getProjectPresentationSlides", () => {
-  it("returns hero, image documents, and gallery images in display order", () => {
+  it("returns image documents and gallery images in display order", () => {
     const slides = getProjectPresentationSlides(createProject());
 
     expect(slides.map((slide) => slide.id)).toEqual([
-      "hero",
       "document:image-1",
       "document:image-2",
       "gallery:gallery-room:gallery-1",

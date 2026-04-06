@@ -95,6 +95,14 @@ async function exitElementFullscreen(doc: FullscreenDocument) {
   }
 }
 
+function clampSlideIndex(index: number, total: number) {
+  if (total <= 0) {
+    return 0;
+  }
+
+  return Math.min(Math.max(index, 0), total - 1);
+}
+
 export function ProjectPresentationProvider({
   project,
   children,
@@ -107,7 +115,10 @@ export function ProjectPresentationProvider({
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(false);
-  const touchStartXRef = useRef<number | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(1);
+  const dragStartXRef = useRef<number | null>(null);
   const ignoreNextTapRef = useRef(false);
   const nativeFullscreenRef = useRef(false);
   const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
@@ -117,24 +128,30 @@ export function ProjectPresentationProvider({
       return;
     }
 
+    function syncViewportWidth() {
+      setViewportWidth(window.innerWidth || 1);
+    }
+
+    syncViewportWidth();
+    window.addEventListener("resize", syncViewportWidth);
+
+    return () => {
+      window.removeEventListener("resize", syncViewportWidth);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     const doc = document as FullscreenDocument;
     const previousOverflow = document.body.style.overflow;
-    let cancelled = false;
 
     document.body.style.overflow = "hidden";
 
-    if (!getFullscreenElement(doc)) {
-      void requestElementFullscreen(trapRef.current as FullscreenTarget | null).then((entered) => {
-        if (!cancelled) {
-          nativeFullscreenRef.current = entered;
-        }
-      });
-    } else {
+    if (getFullscreenElement(doc)) {
       nativeFullscreenRef.current = true;
-    }
-
-    if (cancelled) {
-      return;
     }
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -148,11 +165,11 @@ export function ProjectPresentationProvider({
       }
 
       if (event.key === "ArrowLeft") {
-        setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
+        setActiveIndex((current) => clampSlideIndex(current - 1, slides.length));
       }
 
       if (event.key === "ArrowRight") {
-        setActiveIndex((current) => (current + 1) % slides.length);
+        setActiveIndex((current) => clampSlideIndex(current + 1, slides.length));
       }
     }
 
@@ -169,7 +186,6 @@ export function ProjectPresentationProvider({
     document.addEventListener("MSFullscreenChange", handleFullscreenChange as EventListener);
 
     return () => {
-      cancelled = true;
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
@@ -181,7 +197,7 @@ export function ProjectPresentationProvider({
         void exitElementFullscreen(doc);
       }
     };
-  }, [isOpen, slides.length, trapRef]);
+  }, [isOpen, slides.length]);
 
   function openPresentation(slideId?: string) {
     if (!hasSlides) {
@@ -192,36 +208,33 @@ export function ProjectPresentationProvider({
       ? slides.findIndex((slide) => slide.id === slideId)
       : 0;
 
-    setActiveIndex(nextIndex >= 0 ? nextIndex : 0);
+    setActiveIndex(clampSlideIndex(nextIndex >= 0 ? nextIndex : 0, slides.length));
     setControlsVisible(false);
+    setDragOffset(0);
+    setIsDragging(false);
     setIsOpen(true);
 
     if (typeof document !== "undefined") {
+      const doc = document as FullscreenDocument;
       void requestElementFullscreen(document.documentElement as FullscreenTarget).then((entered) => {
-        nativeFullscreenRef.current = entered;
+        nativeFullscreenRef.current = entered || Boolean(getFullscreenElement(doc));
       });
     }
   }
 
   function closePresentation() {
     setControlsVisible(false);
+    setDragOffset(0);
+    setIsDragging(false);
     setIsOpen(false);
   }
 
   function goToPreviousSlide() {
-    if (slides.length <= 1) {
-      return;
-    }
-
-    setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
+    setActiveIndex((current) => clampSlideIndex(current - 1, slides.length));
   }
 
   function goToNextSlide() {
-    if (slides.length <= 1) {
-      return;
-    }
-
-    setActiveIndex((current) => (current + 1) % slides.length);
+    setActiveIndex((current) => clampSlideIndex(current + 1, slides.length));
   }
 
   function toggleControls() {
@@ -233,38 +246,61 @@ export function ProjectPresentationProvider({
     setControlsVisible((current) => !current);
   }
 
-  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
-    touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
+  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
+    dragStartXRef.current = event.changedTouches[0]?.clientX ?? null;
     ignoreNextTapRef.current = false;
+    setIsDragging(true);
+    setDragOffset(0);
   }
 
-  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
-    const startX = touchStartXRef.current;
-    touchStartXRef.current = null;
+  function handleTouchMove(event: TouchEvent<HTMLDivElement>) {
+    const startX = dragStartXRef.current;
+    if (startX === null) {
+      return;
+    }
 
-    if (startX === null || slides.length <= 1) {
+    const currentX = event.changedTouches[0]?.clientX ?? startX;
+    const rawDelta = currentX - startX;
+    const atFirstSlide = activeIndex === 0;
+    const atLastSlide = activeIndex === slides.length - 1;
+    const resistedDelta =
+      (atFirstSlide && rawDelta > 0) || (atLastSlide && rawDelta < 0)
+        ? rawDelta * 0.35
+        : rawDelta;
+
+    if (Math.abs(rawDelta) > 6) {
+      ignoreNextTapRef.current = true;
+    }
+
+    setDragOffset(resistedDelta);
+    event.preventDefault();
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    const startX = dragStartXRef.current;
+    dragStartXRef.current = null;
+    setIsDragging(false);
+
+    if (startX === null) {
       return;
     }
 
     const endX = event.changedTouches[0]?.clientX ?? startX;
-    const deltaX = endX - startX;
+    const rawDelta = endX - startX;
+    const threshold = Math.min(140, Math.max(48, viewportWidth * 0.14));
 
-    if (Math.abs(deltaX) < 40) {
-      return;
+    if (rawDelta <= -threshold && activeIndex < slides.length - 1) {
+      setActiveIndex((current) => clampSlideIndex(current + 1, slides.length));
+    } else if (rawDelta >= threshold && activeIndex > 0) {
+      setActiveIndex((current) => clampSlideIndex(current - 1, slides.length));
     }
 
-    ignoreNextTapRef.current = true;
-
-    if (deltaX < 0) {
-      goToNextSlide();
-      return;
-    }
-
-    goToPreviousSlide();
+    setDragOffset(0);
   }
 
-  const currentIndex = activeIndex < slides.length ? activeIndex : 0;
+  const currentIndex = clampSlideIndex(activeIndex, slides.length);
   const activeSlide = slides[currentIndex] ?? null;
+  const translateX = -currentIndex * viewportWidth + dragOffset;
 
   return (
     <ProjectPresentationContext.Provider
@@ -285,43 +321,61 @@ export function ProjectPresentationProvider({
             aria-label="Slide presentation"
             className="relative h-full w-full overflow-hidden bg-black"
           >
-            <button
-              type="button"
+            <div
+              className="absolute inset-0 overflow-hidden"
               onClick={toggleControls}
               onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="absolute inset-0 flex h-full w-full items-center justify-center bg-black"
-              aria-label={controlsVisible ? "Hide slide details" : "Show slide details"}
+              style={{ touchAction: "pan-y" }}
             >
-              <Image
-                src={activeSlide.src}
-                alt={activeSlide.alt}
-                width={1600}
-                height={1200}
-                sizes="100vw"
-                unoptimized
-                priority
-                className="h-full w-full object-contain"
-              />
-            </button>
+              <div
+                className="flex h-full"
+                style={{
+                  width: `${slides.length * viewportWidth}px`,
+                  transform: `translate3d(${translateX}px, 0, 0)`,
+                  transition: isDragging ? "none" : "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {slides.map((slide) => (
+                  <div
+                    key={slide.id}
+                    className="flex h-full shrink-0 items-center justify-center bg-black"
+                    style={{ width: `${viewportWidth}px` }}
+                  >
+                    <Image
+                      src={slide.src}
+                      alt={slide.alt}
+                      width={1600}
+                      height={1200}
+                      sizes="100vw"
+                      unoptimized
+                      priority
+                      draggable={false}
+                      className="h-full w-full select-none object-contain"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {controlsVisible ? (
               <>
-                <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end bg-gradient-to-b from-black/75 via-black/30 to-transparent px-4 pb-14 pt-4 md:px-6 md:pb-20 md:pt-6">
+                <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end bg-gradient-to-b from-black/78 via-black/28 to-transparent px-4 pb-16 pt-4 md:px-6 md:pb-20 md:pt-6">
                   <button
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();
                       closePresentation();
                     }}
-                    className="pointer-events-auto inline-flex size-12 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white transition-colors hover:border-white/30 hover:bg-black/70"
+                    className="pointer-events-auto inline-flex size-12 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition-colors hover:border-white/30 hover:bg-black/72"
                     aria-label="Close presentation"
                   >
                     <X className="size-5" />
                   </button>
                 </div>
 
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pb-6 pt-16 md:px-6 md:pb-8 md:pt-24">
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/82 via-black/34 to-transparent px-4 pb-6 pt-16 md:px-6 md:pb-8 md:pt-24">
                   <div className="flex items-end justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-white/88">
@@ -338,11 +392,13 @@ export function ProjectPresentationProvider({
                           label="Previous"
                           onClick={goToPreviousSlide}
                           icon={<ChevronLeft className="size-4" />}
+                          disabled={currentIndex === 0}
                         />
                         <PresentationNavButton
                           label="Next"
                           onClick={goToNextSlide}
                           icon={<ChevronRight className="size-4" />}
+                          disabled={currentIndex === slides.length - 1}
                         />
                       </div>
                     ) : null}
@@ -355,12 +411,14 @@ export function ProjectPresentationProvider({
                         onClick={goToPreviousSlide}
                         icon={<ChevronLeft className="size-4" />}
                         className="justify-center"
+                        disabled={currentIndex === 0}
                       />
                       <PresentationNavButton
                         label="Next"
                         onClick={goToNextSlide}
                         icon={<ChevronRight className="size-4" />}
                         className="justify-center"
+                        disabled={currentIndex === slides.length - 1}
                       />
                     </div>
                   ) : null}
@@ -423,11 +481,13 @@ function PresentationNavButton({
   icon,
   onClick,
   className,
+  disabled = false,
 }: {
   label: string;
   icon: ReactNode;
   onClick: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -436,8 +496,9 @@ function PresentationNavButton({
         event.stopPropagation();
         onClick();
       }}
+      disabled={disabled}
       className={cn(
-        "inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 text-sm font-medium text-white transition-colors hover:border-white/30 hover:bg-black/70",
+        "inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 text-sm font-medium text-white transition-colors hover:border-white/30 hover:bg-black/72 disabled:opacity-35",
         className,
       )}
     >
