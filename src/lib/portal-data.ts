@@ -49,6 +49,15 @@ export interface GalleryRoom {
   images: GalleryImage[];
 }
 
+export interface ProjectPresentationSlide {
+  id: string;
+  src: string;
+  alt: string;
+  title: string;
+  subtitle: string;
+  description: string;
+}
+
 export type TodoPriority = "low" | "medium" | "high";
 export type TodoStatus = "pending" | "in-progress" | "completed";
 
@@ -102,6 +111,87 @@ export function getProjectDocument(project: ClientProject, documentId: string) {
   return project.sections
     .flatMap((section) => section.items)
     .find((item) => item.id === documentId);
+}
+
+function isProjectImageDocument(document: ProjectDocument) {
+  return document.kind === "image" || document.mimeType.startsWith("image/");
+}
+
+export function getProjectPresentationSlides(
+  project: ClientProject,
+): ProjectPresentationSlide[] {
+  const slides: ProjectPresentationSlide[] = [];
+
+  if (hasUsableUrl(project.heroImageUrl)) {
+    slides.push({
+      id: "hero",
+      src: project.heroImageUrl as string,
+      alt: project.title,
+      title: project.title,
+      subtitle: "Hero image",
+      description: project.overview,
+    });
+  }
+
+  for (const section of project.sections) {
+    let imageIndex = 0;
+
+    for (const document of section.items) {
+      if (!isProjectImageDocument(document)) {
+        continue;
+      }
+
+      const src = hasUsableUrl(document.viewerUrl)
+        ? (document.viewerUrl as string)
+        : hasUsableUrl(document.downloadUrl)
+          ? (document.downloadUrl as string)
+          : "";
+
+      if (!src) {
+        continue;
+      }
+
+      imageIndex += 1;
+
+      const roomNames = document.rooms
+        ?.map((room) => room.name.trim())
+        .filter(Boolean)
+        .join(", ") ?? "";
+      const title = document.title.trim() || `${section.title} ${imageIndex}`;
+      const subtitle = [section.title, document.version.trim()].filter(Boolean).join(" • ");
+      const description = [document.summary.trim(), roomNames].filter(Boolean).join(" • ");
+
+      slides.push({
+        id: `document:${document.id}`,
+        src,
+        alt: title,
+        title,
+        subtitle,
+        description,
+      });
+    }
+  }
+
+  for (const room of project.gallery) {
+    for (const image of room.images) {
+      if (!hasUsableUrl(image.src)) {
+        continue;
+      }
+
+      const title = image.caption.trim() || room.name.trim() || project.title;
+
+      slides.push({
+        id: `gallery:${room.id}:${image.id}`,
+        src: image.src,
+        alt: title,
+        title,
+        subtitle: room.name.trim() ? `Gallery • ${room.name.trim()}` : "Gallery",
+        description: image.caption.trim() || "",
+      });
+    }
+  }
+
+  return slides;
 }
 
 export function getProjectDocumentCount(project: ClientProject) {

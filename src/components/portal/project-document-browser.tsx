@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import { useCallback, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Download, Eye, FileDown, LoaderCircle } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Download, Expand, Eye, FileDown, LoaderCircle } from "lucide-react";
 
+import {
+  useProjectPresentation,
+} from "@/components/portal/project-presentation";
 import {
   exportSectionImagesToPdf,
   type PdfExportProgress,
@@ -436,6 +439,7 @@ function ImageDocumentStack({
 }) {
   const [pdfProgress, setPdfProgress] = useState<PdfExportProgress | null>(null);
   const hasSubCategories = sectionCategories.length > 0;
+  const { openPresentation } = useProjectPresentation();
 
   async function handleDownloadPdf() {
     setPdfProgress({ current: 0, total: documents.length });
@@ -470,11 +474,20 @@ function ImageDocumentStack({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {documents.length} รูปในหมวด {category.label}
         </p>
-        <button
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => openPresentation(`document:${documents[0]?.id ?? ""}`)}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+          >
+            <Expand className="size-4" />
+            Slide Presentation
+          </button>
+          <button
           onClick={handleDownloadPdf}
           disabled={isExporting}
           className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
@@ -490,7 +503,8 @@ function ImageDocumentStack({
               ดาวน์โหลดทั้งหมดเป็น PDF
             </>
           )}
-        </button>
+          </button>
+        </div>
       </div>
 
       {!hasSubCategories ? (
@@ -567,22 +581,27 @@ function ImageDocumentCard({
   index: number;
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
+  const { openPresentation } = useProjectPresentation();
   const previewUrl = getDocumentPreviewUrl(project, document);
   const hasDownload = hasUsableUrl(document.downloadUrl);
 
   return (
     <figure className="space-y-2">
       <div className="group relative overflow-hidden rounded-3xl bg-secondary">
-        <a href={previewUrl} target="_blank" rel="noreferrer">
+        <button
+          type="button"
+          onClick={() => openPresentation(`document:${document.id}`)}
+          className="block w-full text-left"
+        >
           <Image
             src={previewUrl}
             alt={document.title || `${category.label} ${index + 1}`}
             width={1200}
             height={800}
             unoptimized
-            className="block h-auto w-full"
+            className="block h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
           />
-        </a>
+        </button>
 
         {hasDownload ? (
           <a

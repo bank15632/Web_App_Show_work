@@ -1,10 +1,15 @@
+"use client";
+
 import Image from "next/image";
+
+import { useProjectPresentation } from "@/components/portal/project-presentation";
 import type { GalleryRoom } from "@/lib/portal-data";
 
 type VisibleGalleryRoom = GalleryRoom;
 
 export function ProjectGallery({ rooms }: { rooms: GalleryRoom[] }) {
   const visibleRooms = getVisibleGalleryRooms(rooms);
+  const { openPresentation } = useProjectPresentation();
 
   if (visibleRooms.length === 0) {
     return null;
@@ -34,16 +39,20 @@ export function ProjectGallery({ rooms }: { rooms: GalleryRoom[] }) {
               <div className="space-y-10">
                 {room.images.map((image) => (
                   <figure key={image.id} className="space-y-3">
-                    <div className="overflow-hidden rounded-2xl bg-secondary">
+                    <button
+                      type="button"
+                      onClick={() => openPresentation(`gallery:${room.id}:${image.id}`)}
+                      className="group block w-full overflow-hidden rounded-2xl bg-secondary text-left"
+                    >
                       <Image
                         src={image.src}
                         alt={image.caption || room.name}
                         width={1600}
                         height={1000}
                         unoptimized
-                        className="aspect-[16/10] w-full object-cover"
+                        className="aspect-[16/10] w-full object-cover transition-transform duration-300 group-hover:scale-[1.01]"
                       />
-                    </div>
+                    </button>
                     {image.caption ? (
                       <figcaption className="text-sm text-muted-foreground">
                         {image.caption}
