@@ -4,9 +4,7 @@ import type { ProjectDocument } from "@/lib/portal-data";
 
 export type PdfPageOrientation = "portrait" | "landscape";
 
-export interface PdfImagePlacement {
-  x: number;
-  y: number;
+export interface PdfPageFormat {
   width: number;
   height: number;
 }
@@ -56,41 +54,19 @@ export function getPdfPageOrientation(
   return imageWidth >= imageHeight ? "landscape" : "portrait";
 }
 
-export function getPdfImageCoverPlacement(
-  pageWidth: number,
-  pageHeight: number,
+export function getPdfPageFormat(
   imageWidth: number,
   imageHeight: number,
-): PdfImagePlacement {
-  const imageRatio = imageWidth / imageHeight;
-  const pageRatio = pageWidth / pageHeight;
-
-  if (imageRatio > pageRatio) {
-    const height = pageHeight;
-    const width = height * imageRatio;
-
-    return {
-      x: (pageWidth - width) / 2,
-      y: 0,
-      width,
-      height,
-    };
-  }
-
-  const width = pageWidth;
-  const height = width / imageRatio;
-
+): PdfPageFormat {
   return {
-    x: 0,
-    y: (pageHeight - height) / 2,
-    width,
-    height,
+    width: imageWidth,
+    height: imageHeight,
   };
 }
 
 /**
  * Collect all image documents from a section and export them as a single PDF.
- * Each image is placed on its own page and cropped to cover A4 without margins.
+ * Each image is placed on its own page using the image's native size.
  */
 export async function exportSectionImagesToPdf(
   documents: ProjectDocument[],
@@ -116,30 +92,30 @@ export async function exportSectionImagesToPdf(
     try {
       const img = await loadImage(dataUrl);
       const orientation = getPdfPageOrientation(img.naturalWidth, img.naturalHeight);
+      const pageFormat = getPdfPageFormat(img.naturalWidth, img.naturalHeight);
 
       if (!pdf) {
-        pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
+        pdf = new jsPDF({
+          orientation,
+          unit: "px",
+          format: [pageFormat.width, pageFormat.height],
+          hotfixes: ["px_scaling"],
+        });
       } else {
-        pdf.addPage("a4", orientation);
+        pdf.addPage([pageFormat.width, pageFormat.height], orientation);
       }
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const placement = getPdfImageCoverPlacement(
-        pageWidth,
-        pageHeight,
-        img.naturalWidth,
-        img.naturalHeight,
-      );
       const format = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
 
       pdf.addImage(
         dataUrl,
         format,
-        placement.x,
-        placement.y,
-        placement.width,
-        placement.height,
+        0,
+        0,
+        pageWidth,
+        pageHeight,
       );
       pagesAdded++;
     } catch {
