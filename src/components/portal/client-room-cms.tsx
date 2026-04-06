@@ -70,6 +70,24 @@ function mapProjectSummary(project: ClientRoomProjectRecord): ClientRoomProjectS
   };
 }
 
+export function resolveClientRoomSelection(
+  projects: Pick<ClientRoomProjectSummary, "id">[],
+  requestedProjectId?: string,
+  currentProjectId?: string,
+) {
+  const projectIds = new Set(projects.map((project) => project.id));
+
+  if (requestedProjectId && projectIds.has(requestedProjectId)) {
+    return requestedProjectId;
+  }
+
+  if (currentProjectId && projectIds.has(currentProjectId)) {
+    return currentProjectId;
+  }
+
+  return projects[0]?.id ?? "";
+}
+
 export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: string }) {
   const [projects, setProjects] = useState<ClientRoomProjectSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -90,19 +108,9 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
   const isUploading = uploadingTarget.length > 0;
 
   useEffect(() => {
-    void loadProjects();
+    void loadProjects(initialProjectId || undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const projectId = initialProjectId;
-    if (!projectId || projectId === selectedProjectId) {
-      return;
-    }
-
-    setSelectedProjectId(projectId);
-    void loadProject(projectId);
-  }, [initialProjectId, selectedProjectId]);
+  }, [initialProjectId]);
 
   async function loadProjects(nextProjectId?: string) {
     setIsLoadingProjects(true);
@@ -119,7 +127,11 @@ export function ClientRoomCms({ initialProjectId = "" }: { initialProjectId?: st
       }
 
       setProjects(data.projects);
-      const targetId = nextProjectId ?? selectedProjectId ?? data.projects[0]?.id ?? "";
+      const targetId = resolveClientRoomSelection(
+        data.projects,
+        nextProjectId,
+        selectedProjectId,
+      );
 
       if (targetId) {
         setSelectedProjectId(targetId);
