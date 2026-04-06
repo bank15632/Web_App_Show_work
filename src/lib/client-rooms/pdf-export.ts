@@ -2,6 +2,15 @@ import { jsPDF } from "jspdf";
 
 import type { ProjectDocument } from "@/lib/portal-data";
 
+export type PdfPageOrientation = "portrait" | "landscape";
+
+export interface PdfImagePlacement {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /**
  * Fetch an image URL and return it as a base64 data URL.
  * Returns null if the fetch fails.
@@ -40,9 +49,48 @@ export interface PdfExportProgress {
   total: number;
 }
 
+export function getPdfPageOrientation(
+  imageWidth: number,
+  imageHeight: number,
+): PdfPageOrientation {
+  return imageWidth >= imageHeight ? "landscape" : "portrait";
+}
+
+export function getPdfImageCoverPlacement(
+  pageWidth: number,
+  pageHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+): PdfImagePlacement {
+  const imageRatio = imageWidth / imageHeight;
+  const pageRatio = pageWidth / pageHeight;
+
+  if (imageRatio > pageRatio) {
+    const height = pageHeight;
+    const width = height * imageRatio;
+
+    return {
+      x: (pageWidth - width) / 2,
+      y: 0,
+      width,
+      height,
+    };
+  }
+
+  const width = pageWidth;
+  const height = width / imageRatio;
+
+  return {
+    x: 0,
+    y: (pageHeight - height) / 2,
+    width,
+    height,
+  };
+}
+
 /**
  * Collect all image documents from a section and export them as a single PDF.
- * Each image is placed on its own page, scaled to fit A4.
+ * Each image is placed on its own page and cropped to cover A4 without margins.
  */
 export async function exportSectionImagesToPdf(
   documents: ProjectDocument[],
@@ -56,13 +104,7 @@ export async function exportSectionImagesToPdf(
 
   if (imageUrls.length === 0) return;
 
-  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 10;
-  const contentWidth = pageWidth - margin * 2;
-  const contentHeight = pageHeight - margin * 2;
-
+  let pdf: jsPDF | null = null;
   let pagesAdded = 0;
 
   for (let i = 0; i < imageUrls.length; i++) {
@@ -73,37 +115,40 @@ export async function exportSectionImagesToPdf(
 
     try {
       const img = await loadImage(dataUrl);
-      const imgRatio = img.naturalWidth / img.naturalHeight;
-      const contentRatio = contentWidth / contentHeight;
+      const orientation = getPdfPageOrientation(img.naturalWidth, img.naturalHeight);
 
-      let drawWidth: number;
-      let drawHeight: number;
-
-      if (imgRatio > contentRatio) {
-        drawWidth = contentWidth;
-        drawHeight = contentWidth / imgRatio;
+      if (!pdf) {
+        pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
       } else {
-        drawHeight = contentHeight;
-        drawWidth = contentHeight * imgRatio;
+        pdf.addPage("a4", orientation);
       }
 
-      const x = margin + (contentWidth - drawWidth) / 2;
-      const y = margin + (contentHeight - drawHeight) / 2;
-
-      if (pagesAdded > 0) {
-        pdf.addPage();
-      }
-
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const placement = getPdfImageCoverPlacement(
+        pageWidth,
+        pageHeight,
+        img.naturalWidth,
+        img.naturalHeight,
+      );
       const format = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
-      pdf.addImage(dataUrl, format, x, y, drawWidth, drawHeight);
+
+      pdf.addImage(
+        dataUrl,
+        format,
+        placement.x,
+        placement.y,
+        placement.width,
+        placement.height,
+      );
       pagesAdded++;
     } catch {
       // Skip images that can't be loaded
     }
   }
 
-  if (pagesAdded === 0) return;
+  if (!pdf || pagesAdded === 0) return;
 
-  const safeName = `${projectTitle} - ${sectionLabel}`.replace(/[^a-zA-Z0-9ก-๙\s_-]/g, "").trim();
+  const safeName = `${projectTitle} - ${sectionLabel}`.replace(/[^a-zA-Z0-9\u0E01-\u0E59\s_-]/g, "").trim();
   pdf.save(`${safeName}.pdf`);
 }
