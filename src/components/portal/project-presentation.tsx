@@ -8,8 +8,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type TouchEvent,
   type ReactNode,
+  type TouchEvent,
 } from "react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 
@@ -24,7 +24,76 @@ type ProjectPresentationContextValue = {
   openPresentation: (slideId?: string) => void;
 };
 
+type FullscreenTarget = HTMLElement & {
+  requestFullscreen?: () => Promise<void>;
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void;
+  msExitFullscreen?: () => Promise<void> | void;
+  webkitFullscreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+};
+
 const ProjectPresentationContext = createContext<ProjectPresentationContextValue | null>(null);
+
+function getFullscreenElement(doc: FullscreenDocument) {
+  return (
+    doc.fullscreenElement ??
+    doc.webkitFullscreenElement ??
+    doc.msFullscreenElement ??
+    null
+  );
+}
+
+async function requestElementFullscreen(element: FullscreenTarget | null) {
+  if (!element) {
+    return false;
+  }
+
+  try {
+    if (element.requestFullscreen) {
+      await element.requestFullscreen();
+      return true;
+    }
+
+    if (element.webkitRequestFullscreen) {
+      await element.webkitRequestFullscreen();
+      return true;
+    }
+
+    if (element.msRequestFullscreen) {
+      await element.msRequestFullscreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
+async function exitElementFullscreen(doc: FullscreenDocument) {
+  try {
+    if (doc.exitFullscreen) {
+      await doc.exitFullscreen();
+      return;
+    }
+
+    if (doc.webkitExitFullscreen) {
+      await doc.webkitExitFullscreen();
+      return;
+    }
+
+    if (doc.msExitFullscreen) {
+      await doc.msExitFullscreen();
+    }
+  } catch {
+    // Ignore fullscreen exit failures and keep the overlay fallback visible.
+  }
+}
 
 export function ProjectPresentationProvider({
   project,
@@ -37,7 +106,10 @@ export function ProjectPresentationProvider({
   const hasSlides = slides.length > 0;
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
+  const ignoreNextTapRef = useRef(false);
+  const nativeFullscreenRef = useRef(false);
   const trapRef = useFocusTrap<HTMLDivElement>(isOpen);
 
   useEffect(() => {
@@ -45,8 +117,25 @@ export function ProjectPresentationProvider({
       return;
     }
 
+    const doc = document as FullscreenDocument;
     const previousOverflow = document.body.style.overflow;
+    let cancelled = false;
+
     document.body.style.overflow = "hidden";
+
+    if (!getFullscreenElement(doc)) {
+      void requestElementFullscreen(trapRef.current as FullscreenTarget | null).then((entered) => {
+        if (!cancelled) {
+          nativeFullscreenRef.current = entered;
+        }
+      });
+    } else {
+      nativeFullscreenRef.current = true;
+    }
+
+    if (cancelled) {
+      return;
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -67,13 +156,32 @@ export function ProjectPresentationProvider({
       }
     }
 
+    function handleFullscreenChange() {
+      if (nativeFullscreenRef.current && !getFullscreenElement(doc)) {
+        nativeFullscreenRef.current = false;
+        setIsOpen(false);
+      }
+    }
+
     window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange as EventListener);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange as EventListener);
 
     return () => {
+      cancelled = true;
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange as EventListener);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange as EventListener);
+
+      if (nativeFullscreenRef.current) {
+        nativeFullscreenRef.current = false;
+        void exitElementFullscreen(doc);
+      }
     };
-  }, [isOpen, slides.length]);
+  }, [isOpen, slides.length, trapRef]);
 
   function openPresentation(slideId?: string) {
     if (!hasSlides) {
@@ -85,10 +193,18 @@ export function ProjectPresentationProvider({
       : 0;
 
     setActiveIndex(nextIndex >= 0 ? nextIndex : 0);
+    setControlsVisible(false);
     setIsOpen(true);
+
+    if (typeof document !== "undefined") {
+      void requestElementFullscreen(document.documentElement as FullscreenTarget).then((entered) => {
+        nativeFullscreenRef.current = entered;
+      });
+    }
   }
 
   function closePresentation() {
+    setControlsVisible(false);
     setIsOpen(false);
   }
 
@@ -108,11 +224,21 @@ export function ProjectPresentationProvider({
     setActiveIndex((current) => (current + 1) % slides.length);
   }
 
-  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
-    touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
+  function toggleControls() {
+    if (ignoreNextTapRef.current) {
+      ignoreNextTapRef.current = false;
+      return;
+    }
+
+    setControlsVisible((current) => !current);
   }
 
-  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
+  function handleTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
+    ignoreNextTapRef.current = false;
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLButtonElement>) {
     const startX = touchStartXRef.current;
     touchStartXRef.current = null;
 
@@ -126,6 +252,8 @@ export function ProjectPresentationProvider({
     if (Math.abs(deltaX) < 40) {
       return;
     }
+
+    ignoreNextTapRef.current = true;
 
     if (deltaX < 0) {
       goToNextSlide();
@@ -149,121 +277,96 @@ export function ProjectPresentationProvider({
       {children}
 
       {isOpen && activeSlide ? (
-        <div className="fixed inset-0 z-[80] bg-black text-white">
+        <div className="fixed inset-0 z-[80] bg-black">
           <div
             ref={trapRef}
             role="dialog"
             aria-modal="true"
             aria-label="Slide presentation"
-            className="flex h-full flex-col"
+            className="relative h-full w-full overflow-hidden bg-black"
           >
-            <div className="flex items-center justify-between gap-4 px-4 py-4 md:px-6">
-              <div className="min-w-0">
-                <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/55">
-                  Slide Presentation
-                </p>
-                <p className="mt-1 text-sm text-white/80">
-                  {currentIndex + 1} / {slides.length}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closePresentation}
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 text-sm font-medium text-white transition-colors hover:border-white/30 hover:bg-white/15"
-              >
-                <X className="size-4" />
-                Close
-              </button>
-            </div>
-
-            <div
-              className="relative flex min-h-0 flex-1 items-center justify-center"
+            <button
+              type="button"
+              onClick={toggleControls}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
+              className="absolute inset-0 flex h-full w-full items-center justify-center bg-black"
+              aria-label={controlsVisible ? "Hide slide details" : "Show slide details"}
             >
-              <button
-                type="button"
-                onClick={goToPreviousSlide}
-                disabled={slides.length <= 1}
-                className="absolute inset-y-0 left-0 z-10 hidden w-24 md:block"
-                aria-label="Previous slide"
+              <Image
+                src={activeSlide.src}
+                alt={activeSlide.alt}
+                width={1600}
+                height={1200}
+                sizes="100vw"
+                unoptimized
+                priority
+                className="h-full w-full object-contain"
               />
-              <button
-                type="button"
-                onClick={goToNextSlide}
-                disabled={slides.length <= 1}
-                className="absolute inset-y-0 right-0 z-10 hidden w-24 md:block"
-                aria-label="Next slide"
-              />
+            </button>
 
-              <div className="flex h-full w-full items-center justify-center px-4 pb-24 pt-4 md:px-10 md:pb-28">
-                <Image
-                  src={activeSlide.src}
-                  alt={activeSlide.alt}
-                  width={1600}
-                  height={1200}
-                  unoptimized
-                  className="max-h-full max-w-full object-contain"
-                  priority
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-white/10 bg-black/70 px-4 py-4 backdrop-blur md:px-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/45">
-                    {activeSlide.subtitle}
-                  </p>
-                  <h2 className="mt-2 text-lg font-medium text-white md:text-2xl">
-                    {activeSlide.title}
-                  </h2>
-                  {activeSlide.description ? (
-                    <p className="mt-2 max-w-3xl text-sm leading-7 text-white/72">
-                      {activeSlide.description}
-                    </p>
-                  ) : null}
-                  {slides.length > 1 ? (
-                    <p className="mt-3 text-xs text-white/45">
-                      Swipe on mobile or use the navigation buttons to move between slides.
-                    </p>
-                  ) : null}
+            {controlsVisible ? (
+              <>
+                <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-end bg-gradient-to-b from-black/75 via-black/30 to-transparent px-4 pb-14 pt-4 md:px-6 md:pb-20 md:pt-6">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closePresentation();
+                    }}
+                    className="pointer-events-auto inline-flex size-12 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white transition-colors hover:border-white/30 hover:bg-black/70"
+                    aria-label="Close presentation"
+                  >
+                    <X className="size-5" />
+                  </button>
                 </div>
 
-                {slides.length > 1 ? (
-                  <div className="hidden items-center gap-2 md:flex">
-                    <PresentationNavButton
-                      label="Previous"
-                      onClick={goToPreviousSlide}
-                      icon={<ChevronLeft className="size-4" />}
-                    />
-                    <PresentationNavButton
-                      label="Next"
-                      onClick={goToNextSlide}
-                      icon={<ChevronRight className="size-4" />}
-                    />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pb-6 pt-16 md:px-6 md:pb-8 md:pt-24">
+                  <div className="flex items-end justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white/88">
+                        {currentIndex + 1} / {slides.length}
+                      </p>
+                      <h2 className="mt-1 truncate text-base font-medium text-white md:text-xl">
+                        {activeSlide.title}
+                      </h2>
+                    </div>
+
+                    {slides.length > 1 ? (
+                      <div className="pointer-events-auto hidden items-center gap-2 md:flex">
+                        <PresentationNavButton
+                          label="Previous"
+                          onClick={goToPreviousSlide}
+                          icon={<ChevronLeft className="size-4" />}
+                        />
+                        <PresentationNavButton
+                          label="Next"
+                          onClick={goToNextSlide}
+                          icon={<ChevronRight className="size-4" />}
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
 
-              {slides.length > 1 ? (
-                <div className="mt-4 grid grid-cols-2 gap-2 md:hidden">
-                  <PresentationNavButton
-                    label="Previous"
-                    onClick={goToPreviousSlide}
-                    icon={<ChevronLeft className="size-4" />}
-                    className="justify-center"
-                  />
-                  <PresentationNavButton
-                    label="Next"
-                    onClick={goToNextSlide}
-                    icon={<ChevronRight className="size-4" />}
-                    className="justify-center"
-                  />
+                  {slides.length > 1 ? (
+                    <div className="pointer-events-auto mt-4 grid grid-cols-2 gap-2 md:hidden">
+                      <PresentationNavButton
+                        label="Previous"
+                        onClick={goToPreviousSlide}
+                        icon={<ChevronLeft className="size-4" />}
+                        className="justify-center"
+                      />
+                      <PresentationNavButton
+                        label="Next"
+                        onClick={goToNextSlide}
+                        icon={<ChevronRight className="size-4" />}
+                        className="justify-center"
+                      />
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
+              </>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -329,9 +432,12 @@ function PresentationNavButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       className={cn(
-        "inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 text-sm font-medium text-white transition-colors hover:border-white/30 hover:bg-white/15",
+        "inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-black/55 px-4 text-sm font-medium text-white transition-colors hover:border-white/30 hover:bg-black/70",
         className,
       )}
     >
