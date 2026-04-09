@@ -349,6 +349,7 @@ export function ProjectPresentationProvider({
                       width={1600}
                       height={1200}
                       sizes="100vw"
+                      unoptimized
                       loading={Math.abs(index - currentIndex) <= 1 ? "eager" : "lazy"}
                       priority={index === currentIndex}
                       draggable={false}

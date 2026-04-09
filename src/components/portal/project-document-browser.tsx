@@ -598,7 +598,7 @@ function ImageDocumentCard({
             alt={document.title || `${category.label} ${index + 1}`}
             width={1200}
             height={800}
-            sizes="(max-width: 768px) 100vw, 1280px"
+            unoptimized
             className="block h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
           />
         </button>
