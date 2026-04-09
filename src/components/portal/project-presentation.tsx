@@ -337,7 +337,7 @@ export function ProjectPresentationProvider({
                   transition: isDragging ? "none" : "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
-                {slides.map((slide) => (
+                {slides.map((slide, index) => (
                   <div
                     key={slide.id}
                     className="flex h-full shrink-0 items-center justify-center bg-black"
@@ -349,8 +349,8 @@ export function ProjectPresentationProvider({
                       width={1600}
                       height={1200}
                       sizes="100vw"
-                      unoptimized
-                      priority
+                      loading={Math.abs(index - currentIndex) <= 1 ? "eager" : "lazy"}
+                      priority={index === currentIndex}
                       draggable={false}
                       className="h-full w-full select-none object-contain"
                     />

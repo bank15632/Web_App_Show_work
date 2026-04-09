@@ -50,7 +50,7 @@ export function ProjectRoomView({ project }: { project: ClientProject }) {
                     alt={project.title}
                     width={1600}
                     height={900}
-                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 1280px"
                     className="aspect-[16/9] w-full object-cover"
                   />
                 ) : (
